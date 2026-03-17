@@ -6,6 +6,9 @@ ROUTING = {
     "nextjs": "gemini",
     "fastapi": "claude",
     "both": "claude",
+    "python-cli": "claude",
+    "ts-package": "claude",
+    "python-worker": "claude",
 }
 
 FALLBACK_ORDER = ("claude", "gemini", "codex")

@@ -17,6 +17,18 @@ def test_both_routes_to_claude():
     assert pick_backend("both") == "claude"
 
 
+def test_python_cli_routes_to_claude():
+    assert pick_backend("python-cli") == "claude"
+
+
+def test_ts_package_routes_to_claude():
+    assert pick_backend("ts-package") == "claude"
+
+
+def test_python_worker_routes_to_claude():
+    assert pick_backend("python-worker") == "claude"
+
+
 def test_unknown_stack_defaults_to_claude():
     assert pick_backend("unknown") == "claude"
 

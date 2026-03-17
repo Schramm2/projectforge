@@ -25,11 +25,19 @@ STACK_ALIASES = {
     "next": "nextjs",
     "react": "nextjs",
     "fastapi": "fastapi",
-    "python": "fastapi",
     "api": "fastapi",
     "both": "both",
     "fullstack": "both",
     "monorepo": "both",
+    "python-cli": "python-cli",
+    "cli": "python-cli",
+    "typer": "python-cli",
+    "ts-package": "ts-package",
+    "npm-package": "ts-package",
+    "library": "ts-package",
+    "python-worker": "python-worker",
+    "worker": "python-worker",
+    "service": "python-worker",
 }
 
 
@@ -59,7 +67,7 @@ def main(
         str | None,
         typer.Option(
             "--stack", "-s",
-            help="Stack selection: nextjs, fastapi, or both (skips interactive prompt).",
+            help="Stack: nextjs, fastapi, both, python-cli, ts-package, python-worker.",
         ),
     ] = None,
     description: Annotated[
@@ -73,6 +81,13 @@ def main(
     extra: Annotated[
         str | None,
         typer.Option("--extra", "-e", help="Extra instructions for the AI."),
+    ] = None,
+    services: Annotated[
+        str | None,
+        typer.Option(
+            "--services",
+            help="Comma-separated services to include (e.g. 'Clerk,PostgreSQL').",
+        ),
     ] = None,
     verbose: Annotated[
         bool,
@@ -110,11 +125,13 @@ def main(
             console.print(f"[red]Unknown stack '{stack}'. Choose from: {valid}[/red]")
             raise typer.Exit(1)
 
-        answers: dict[str, str | bool] = {
+        svc_list = [s.strip() for s in services.split(",")] if services else []
+        answers: dict = {
             "name": name.strip(),
             "stack": resolved_stack,
             "description": description.strip(),
             "docker": docker if docker is not None else True,
+            "services": svc_list,
             "extra": (extra or "").strip(),
         }
     else:

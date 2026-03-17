@@ -4,10 +4,15 @@ import re
 
 import questionary
 
+from forge.stacks import STACK_META
+
 STACK_CHOICES = [
     questionary.Choice("Next.js + React (frontend or fullstack)", value="nextjs"),
     questionary.Choice("Python API (FastAPI)", value="fastapi"),
     questionary.Choice("Both (Next.js frontend + FastAPI backend)", value="both"),
+    questionary.Choice("Python CLI Tool (Typer + Rich)", value="python-cli"),
+    questionary.Choice("TypeScript npm Package", value="ts-package"),
+    questionary.Choice("Python Worker / Scheduled Service", value="python-worker"),
 ]
 
 
@@ -23,7 +28,25 @@ def _validate_project_name(name: str) -> bool | str:
     return True
 
 
-def collect_answers() -> dict[str, str | bool]:
+def _ask_services(stack: str) -> list[str]:
+    """Ask the user which services to include, based on the stack's typical services."""
+    meta = STACK_META.get(stack)
+    if not meta or not meta.services:
+        return []
+
+    choices = [questionary.Choice(s, value=s) for s in meta.services]
+    selected = questionary.checkbox(
+        "Include any of these services? (space to select, enter to confirm):",
+        choices=choices,
+    ).ask()
+
+    if selected is None:
+        raise SystemExit(0)
+
+    return selected
+
+
+def collect_answers() -> dict:
     """Run the interactive prompt flow and return answers as a dict."""
     name = questionary.text(
         "Project name:",
@@ -47,6 +70,8 @@ def collect_answers() -> dict[str, str | bool]:
     if docker is None:
         raise SystemExit(0)
 
+    services = _ask_services(stack)
+
     extra = questionary.text(
         "Any extra instructions? (optional, press Enter to skip):",
         default="",
@@ -59,5 +84,6 @@ def collect_answers() -> dict[str, str | bool]:
         "stack": stack,
         "description": description.strip(),
         "docker": docker,
+        "services": services,
         "extra": extra.strip(),
     }
