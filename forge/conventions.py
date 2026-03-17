@@ -55,13 +55,32 @@ Follow these conventions when generating any project files.
 """
 
 
-def load_conventions() -> str:
-    """Load conventions from ~/.forge/conventions.md, creating defaults if missing."""
+MIN_CONVENTIONS_LENGTH = 50
+
+
+def load_conventions() -> tuple[str, list[str]]:
+    """Load conventions from ~/.forge/conventions.md, creating defaults if missing.
+
+    Returns:
+        Tuple of (conventions_content, warnings).
+    """
+    warnings: list[str] = []
+
     if not CONVENTIONS_PATH.exists():
         FORGE_DIR.mkdir(parents=True, exist_ok=True)
         CONVENTIONS_PATH.write_text(DEFAULT_CONVENTIONS)
+        warnings.append("Created default conventions at ~/.forge/conventions.md")
 
-    return CONVENTIONS_PATH.read_text()
+    content = CONVENTIONS_PATH.read_text()
+
+    if not content.strip():
+        warnings.append("Conventions file is empty — scaffolds will lack guidance.")
+    elif len(content.strip()) < MIN_CONVENTIONS_LENGTH:
+        warnings.append(
+            "Conventions file is very short — consider adding more detail."
+        )
+
+    return content, warnings
 
 
 def load_claude_md_template() -> str | None:

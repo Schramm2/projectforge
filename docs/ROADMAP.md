@@ -2,13 +2,15 @@
 
 Ideas for expanding Forge into a production-grade Ubundi project scaffolder. Organized by theme, not priority.
 
+Items marked with [DONE] have been implemented.
+
 ---
 
 ## Smarter AI Routing
 
 - **Quality-based routing**: Track which backend produces better results per stack over time. Store simple success/failure signals after each scaffold and shift routing weights accordingly.
-- **Model selection per backend**: Let users specify a model preference (e.g. `--model opus` for Claude, `--model flash` for Gemini) that gets passed through to the subprocess.
-- **Fallback chain**: If the primary backend isn't installed, automatically try the next best option instead of erroring out.
+- [DONE] **Model selection per backend**: `--model opus` passes the model flag through to the AI CLI subprocess.
+- [DONE] **Fallback chain**: If the primary backend isn't installed, automatically try the next available (claude → gemini → codex).
 - **Cost-aware routing**: For backends with usage-based pricing, optionally prefer cheaper options for simple scaffolds.
 
 ---
@@ -18,7 +20,7 @@ Ideas for expanding Forge into a production-grade Ubundi project scaffolder. Org
 - **Named convention profiles**: `forge --conventions fintech-client` loads `~/.forge/conventions/fintech-client.md` instead of the default. Different clients, different standards.
 - **Convention composition**: Stack multiple convention files — a base `ubundi.md` plus a client-specific overlay.
 - **Project-local conventions**: Check for a `.forge/conventions.md` in the current directory first, then fall back to `~/.forge/conventions.md`. Useful for monorepos with sub-project conventions.
-- **Convention validation**: Warn if the conventions file is empty or suspiciously short.
+- [DONE] **Convention validation**: Warns if the conventions file is empty or suspiciously short.
 
 ---
 
@@ -49,7 +51,7 @@ Ideas for expanding Forge into a production-grade Ubundi project scaffolder. Org
 ## Post-Scaffold Automation
 
 - **Auto-install dependencies**: After the AI finishes, detect package.json / pyproject.toml and run the install automatically.
-- **Auto-open in editor**: `forge --open` opens the new project in VS Code / Cursor after scaffolding.
+- [DONE] **Auto-open in editor**: `forge --open` opens the new project in Cursor or VS Code after scaffolding.
 - **Auto-git-init**: Verify git was initialized, make the initial commit if the AI didn't.
 - **Post-scaffold hooks**: User-defined scripts in `~/.forge/hooks/post-scaffold.sh` that run after every scaffold (e.g. configure git remote, set up pre-commit hooks, copy .env from a vault).
 - **Health check**: After scaffolding, attempt to run the project's dev server briefly to verify it actually works.
@@ -61,8 +63,8 @@ Ideas for expanding Forge into a production-grade Ubundi project scaffolder. Org
 - **Saved presets**: `forge --save-preset api-starter` saves your current answers. Next time: `forge --preset api-starter` skips the questions entirely.
 - **Recent projects**: `forge --last` repeats the most recent scaffold with the same settings but a new name.
 - **Prompt editor**: `forge --edit-prompt` opens the assembled prompt in $EDITOR before sending it, so you can tweak it.
-- **Progress display**: Show a Rich progress bar or spinner while the AI CLI is working, with elapsed time.
-- **Non-interactive mode**: `forge --name pulse --stack fastapi --description "health API" --no-docker` for scripting and CI.
+- [DONE] **Progress display**: Rich spinner with elapsed time while the AI CLI is working.
+- [DONE] **Non-interactive mode**: `forge --name pulse --stack fastapi --description "health API" --no-docker` for scripting and CI.
 
 ---
 
@@ -87,7 +89,7 @@ Ideas for expanding Forge into a production-grade Ubundi project scaffolder. Org
 
 - **Shared conventions via git**: `forge conventions pull git@github.com:ubundi/conventions.git` syncs team conventions from a shared repo.
 - **Convention locking**: `forge conventions lock` snapshots the current conventions so scaffolds are reproducible even if the file changes later.
-- **Export scaffold prompt**: `forge --export prompt.md` saves the assembled prompt to a file for sharing or debugging.
+- [DONE] **Export scaffold prompt**: `forge --export prompt.md` saves the assembled prompt to a file for sharing or debugging.
 
 ---
 
@@ -95,7 +97,7 @@ Ideas for expanding Forge into a production-grade Ubundi project scaffolder. Org
 
 - **Plugin system**: Third-party plugins that add new stacks, backends, or post-scaffold hooks. Simple Python entry points.
 - **Shell completions**: Tab completion for `--use`, `--stack`, `--preset`, `--conventions` values.
-- **Verbose mode**: `forge --verbose` shows exactly what's happening — which files are being loaded, the full subprocess command, timing.
+- [DONE] **Verbose mode**: `forge --verbose` shows the full subprocess command, conventions file size, prompt length, and execution timing.
 - **Config file**: `~/.forge/config.toml` for persistent preferences (default backend, default Docker=yes, preferred editor, etc).
 - **Update checker**: Notify when a new version of Forge is available.
 
