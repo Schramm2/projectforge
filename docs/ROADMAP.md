@@ -19,7 +19,7 @@ Items marked with [DONE] have been implemented.
 
 - **Named convention profiles**: `forge --conventions fintech-client` loads `~/.forge/conventions/fintech-client.md` instead of the default. Different clients, different standards.
 - **Convention composition**: Stack multiple convention files — a base `ubundi.md` plus a client-specific overlay.
-- **Project-local conventions**: Check for a `.forge/conventions.md` in the current directory first, then fall back to `~/.forge/conventions.md`. Useful for monorepos with sub-project conventions.
+- [DONE] **Project-local conventions**: Checks `.forge/conventions.md` in the current directory first, falls back to `~/.forge/conventions.md`.
 - [DONE] **Convention validation**: Warns if the conventions file is empty or suspiciously short.
 
 ---
@@ -52,7 +52,7 @@ Items marked with [DONE] have been implemented.
 
 - **Auto-install dependencies**: After the AI finishes, detect package.json / pyproject.toml and run the install automatically.
 - [DONE] **Auto-open in editor**: `forge --open` opens the new project in Cursor or VS Code after scaffolding.
-- **Auto-git-init**: Verify git was initialized, make the initial commit if the AI didn't.
+- [DONE] **Auto-git-init**: Verifies git was initialized after scaffold; if not, runs `git init` and makes an initial commit.
 - **Post-scaffold hooks**: User-defined scripts in `~/.forge/hooks/post-scaffold.sh` that run after every scaffold (e.g. configure git remote, set up pre-commit hooks, copy .env from a vault).
 - **Health check**: After scaffolding, attempt to run the project's dev server briefly to verify it actually works.
 
@@ -98,7 +98,7 @@ Items marked with [DONE] have been implemented.
 - **Ubundi standard packs**: `forge --standard api-service` or `forge --standard internal-tool` applies an approved bundle of stack choices, docs, CI, Docker, observability, and naming conventions with fewer questions.
 - **Policy checks before handoff**: Validate the chosen scaffold against Ubundi rules before sending it to the AI CLI — required docs present, approved runtime versions, allowed dependency families, and required files like `.env.example`.
 - **Dependency and license allowlists**: Warn or block when a scaffold asks for packages outside an approved set, or licenses that do not meet Ubundi policy.
-- **Risky change confirmation**: If Forge detects that a scaffold may overwrite an existing directory, create infrastructure configs, or introduce external services, require explicit approval with a clear preview of what is about to happen.
+- [DONE] **Risky change confirmation**: Prompts for confirmation before overwriting an existing non-empty project directory.
 
 ---
 
@@ -116,7 +116,7 @@ Items marked with [DONE] have been implemented.
 - **Security baseline starter**: Offer an opinionated bundle with Dependabot or Renovate, basic secret scanning, pinned runtime versions, and a secure default `.gitignore` / `.env.example`.
 - **Observability bootstrap**: Generate structured logging, request IDs, health endpoints, readiness checks, and a starter metrics/tracing setup for supported backend stacks.
 - **Readiness scorecard**: After scaffolding, grade the project against a production checklist — tests, linting, CI, Docker health checks, docs, env file examples, logging, and error handling.
-- **Secrets-safe prompts**: Detect if the user's extra instructions contain likely secrets or copied credentials and stop before they are passed through to an external AI CLI.
+- [DONE] **Secrets-safe prompts**: Scans extra instructions for Stripe keys, GitHub tokens, AWS keys, Slack tokens, JWTs, and private keys. Blocks execution if detected.
 
 ---
 

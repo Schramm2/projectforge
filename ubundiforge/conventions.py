@@ -58,20 +58,29 @@ Follow these conventions when generating any project files.
 MIN_CONVENTIONS_LENGTH = 50
 
 
+LOCAL_CONVENTIONS_PATH = Path.cwd() / ".forge" / "conventions.md"
+
+
 def load_conventions() -> tuple[str, list[str]]:
-    """Load conventions from ~/.forge/conventions.md, creating defaults if missing.
+    """Load conventions, checking local .forge/conventions.md first, then ~/.forge/.
 
     Returns:
         Tuple of (conventions_content, warnings).
     """
     warnings: list[str] = []
 
-    if not CONVENTIONS_PATH.exists():
-        FORGE_DIR.mkdir(parents=True, exist_ok=True)
-        CONVENTIONS_PATH.write_text(DEFAULT_CONVENTIONS)
-        warnings.append("Created default conventions at ~/.forge/conventions.md")
+    # Check for project-local conventions first
+    if LOCAL_CONVENTIONS_PATH.exists():
+        source = LOCAL_CONVENTIONS_PATH
+        warnings.append(f"Using local conventions from {LOCAL_CONVENTIONS_PATH}")
+    else:
+        source = CONVENTIONS_PATH
+        if not source.exists():
+            FORGE_DIR.mkdir(parents=True, exist_ok=True)
+            source.write_text(DEFAULT_CONVENTIONS)
+            warnings.append("Created default conventions at ~/.forge/conventions.md")
 
-    content = CONVENTIONS_PATH.read_text()
+    content = source.read_text()
 
     if not content.strip():
         warnings.append("Conventions file is empty — scaffolds will lack guidance.")

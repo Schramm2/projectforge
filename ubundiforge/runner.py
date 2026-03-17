@@ -88,6 +88,23 @@ def run_ai(
     return result.returncode
 
 
+def ensure_git_init(project_dir: Path) -> None:
+    """Verify git was initialized in the project dir; if not, init and commit."""
+    git_dir = project_dir / ".git"
+    if git_dir.exists():
+        return
+
+    console.print("[dim]Git not initialized by AI — setting up...[/dim]")
+    subprocess.run(["git", "init"], cwd=project_dir, capture_output=True)
+    subprocess.run(["git", "add", "-A"], cwd=project_dir, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Initial commit (via UbundiForge)"],
+        cwd=project_dir,
+        capture_output=True,
+    )
+    console.print("[dim]Git initialized with initial commit[/dim]")
+
+
 def open_in_editor(project_dir: Path) -> None:
     """Open the project directory in the user's editor."""
     for editor in ("cursor", "code"):

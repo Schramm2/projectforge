@@ -14,7 +14,8 @@ from ubundiforge.logo import print_logo
 from ubundiforge.prompt_builder import build_prompt
 from ubundiforge.prompts import collect_answers
 from ubundiforge.router import pick_backend_with_fallback
-from ubundiforge.runner import open_in_editor, run_ai
+from ubundiforge.runner import ensure_git_init, open_in_editor, run_ai
+from ubundiforge.safety import check_for_secrets
 
 app = typer.Typer(add_completion=False)
 console = Console()
@@ -177,6 +178,19 @@ def main(
     if claude_md_template:
         console.print("[dim]Loaded CLAUDE.md template[/dim]")
 
+    # Check extra instructions for secrets
+    extra_text = answers.get("extra", "")
+    if extra_text:
+        secret_warnings = check_for_secrets(extra_text)
+        if secret_warnings:
+            types = ", ".join(secret_warnings)
+            console.print(
+                f"\n[red bold]Possible secrets detected in extra instructions: "
+                f"{types}[/red bold]"
+                "\n[red]Remove credentials before passing them to an AI CLI.[/red]"
+            )
+            raise typer.Exit(1)
+
     # Build prompt
     prompt = build_prompt(answers, conventions, claude_md_template)
 
@@ -197,10 +211,26 @@ def main(
 
     # Run
     project_dir = Path.cwd() / answers["name"]
+
+    # Check if directory already exists
+    if project_dir.exists() and any(project_dir.iterdir()):
+        console.print(
+            f"\n[yellow bold]{project_dir} already exists and is not empty.[/yellow bold]"
+        )
+        import questionary
+
+        confirm = questionary.confirm(
+            "Overwrite existing directory?", default=False
+        ).ask()
+        if not confirm:
+            console.print("[dim]Aborted.[/dim]")
+            raise typer.Exit(0)
+
     console.print(f"[dim]Handing off to {backend}...[/dim]\n")
     returncode = run_ai(backend, prompt, project_dir, model=model, verbose=verbose)
 
     if returncode == 0:
+        ensure_git_init(project_dir)
         console.print(
             f"\n[green bold]Done![/green bold] "
             f"Project created at [bold]{project_dir}[/bold]"
