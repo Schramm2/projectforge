@@ -1,6 +1,6 @@
 """Assembles the prompt string that gets piped into the AI CLI."""
 
-from forge.stacks import STACK_META
+from ubundiforge.stacks import STACK_META
 
 STACK_LABELS = {
     "nextjs": "Next.js + React",

@@ -1,13 +1,13 @@
 """Tests for convention loading and validation."""
 
-from forge.conventions import MIN_CONVENTIONS_LENGTH, load_conventions
+from ubundiforge.conventions import MIN_CONVENTIONS_LENGTH, load_conventions
 
 
 def test_empty_conventions_warns(tmp_path, monkeypatch):
     conv_path = tmp_path / "conventions.md"
     conv_path.write_text("")
-    monkeypatch.setattr("forge.conventions.CONVENTIONS_PATH", conv_path)
-    monkeypatch.setattr("forge.conventions.FORGE_DIR", tmp_path)
+    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", conv_path)
+    monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path)
 
     content, warnings = load_conventions()
     assert content == ""
@@ -17,8 +17,8 @@ def test_empty_conventions_warns(tmp_path, monkeypatch):
 def test_short_conventions_warns(tmp_path, monkeypatch):
     conv_path = tmp_path / "conventions.md"
     conv_path.write_text("short")
-    monkeypatch.setattr("forge.conventions.CONVENTIONS_PATH", conv_path)
-    monkeypatch.setattr("forge.conventions.FORGE_DIR", tmp_path)
+    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", conv_path)
+    monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path)
 
     content, warnings = load_conventions()
     assert len(content.strip()) < MIN_CONVENTIONS_LENGTH
@@ -28,8 +28,8 @@ def test_short_conventions_warns(tmp_path, monkeypatch):
 def test_valid_conventions_no_warnings(tmp_path, monkeypatch):
     conv_path = tmp_path / "conventions.md"
     conv_path.write_text("x" * 100)
-    monkeypatch.setattr("forge.conventions.CONVENTIONS_PATH", conv_path)
-    monkeypatch.setattr("forge.conventions.FORGE_DIR", tmp_path)
+    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", conv_path)
+    monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path)
 
     content, warnings = load_conventions()
     assert len(content) == 100
@@ -38,8 +38,8 @@ def test_valid_conventions_no_warnings(tmp_path, monkeypatch):
 
 def test_missing_conventions_creates_default(tmp_path, monkeypatch):
     conv_path = tmp_path / "conventions.md"
-    monkeypatch.setattr("forge.conventions.CONVENTIONS_PATH", conv_path)
-    monkeypatch.setattr("forge.conventions.FORGE_DIR", tmp_path)
+    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", conv_path)
+    monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path)
 
     assert not conv_path.exists()
     content, warnings = load_conventions()

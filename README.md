@@ -1,6 +1,6 @@
-# Forge
+# UbundiForge
 
-Forge is a Python CLI that scaffolds new projects with AI coding tools while baking in your Ubundi conventions from the start. It collects a few project details, chooses an AI backend, assembles a structured prompt, and hands off generation to Claude Code, Gemini CLI, or Codex.
+UbundiForge is a Python CLI that scaffolds new projects with AI coding tools while baking in your Ubundi conventions from the start. It collects a few project details, chooses an AI backend, assembles a structured prompt, and hands off generation to Claude Code, Gemini CLI, or Codex.
 
 ## What It Does
 
@@ -19,13 +19,13 @@ Forge is a Python CLI that scaffolds new projects with AI coding tools while bak
 
 ## Backend Routing
 
-By default, Forge uses:
+By default, UbundiForge uses:
 
 - `gemini` for Next.js projects
 - `claude` for FastAPI projects
 - `claude` for combined frontend/backend projects
 
-If the primary backend isn't installed, Forge automatically falls back to the next available one (claude → gemini → codex).
+If the primary backend isn't installed, UbundiForge automatically falls back to the next available one (claude -> gemini -> codex).
 
 You can override the routing with `--use`.
 
@@ -123,7 +123,7 @@ forge --version
 
 ## How It Works
 
-1. Forge collects answers through an interactive terminal flow (or CLI flags).
+1. UbundiForge collects answers through an interactive terminal flow (or CLI flags).
 2. It loads your shared conventions and optional `CLAUDE.md` template.
 3. It builds a single scaffold prompt tailored to the chosen stack.
 4. It picks the best AI backend (with automatic fallback if needed).
@@ -133,7 +133,7 @@ forge --version
 
 ```text
 forge/
-├── forge/
+├── ubundiforge/
 │   ├── cli.py
 │   ├── config.py
 │   ├── conventions.py
@@ -159,11 +159,11 @@ uv run pytest
 Run Ruff:
 
 ```bash
-uv run ruff check forge/ tests/
+uv run ruff check ubundiforge/ tests/
 ```
 
 ## Notes
 
-- Forge expects external AI CLIs to already be installed and available on `PATH`.
-- Conventions are loaded from `~/.forge/conventions.md`. If that file does not exist, Forge creates it with defaults. Forge warns if the conventions file is empty or very short.
-- The bundled `CLAUDE.md` template is loaded from `forge/templates/claude-md-template.md`.
+- UbundiForge expects external AI CLIs to already be installed and available on `PATH`.
+- Conventions are loaded from `~/.forge/conventions.md`. If that file does not exist, UbundiForge creates it with defaults. UbundiForge warns if the conventions file is empty or very short.
+- The bundled `CLAUDE.md` template is loaded from `ubundiforge/templates/claude-md-template.md`.

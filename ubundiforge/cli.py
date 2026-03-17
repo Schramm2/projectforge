@@ -1,4 +1,4 @@
-"""Forge CLI — entry point."""
+"""UbundiForge CLI — entry point."""
 
 from pathlib import Path
 from typing import Annotated
@@ -7,14 +7,14 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 
-from forge import __version__
-from forge.config import SUPPORTED_BACKENDS, check_backend_installed
-from forge.conventions import load_claude_md_template, load_conventions
-from forge.logo import print_logo
-from forge.prompt_builder import build_prompt
-from forge.prompts import collect_answers
-from forge.router import pick_backend_with_fallback
-from forge.runner import open_in_editor, run_ai
+from ubundiforge import __version__
+from ubundiforge.config import SUPPORTED_BACKENDS, check_backend_installed
+from ubundiforge.conventions import load_claude_md_template, load_conventions
+from ubundiforge.logo import print_logo
+from ubundiforge.prompt_builder import build_prompt
+from ubundiforge.prompts import collect_answers
+from ubundiforge.router import pick_backend_with_fallback
+from ubundiforge.runner import open_in_editor, run_ai
 
 app = typer.Typer(add_completion=False)
 console = Console()
@@ -102,9 +102,9 @@ def main(
         typer.Option("--export", help="Export assembled prompt to a file."),
     ] = None,
 ) -> None:
-    """Forge — Ubundi Project Scaffolder. Scaffold projects with AI + your conventions."""
+    """UbundiForge — Ubundi Project Scaffolder. Scaffold projects with AI + your conventions."""
     if version:
-        console.print(f"forge {__version__}")
+        console.print(f"ubundiforge {__version__}")
         raise typer.Exit()
 
     if use and use not in SUPPORTED_BACKENDS:
@@ -115,7 +115,7 @@ def main(
         raise typer.Exit(1)
 
     print_logo(console)
-    console.print(Panel("[bold]Forge[/bold] -- Ubundi Project Scaffolder", style="cyan"))
+    console.print(Panel("[bold]UbundiForge[/bold] -- Ubundi Project Scaffolder", style="cyan"))
 
     # Non-interactive mode: all required flags provided
     if name and stack and description:
@@ -141,7 +141,7 @@ def main(
     backend, was_fallback = pick_backend_with_fallback(answers["stack"], override=use)
 
     if was_fallback:
-        from forge.router import pick_backend
+        from ubundiforge.router import pick_backend
 
         primary = pick_backend(answers["stack"], override=use)
         console.print(

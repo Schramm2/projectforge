@@ -93,6 +93,42 @@ Items marked with [DONE] have been implemented.
 
 ---
 
+## Governance & Guardrails
+
+- **Ubundi standard packs**: `forge --standard api-service` or `forge --standard internal-tool` applies an approved bundle of stack choices, docs, CI, Docker, observability, and naming conventions with fewer questions.
+- **Policy checks before handoff**: Validate the chosen scaffold against Ubundi rules before sending it to the AI CLI — required docs present, approved runtime versions, allowed dependency families, and required files like `.env.example`.
+- **Dependency and license allowlists**: Warn or block when a scaffold asks for packages outside an approved set, or licenses that do not meet Ubundi policy.
+- **Risky change confirmation**: If Forge detects that a scaffold may overwrite an existing directory, create infrastructure configs, or introduce external services, require explicit approval with a clear preview of what is about to happen.
+
+---
+
+## Reproducibility & Auditability
+
+- **Scaffold manifest**: Write a `.forge/scaffold.json` file containing the stack, backend, model, prompt hash, conventions hash, selected templates, and timestamp so every generated project has traceable provenance.
+- **Replay exact scaffold**: `forge replay <project-or-log-id>` re-runs a scaffold with the original inputs and locked conventions for debugging, comparison, or regeneration.
+- **Decision log**: Record which defaults were accepted, which were overridden, and which warnings were ignored so teams can understand why a project deviates from the golden path.
+- **Prompt + output bundle**: `forge bundle` saves the assembled prompt, manifest, backend choice, and validation results into one artifact for review, support, or future audits.
+
+---
+
+## Security & Production Readiness
+
+- **Security baseline starter**: Offer an opinionated bundle with Dependabot or Renovate, basic secret scanning, pinned runtime versions, and a secure default `.gitignore` / `.env.example`.
+- **Observability bootstrap**: Generate structured logging, request IDs, health endpoints, readiness checks, and a starter metrics/tracing setup for supported backend stacks.
+- **Readiness scorecard**: After scaffolding, grade the project against a production checklist — tests, linting, CI, Docker health checks, docs, env file examples, logging, and error handling.
+- **Secrets-safe prompts**: Detect if the user's extra instructions contain likely secrets or copied credentials and stop before they are passed through to an external AI CLI.
+
+---
+
+## Internal Platform Integration
+
+- **GitHub repo bootstrap**: `forge --create-repo` creates the repository, sets visibility, applies branch protection defaults, adds CODEOWNERS, and seeds labels or issue templates.
+- **Ubundi project naming rules**: Enforce or suggest naming conventions for repos, packages, Docker images, and service names so new projects line up with internal standards automatically.
+- **Internal service presets**: Pre-configured options for Ubundi's most common internal builds — API service, worker, CLI utility, research prototype, npm package — each with the right defaults and docs.
+- **Environment bootstrap**: Generate environment-specific config scaffolds for `local`, `staging`, and `prod`, including example variable files and a clear promotion path between them.
+
+---
+
 ## Developer Experience
 
 - **Plugin system**: Third-party plugins that add new stacks, backends, or post-scaffold hooks. Simple Python entry points.

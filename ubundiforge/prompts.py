@@ -4,7 +4,7 @@ import re
 
 import questionary
 
-from forge.stacks import STACK_META
+from ubundiforge.stacks import STACK_META
 
 STACK_CHOICES = [
     questionary.Choice("Next.js + React (frontend or fullstack)", value="nextjs"),

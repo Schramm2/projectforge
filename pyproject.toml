@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "forge-cli"
+name = "ubundiforge"
 version = "0.1.0"
 description = "A CLI wrapper that scaffolds new projects using AI coding tools with your conventions baked in."
 readme = "README.md"
@@ -16,10 +16,10 @@ dependencies = [
 ]
 
 [project.scripts]
-forge = "forge.cli:app"
+forge = "ubundiforge.cli:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["forge"]
+packages = ["ubundiforge"]
 
 [tool.ruff]
 line-length = 100

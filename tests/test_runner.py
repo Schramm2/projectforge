@@ -1,6 +1,6 @@
 """Tests for the runner module."""
 
-from forge.runner import _build_cmd
+from ubundiforge.runner import _build_cmd
 
 
 def test_claude_cmd_basic():

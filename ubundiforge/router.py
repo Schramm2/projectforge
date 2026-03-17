@@ -1,6 +1,6 @@
 """AI backend routing — picks the best CLI tool for the job."""
 
-from forge.config import check_backend_installed
+from ubundiforge.config import check_backend_installed
 
 ROUTING = {
     "nextjs": "gemini",

@@ -1,4 +1,4 @@
-# Forge — Ubundi Project Scaffolder
+# UbundiForge — Ubundi Project Scaffolder
 
 A Python CLI that wraps AI coding tools (Claude Code, Gemini CLI, Codex) to scaffold new projects with Ubundi conventions baked in.
 
@@ -6,12 +6,12 @@ A Python CLI that wraps AI coding tools (Claude Code, Gemini CLI, Codex) to scaf
 
 - Python 3.12+, Typer, Rich, questionary
 - Packaged with hatchling, installed via `uv pip install -e .`
-- Entry point: `forge` -> `forge.cli:app`
+- Entry point: `forge` -> `ubundiforge.cli:app`
 
 ## Structure
 
 ```
-forge/
+ubundiforge/
   cli.py           — Typer app, single command entry point
   prompts.py       — Interactive question flow (questionary)
   router.py        — Picks AI backend based on stack selection
@@ -34,10 +34,10 @@ tests/
 ## Dev commands
 
 ```bash
-uv pip install -e .          # Install in dev mode
-uv run pytest                # Run tests
-uv run ruff check forge/     # Lint
-uv run ruff format forge/    # Format
+uv pip install -e .              # Install in dev mode
+uv run pytest                    # Run tests
+uv run ruff check ubundiforge/   # Lint
+uv run ruff format ubundiforge/  # Format
 ```
 
 ## Key flags
