@@ -38,7 +38,11 @@ Follow these conventions when generating any project files.
 - Type hints on all functions and variables
 - Pydantic models for all data structures
 - Async endpoints where possible
-- Structure: app/ with routers/, models/, services/, config.py
+- Structure: api/ for routes + a domain-named package for core logic
+- No ORM — use raw SQL via asyncpg
+- API routes prefixed with /v1/
+- Structured error responses using Pydantic models for error bodies
+- FastAPI exception handlers for consistent error formatting
 - Ruff for linting and formatting
 
 ## Always Include

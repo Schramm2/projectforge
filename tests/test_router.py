@@ -6,7 +6,7 @@ from ubundiforge.router import pick_backend, pick_backend_with_fallback
 
 
 def test_nextjs_routes_to_gemini():
-    assert pick_backend("nextjs") == "gemini"
+    assert pick_backend("nextjs") == "claude"
 
 
 def test_fastapi_routes_to_claude():
@@ -15,6 +15,10 @@ def test_fastapi_routes_to_claude():
 
 def test_both_routes_to_claude():
     assert pick_backend("both") == "claude"
+
+
+def test_fastapi_ai_routes_to_claude():
+    assert pick_backend("fastapi-ai") == "claude"
 
 
 def test_python_cli_routes_to_claude():
@@ -39,7 +43,7 @@ def test_override_takes_precedence():
 
 
 def test_override_none_uses_routing():
-    assert pick_backend("nextjs", override=None) == "gemini"
+    assert pick_backend("nextjs", override=None) == "claude"
 
 
 # Fallback chain tests
@@ -77,4 +81,4 @@ def test_fallback_returns_primary_when_nothing_installed(mock_check):
 def test_fallback_for_nextjs_when_gemini_missing(mock_check):
     backend, was_fallback = pick_backend_with_fallback("nextjs")
     assert backend == "claude"
-    assert was_fallback is True
+    assert was_fallback is False

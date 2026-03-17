@@ -3,8 +3,9 @@
 from ubundiforge.config import check_backend_installed
 
 ROUTING = {
-    "nextjs": "gemini",
+    "nextjs": "claude",
     "fastapi": "claude",
+    "fastapi-ai": "claude",
     "both": "claude",
     "python-cli": "claude",
     "ts-package": "claude",

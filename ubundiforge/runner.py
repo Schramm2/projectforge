@@ -88,6 +88,13 @@ def run_ai(
     return result.returncode
 
 
+def reset_project_dir(project_dir: Path) -> None:
+    """Remove an existing scaffold target so generation starts from a clean slate."""
+    if project_dir.exists():
+        shutil.rmtree(project_dir)
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+
 def ensure_git_init(project_dir: Path) -> None:
     """Verify git was initialized in the project dir; if not, init and commit."""
     git_dir = project_dir / ".git"

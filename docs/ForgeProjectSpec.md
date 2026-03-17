@@ -13,7 +13,7 @@ Forge does NOT call APIs directly. It does NOT parse output or write files itsel
 **The core loop:**
 1. You run `forge`
 2. Forge asks 4-5 quick questions
-3. Forge picks the best AI backend based on what you're building
+3. Forge picks the default AI backend
 4. Forge constructs a prompt (your answers + conventions file)
 5. Forge pipes that prompt into the chosen AI CLI
 6. The AI creates your project
@@ -48,20 +48,20 @@ Total time from idea to building: under 60 seconds.
 
 ---
 
-## AI Routing — Which Tool For Which Job
+## AI Routing — Default Backend
 
-Forge is opinionated about which AI CLI is best for the job. It picks automatically based on the stack selection:
+Forge defaults all stacks to Claude for now, with a fallback chain if Claude is not installed:
 
 | Stack Selected | AI CLI Used | Why |
 |---|---|---|
-| Next.js + React | `gemini` | Gemini is strongest at frontend generation |
-| Python API (FastAPI) | `claude` | Claude is best overall, ideal for backend |
-| Both (monorepo) | `claude` | Complex project = use the best generalist |
+| Next.js + React | `claude` | Temporary default until scaffold-quality research says otherwise |
+| Python API (FastAPI) | `claude` | Best general default |
+| Both (monorepo) | `claude` | Best general default |
 | Any test/automation task (future) | `codex` | Codex excels at tests, scripts, automation |
 
 **Override flag:** `forge --use claude` or `forge --use gemini` or `forge --use codex` to force a specific backend regardless of the routing logic.
 
-The routing logic lives in a single function that's easy to update as you learn which tool does what best. Start with these defaults and adjust based on experience.
+The routing logic lives in a single function that's easy to update as you learn what works best in practice.
 
 ---
 
@@ -113,13 +113,15 @@ forge/
 
 ### prompts.py — Questions
 
-Uses questionary. Five questions max — speed is the point:
+Uses questionary. Keep the flow short, but allow a few targeted follow-ups when requested:
 
 1. **Project name** (text input, validated as valid directory name)
 2. **Stack** (select): Next.js + React / Python API (FastAPI) / Both
 3. **Description** (text): 1-2 sentences about what you're building
 4. **Docker?** (confirm, default yes)
-5. **Any extra instructions?** (text, optional): freeform additions like "use Supabase for auth" or "include Stripe integration"
+5. **Authentication?** (optional for Next.js/fullstack): provider selection such as Clerk, Supabase Auth, Auth.js, or Better Auth
+6. **CI?** (optional): include CI, then either choose CI actions or request a blank template
+7. **Any extra instructions?** (text, optional): freeform additions like "include Stripe integration"
 
 Returns a simple dict with the answers.
 
@@ -133,7 +135,7 @@ def pick_backend(stack: str, override: str | None = None) -> str:
         return override
     
     routing = {
-        "nextjs": "gemini",
+        "nextjs": "claude",
         "fastapi": "claude",
         "both": "claude",
     }
@@ -149,7 +151,7 @@ This module assembles the prompt that gets piped into the AI CLI. It combines:
 1. **The conventions file** (~/.forge/conventions.md) — your Ubundi standards
 2. **The project details** — name, stack, description, Docker yes/no
 3. **The scaffold instruction** — telling the AI exactly what to create
-4. **Extra instructions** — any freeform additions from question 5
+4. **Extra instructions** — any freeform additions from the final question
 
 The assembled prompt should read like a clear, detailed brief. Example of what gets generated:
 
@@ -168,6 +170,7 @@ CONVENTIONS (follow these exactly):
 INSTRUCTIONS:
 - Create a complete, working project structure with all config files
 - Include a CLAUDE.md at the root that describes this project for AI coding assistants
+- Include an agent_docs/ directory with starter docs that match the CLAUDE.md progressive-disclosure structure
 - Include appropriate .gitignore, .env.example, README.md
 - Include Docker setup (Dockerfile + docker-compose.yml)
 - Initialize with sensible defaults — the user should be able to run the project immediately after scaffolding

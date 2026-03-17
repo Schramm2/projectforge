@@ -21,6 +21,14 @@ forge = "ubundiforge.cli:app"
 [tool.hatch.build.targets.wheel]
 packages = ["ubundiforge"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"assets/ascii-art.txt" = "assets/ascii-art.txt"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "assets/ascii-art.txt",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"

@@ -14,8 +14,15 @@ from ubundiforge.logo import print_logo
 from ubundiforge.prompt_builder import build_prompt
 from ubundiforge.prompts import collect_answers
 from ubundiforge.router import pick_backend_with_fallback
-from ubundiforge.runner import ensure_git_init, open_in_editor, run_ai
+from ubundiforge.runner import ensure_git_init, open_in_editor, reset_project_dir, run_ai
 from ubundiforge.safety import check_for_secrets
+from ubundiforge.scaffold_options import (
+    AUTH_PROVIDER_OPTIONS,
+    CI_TEMPLATE_MODES,
+    auth_provider_ids_for_stack,
+    auth_provider_supported_for_stack,
+    ci_action_ids_for_stack,
+)
 
 app = typer.Typer(add_completion=False)
 console = Console()
@@ -27,6 +34,9 @@ STACK_ALIASES = {
     "react": "nextjs",
     "fastapi": "fastapi",
     "api": "fastapi",
+    "fastapi-ai": "fastapi-ai",
+    "ai": "fastapi-ai",
+    "llm": "fastapi-ai",
     "both": "both",
     "fullstack": "both",
     "monorepo": "both",
@@ -68,7 +78,7 @@ def main(
         str | None,
         typer.Option(
             "--stack", "-s",
-            help="Stack: nextjs, fastapi, both, python-cli, ts-package, python-worker.",
+            help="Stack: nextjs, fastapi, fastapi-ai, both, python-cli, ts-package, python-worker.",
         ),
     ] = None,
     description: Annotated[
@@ -88,6 +98,31 @@ def main(
         typer.Option(
             "--services",
             help="Comma-separated services to include (e.g. 'Clerk,PostgreSQL').",
+        ),
+    ] = None,
+    auth_provider: Annotated[
+        str | None,
+        typer.Option(
+            "--auth-provider",
+            help="Optional auth provider for Next.js/fullstack stacks.",
+        ),
+    ] = None,
+    ci: Annotated[
+        bool | None,
+        typer.Option("--ci/--no-ci", help="Include a GitHub Actions CI workflow."),
+    ] = None,
+    ci_template: Annotated[
+        str | None,
+        typer.Option(
+            "--ci-template",
+            help="CI template mode: questionnaire or blank-template.",
+        ),
+    ] = None,
+    ci_actions: Annotated[
+        str | None,
+        typer.Option(
+            "--ci-actions",
+            help="Comma-separated CI actions (e.g. 'lint,typecheck,unit-tests').",
         ),
     ] = None,
     verbose: Annotated[
@@ -126,13 +161,71 @@ def main(
             console.print(f"[red]Unknown stack '{stack}'. Choose from: {valid}[/red]")
             raise typer.Exit(1)
 
+        from ubundiforge.stacks import STACK_META
+
         svc_list = [s.strip() for s in services.split(",")] if services else []
+        meta = STACK_META.get(resolved_stack)
+        docker_val = docker if docker is not None else (meta.docker_default if meta else True)
+        if auth_provider and auth_provider not in AUTH_PROVIDER_OPTIONS:
+            valid = ", ".join(sorted(AUTH_PROVIDER_OPTIONS))
+            console.print(
+                f"[red]Unknown auth provider '{auth_provider}'. Choose from: {valid}[/red]"
+            )
+            raise typer.Exit(1)
+        if auth_provider and not auth_provider_supported_for_stack(resolved_stack, auth_provider):
+            allowed = auth_provider_ids_for_stack(resolved_stack)
+            if allowed:
+                valid = ", ".join(allowed)
+                console.print(
+                    "[red]Auth provider "
+                    f"'{auth_provider}' is not supported for stack '{resolved_stack}'. "
+                    f"Choose from: {valid}[/red]"
+                )
+            else:
+                console.print(
+                    f"[red]Stack '{resolved_stack}' does not support --auth-provider.[/red]"
+                )
+            raise typer.Exit(1)
+
+        if ci_template and ci_template not in CI_TEMPLATE_MODES:
+            valid = ", ".join(CI_TEMPLATE_MODES)
+            console.print(
+                f"[red]Unknown CI template '{ci_template}'. Choose from: {valid}[/red]"
+            )
+            raise typer.Exit(1)
+
+        ci_requested = ci if ci is not None else bool(ci_template or ci_actions)
+        ci_mode = None
+        action_ids: list[str] = []
+        if ci_requested:
+            ci_mode = ci_template or ("questionnaire" if ci_actions else "blank-template")
+            allowed_actions = set(ci_action_ids_for_stack(resolved_stack))
+            if ci_actions:
+                action_ids = [action.strip() for action in ci_actions.split(",") if action.strip()]
+                invalid_actions = [action for action in action_ids if action not in allowed_actions]
+                if invalid_actions:
+                    valid = ", ".join(sorted(allowed_actions))
+                    invalid = ", ".join(invalid_actions)
+                    console.print(
+                        "[red]Unknown CI actions "
+                        f"'{invalid}' for stack '{resolved_stack}'. Choose from: {valid}[/red]"
+                    )
+                    raise typer.Exit(1)
+            elif ci_mode == "questionnaire":
+                action_ids = ci_action_ids_for_stack(resolved_stack)
+
         answers: dict = {
             "name": name.strip(),
             "stack": resolved_stack,
             "description": description.strip(),
-            "docker": docker if docker is not None else True,
+            "docker": docker_val,
+            "auth_provider": auth_provider,
             "services": svc_list,
+            "ci": {
+                "include": ci_requested,
+                "mode": ci_mode,
+                "actions": action_ids,
+            },
             "extra": (extra or "").strip(),
         }
     else:
@@ -225,6 +318,7 @@ def main(
         if not confirm:
             console.print("[dim]Aborted.[/dim]")
             raise typer.Exit(0)
+        reset_project_dir(project_dir)
 
     console.print(f"[dim]Handing off to {backend}...[/dim]\n")
     returncode = run_ai(backend, prompt, project_dir, model=model, verbose=verbose)

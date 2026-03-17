@@ -1,6 +1,8 @@
 """Tests for the runner module."""
 
-from ubundiforge.runner import _build_cmd
+from pathlib import Path
+
+from ubundiforge.runner import _build_cmd, reset_project_dir
 
 
 def test_claude_cmd_basic():
@@ -44,3 +46,26 @@ def test_codex_cmd_with_model():
 def test_unknown_backend_returns_empty():
     cmd = _build_cmd("unknown", "do stuff")
     assert cmd == []
+
+
+def test_reset_project_dir_clears_existing_contents(tmp_path):
+    project_dir = tmp_path / "demo"
+    project_dir.mkdir()
+    (project_dir / "README.md").write_text("stale")
+    nested_dir = project_dir / "src"
+    nested_dir.mkdir()
+    (nested_dir / "main.py").write_text("print('stale')")
+
+    reset_project_dir(project_dir)
+
+    assert project_dir.exists()
+    assert list(project_dir.iterdir()) == []
+
+
+def test_reset_project_dir_creates_missing_directory(tmp_path):
+    project_dir = tmp_path / "new-project"
+
+    reset_project_dir(project_dir)
+
+    assert project_dir.exists()
+    assert isinstance(project_dir, Path)
