@@ -26,6 +26,7 @@ dist/
 .coverage.*
 htmlcov/
 
-# Scaffolded projects (created by forge during testing)
+# Scaffolded projects
+projects/
 pulse-dashboard/
 atlas-crm/

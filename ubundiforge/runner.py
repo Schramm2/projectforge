@@ -1,13 +1,21 @@
 """Executes the AI CLI subprocess with the assembled prompt."""
 
+import io
 import platform
 import shutil
 import subprocess
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from rich.console import Console
+from rich.live import Live
+from rich.spinner import Spinner
+from rich.table import Table
+from rich.text import Text
 
 console = Console()
 
@@ -34,7 +42,7 @@ def _build_cmd(backend: str, prompt: str, model: str | None = None) -> list[str]
     return cmd
 
 
-_PHASE_TIMEOUT = 600  # 10 minutes per phase
+_PHASE_TIMEOUT = 1800  # 30 minutes per phase
 
 
 def run_ai(
@@ -43,12 +51,12 @@ def run_ai(
     project_dir: Path,
     model: str | None = None,
     verbose: bool = False,
+    label: str = "",
 ) -> int:
     """Execute the AI CLI with the assembled prompt.
 
     Creates the project directory if it doesn't exist, then runs the chosen
-    AI CLI inside it. Output streams to the terminal in real-time to avoid
-    pipe-buffer deadlocks (which caused hangs with Codex).
+    AI CLI inside it. Output streams to the terminal in real-time.
 
     Args:
         backend: Which CLI to use (claude, gemini, codex).
@@ -56,11 +64,13 @@ def run_ai(
         project_dir: Path to the project directory to scaffold into.
         model: Optional model to pass to the AI CLI.
         verbose: If True, print the full command and timing info.
+        label: Display label for this phase (used in spinner text).
 
     Returns:
         The subprocess return code.
     """
     project_dir.mkdir(parents=True, exist_ok=True)
+    display_label = label or backend
 
     cmd = _build_cmd(backend, prompt, model)
     if not cmd:
@@ -74,29 +84,208 @@ def run_ai(
 
     start = time.monotonic()
 
-    # Stream output directly to terminal instead of capturing it.
-    # capture_output=True caused hangs when backends (especially Codex)
-    # spawned child processes that inherited the pipes.
+    spinner = Spinner("dots", text=Text(f"Starting {display_label}...", style="dim"))
+
+    def _stream_stdout(pipe: io.BufferedReader, live: Live) -> None:
+        """Read stdout line-by-line, print above the spinner via Rich."""
+        try:
+            for raw_line in iter(pipe.readline, b""):
+                line = raw_line.decode("utf-8", errors="replace").rstrip("\n")
+                if line:
+                    live.console.print(line)
+        except ValueError:
+            pass  # pipe closed
+
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
             cwd=project_dir,
-            timeout=_PHASE_TIMEOUT,
+            stdout=subprocess.PIPE,
         )
-    except subprocess.TimeoutExpired:
-        elapsed = time.monotonic() - start
-        console.print(
-            f"\n[yellow]{backend} timed out after {elapsed:.0f}s. "
-            f"The phase may have stalled.[/yellow]"
-        )
+
+        with Live(spinner, console=console, refresh_per_second=10) as live:
+            reader = threading.Thread(
+                target=_stream_stdout, args=(proc.stdout, live), daemon=True
+            )
+            reader.start()
+
+            while proc.poll() is None:
+                elapsed = time.monotonic() - start
+                if elapsed > _PHASE_TIMEOUT:
+                    proc.kill()
+                    proc.wait()
+                    reader.join(timeout=5)
+                    console.print(
+                        f"\n[yellow]{display_label} timed out after {elapsed:.0f}s. "
+                        f"The phase may have stalled.[/yellow]"
+                    )
+                    return 1
+                spinner.update(text=Text(
+                    f"{display_label} working... ({elapsed:.0f}s)", style="dim"
+                ))
+                time.sleep(0.2)
+
+            reader.join(timeout=5)
+
+    except FileNotFoundError:
+        console.print(f"[red]{backend} command not found.[/red]")
         return 1
 
     elapsed = time.monotonic() - start
 
     if verbose:
-        console.print(f"[dim]Completed in {elapsed:.1f}s (exit code {result.returncode})[/dim]")
+        console.print(
+            f"[dim]{display_label} completed in {elapsed:.1f}s"
+            f" (exit {proc.returncode})[/dim]"
+        )
+    else:
+        console.print(f"[dim]{display_label} finished in {elapsed:.0f}s[/dim]")
 
-    return result.returncode
+    return proc.returncode
+
+
+@dataclass
+class _ParallelPhase:
+    """Tracks a phase running in the background."""
+    label: str
+    backend: str
+    start: float = 0.0
+    returncode: int | None = None
+    lines: list[str] = field(default_factory=list)
+
+
+def run_ai_parallel(
+    phases: list[dict],
+    project_dir: Path,
+    verbose: bool = False,
+) -> list[tuple[str, int]]:
+    """Run multiple AI phases concurrently with a shared status display.
+
+    Args:
+        phases: List of dicts with keys: label, backend, prompt, model.
+        project_dir: Shared project directory.
+        verbose: Show detailed output.
+
+    Returns:
+        List of (label, returncode) tuples.
+    """
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    trackers: dict[str, _ParallelPhase] = {}
+    procs: dict[str, subprocess.Popen] = {}
+    readers: dict[str, threading.Thread] = {}
+    lock = threading.Lock()
+
+    def _build_status_table() -> Table:
+        """Build a Rich table showing all parallel phase statuses."""
+        table = Table(show_header=False, show_edge=False, pad_edge=False, box=None)
+        table.add_column(width=3)
+        table.add_column()
+        for t in trackers.values():
+            elapsed = time.monotonic() - t.start if t.start else 0
+            if t.returncode is not None:
+                if t.returncode == 0:
+                    icon = "[green]ok[/green]"
+                    status = f"{t.label} finished in {elapsed:.0f}s"
+                else:
+                    icon = "[red]!![/red]"
+                    status = f"{t.label} failed (exit {t.returncode})"
+            else:
+                icon = "[cyan]...[/cyan]"
+                status = f"{t.label} ({t.backend}) working... ({elapsed:.0f}s)"
+            table.add_row(icon, f"[dim]{status}[/dim]")
+        return table
+
+    def _reader_fn(label: str, pipe: io.BufferedReader) -> None:
+        try:
+            for raw_line in iter(pipe.readline, b""):
+                line = raw_line.decode("utf-8", errors="replace").rstrip("\n")
+                if line:
+                    with lock:
+                        trackers[label].lines.append(line)
+        except ValueError:
+            pass
+
+    def _run_one(phase: dict) -> tuple[str, int]:
+        label = phase["label"]
+        backend = phase["backend"]
+        prompt = phase["prompt"]
+        model = phase.get("model")
+
+        cmd = _build_cmd(backend, prompt, model)
+        if not cmd:
+            with lock:
+                trackers[label].returncode = 1
+            return label, 1
+
+        start = time.monotonic()
+        with lock:
+            trackers[label].start = start
+
+        try:
+            proc = subprocess.Popen(cmd, cwd=project_dir, stdout=subprocess.PIPE)
+        except FileNotFoundError:
+            with lock:
+                trackers[label].returncode = 1
+            return label, 1
+
+        with lock:
+            procs[label] = proc
+
+        reader = threading.Thread(target=_reader_fn, args=(label, proc.stdout), daemon=True)
+        reader.start()
+        with lock:
+            readers[label] = reader
+
+        while proc.poll() is None:
+            elapsed = time.monotonic() - start
+            if elapsed > _PHASE_TIMEOUT:
+                proc.kill()
+                proc.wait()
+                reader.join(timeout=5)
+                with lock:
+                    trackers[label].returncode = 1
+                return label, 1
+            time.sleep(0.5)
+
+        reader.join(timeout=5)
+        with lock:
+            trackers[label].returncode = proc.returncode
+
+        return label, proc.returncode
+
+    # Initialize trackers
+    for phase in phases:
+        trackers[phase["label"]] = _ParallelPhase(
+            label=phase["label"], backend=phase["backend"]
+        )
+
+    results: list[tuple[str, int]] = []
+
+    with ThreadPoolExecutor(max_workers=len(phases)) as pool:
+        futures = {pool.submit(_run_one, p): p["label"] for p in phases}
+
+        with Live(_build_status_table(), console=console, refresh_per_second=4) as live:
+            while not all(f.done() for f in futures):
+                live.update(_build_status_table())
+                time.sleep(0.25)
+            # Final update
+            live.update(_build_status_table())
+
+        for future in futures:
+            label, rc = future.result()
+            results.append((label, rc))
+
+    # Print buffered output from each phase
+    for phase in phases:
+        label = phase["label"]
+        t = trackers[label]
+        if t.lines:
+            console.print(f"\n[bold]--- {label} output ---[/bold]")
+            for line in t.lines:
+                console.print(line)
+
+    return results
 
 
 def reset_project_dir(project_dir: Path) -> None:

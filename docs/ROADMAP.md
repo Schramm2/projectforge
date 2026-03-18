@@ -11,6 +11,8 @@ Items marked with [DONE] have been implemented.
 - **Quality-based routing**: Track which backend produces better results per stack over time. Store simple success/failure signals after each scaffold and shift routing weights accordingly.
 - [DONE] **Model selection per backend**: `--model opus` passes the model flag through to the AI CLI subprocess.
 - [DONE] **Fallback chain**: If the primary backend isn't installed, automatically try the next available (claude → gemini → codex).
+- [DONE] **Multi-backend phase routing**: Different scaffold phases (architecture, frontend, tests, verify) route to the ideal AI backend based on strengths. Adjacent phases using the same backend are merged to reduce handoffs.
+- [DONE] **Specialist prompt variants**: Each phase has a "best" prompt variant optimized for its ideal backend, plus a general fallback variant for other backends.
 - **Cost-aware routing**: For backends with usage-based pricing, optionally prefer cheaper options for simple scaffolds.
 
 ---
@@ -32,8 +34,11 @@ Items marked with [DONE] have been implemented.
   - Go (Chi / Gin)
   - Astro / static sites
   - Chrome extension
-  - CLI tool (Python or Node)
   - Turborepo monorepo
+- [DONE] **Python CLI stack**: `python-cli` stack for building Typer-based CLI tools.
+- [DONE] **TypeScript package stack**: `ts-package` stack for npm package scaffolding.
+- [DONE] **Python worker stack**: `python-worker` stack for background workers and services.
+- [DONE] **AI-powered API stack**: `fastapi-ai` stack for FastAPI services with LLM/embeddings integration.
 - **Sub-stack prompts**: After selecting "Next.js + React", ask follow-ups like "Auth provider?" (Supabase, Clerk, NextAuth), "Database?" (Postgres, SQLite, none), "UI library?" (shadcn/ui, Radix, none).
 - **Stack detection from existing project**: Run `forge` inside an existing repo and have it detect the stack from package.json / pyproject.toml, then scaffold missing pieces (e.g. add Docker to an existing project).
 
@@ -50,11 +55,12 @@ Items marked with [DONE] have been implemented.
 
 ## Post-Scaffold Automation
 
-- **Auto-install dependencies**: After the AI finishes, detect package.json / pyproject.toml and run the install automatically.
+- [DONE] **Auto-install dependencies**: The verify phase detects package.json / pyproject.toml and runs the appropriate install (npm install / uv sync) automatically.
 - [DONE] **Auto-open in editor**: `forge --open` opens the new project in Cursor or VS Code after scaffolding.
 - [DONE] **Auto-git-init**: Verifies git was initialized after scaffold; if not, runs `git init` and makes an initial commit.
+- [DONE] **Health check**: The verify phase starts the dev server and probes `/health` or `/ready` endpoints to confirm the project boots.
+- [DONE] **Post-scaffold verification**: `--verify/--no-verify` runs lint, typecheck, build, and test commands after scaffolding with a Rich table summary of results.
 - **Post-scaffold hooks**: User-defined scripts in `~/.forge/hooks/post-scaffold.sh` that run after every scaffold (e.g. configure git remote, set up pre-commit hooks, copy .env from a vault).
-- **Health check**: After scaffolding, attempt to run the project's dev server briefly to verify it actually works.
 
 ---
 
@@ -65,6 +71,7 @@ Items marked with [DONE] have been implemented.
 - **Prompt editor**: `forge --edit-prompt` opens the assembled prompt in $EDITOR before sending it, so you can tweak it.
 - [DONE] **Progress display**: Rich spinner with elapsed time while the AI CLI is working.
 - [DONE] **Non-interactive mode**: `forge --name pulse --stack fastapi --description "health API" --no-docker` for scripting and CI.
+- [DONE] **Demo mode**: `forge --demo` scaffolds projects that run without real API keys by using mock data and graceful fallbacks. Toggleable via `--demo/--no-demo`.
 
 ---
 
@@ -73,7 +80,7 @@ Items marked with [DONE] have been implemented.
 - **Scaffold validation**: After the AI finishes, run basic checks — does the expected file structure exist? Is there a package.json/pyproject.toml? Does it parse correctly?
 - **Diff review**: Show a tree of created files with line counts before the AI starts writing, let the user approve.
 - **Retry with feedback**: If the scaffold is bad, `forge retry "the auth setup is wrong, use Clerk not NextAuth"` re-runs with the original prompt plus correction.
-- **Multi-pass scaffolding**: First pass creates structure, second pass reviews and fixes issues. Expensive but higher quality.
+- [DONE] **Multi-pass scaffolding**: Scaffold phases (architecture, frontend, tests, verify) run sequentially, each reviewing and building on the previous phase's output. The verify phase acts as a final QA pass.
 
 ---
 

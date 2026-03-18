@@ -19,7 +19,13 @@ from ubundiforge.router import (
     merge_adjacent_phases,
     pick_phase_backends,
 )
-from ubundiforge.runner import ensure_git_init, open_in_editor, reset_project_dir, run_ai
+from ubundiforge.runner import (
+    ensure_git_init,
+    open_in_editor,
+    reset_project_dir,
+    run_ai,
+    run_ai_parallel,
+)
 from ubundiforge.safety import check_for_secrets
 from ubundiforge.scaffold_options import (
     AUTH_PROVIDER_OPTIONS,
@@ -270,18 +276,52 @@ def main(
     merged_groups = merge_adjacent_phases(phase_backends)
     all_phases = STACK_PHASES.get(answers["stack"], ["architecture", "tests"])
 
+    # Identify which phases can run in parallel (everything between first and last)
+    # Architecture must run first, verify must run last, middle phases run concurrently.
+    from ubundiforge.router import PHASE_ARCHITECTURE, PHASE_VERIFY
+
+    serial_first: list[tuple[str, str]] = []
+    parallel_middle: list[tuple[str, str]] = []
+    serial_last: list[tuple[str, str]] = []
+    for phase, backend in phase_backends:
+        if phase == PHASE_ARCHITECTURE:
+            serial_first.append((phase, backend))
+        elif phase == PHASE_VERIFY:
+            serial_last.append((phase, backend))
+        else:
+            parallel_middle.append((phase, backend))
+
+    can_parallel = len(parallel_middle) > 1
+
     # Show routing plan
     if len(merged_groups) == 1:
         _, backend = merged_groups[0]
         console.print(f"\n[dim]Using {backend} for all scaffolding[/dim]")
     else:
         console.print("\n[dim]Multi-backend routing:[/dim]")
-        for i, (phases, backend) in enumerate(merged_groups, 1):
-            labels = " + ".join(PHASE_LABELS.get(p, p) for p in phases)
-            console.print(f"[dim]  {i}. {labels} -> {backend}[/dim]")
+        step = 1
+        for phase, backend in serial_first:
+            label = PHASE_LABELS.get(phase, phase)
+            console.print(f"[dim]  {step}. {label} -> {backend}[/dim]")
+            step += 1
+        if can_parallel:
+            parts = []
+            for phase, backend in parallel_middle:
+                parts.append(f"{PHASE_LABELS.get(phase, phase)} -> {backend}")
+            console.print(f"[dim]  {step}. [bold]parallel:[/bold] {' | '.join(parts)}[/dim]")
+            step += 1
+        else:
+            for phase, backend in parallel_middle:
+                label = PHASE_LABELS.get(phase, phase)
+                console.print(f"[dim]  {step}. {label} -> {backend}[/dim]")
+                step += 1
+        for phase, backend in serial_last:
+            label = PHASE_LABELS.get(phase, phase)
+            console.print(f"[dim]  {step}. {label} -> {backend}[/dim]")
+            step += 1
 
     # Check that all required backends are installed
-    required_backends = {backend for _, backend in merged_groups}
+    required_backends = {backend for _, backend in phase_backends}
     for backend in required_backends:
         if not check_backend_installed(backend):
             console.print(
@@ -336,8 +376,21 @@ def main(
             )
             raise typer.Exit(1)
 
-    # Build prompts for each phase group
-    phase_prompts: list[tuple[list[str], str, str]] = []
+    # Build prompts for each individual phase
+    phase_prompts: list[tuple[str, str, str]] = []  # (phase, backend, prompt)
+    for phase, backend in phase_backends:
+        prompt = build_phase_prompt(
+            [phase],
+            all_phases,
+            answers,
+            conventions,
+            backend=backend,
+            claude_md_template=claude_md_template,
+        )
+        phase_prompts.append((phase, backend, prompt))
+
+    # Also build merged prompts for dry-run/export (preserves existing behavior)
+    merged_prompts: list[tuple[list[str], str, str]] = []
     for phases, backend in merged_groups:
         prompt = build_phase_prompt(
             phases,
@@ -347,14 +400,14 @@ def main(
             backend=backend,
             claude_md_template=claude_md_template,
         )
-        phase_prompts.append((phases, backend, prompt))
+        merged_prompts.append((phases, backend, prompt))
 
     # Dry run / export: show all phase prompts
     if dry_run or export:
-        for phases, backend, prompt in phase_prompts:
+        for phases, backend, prompt in merged_prompts:
             labels = " + ".join(PHASE_LABELS.get(p, p) for p in phases)
             if dry_run:
-                if len(phase_prompts) > 1:
+                if len(merged_prompts) > 1:
                     console.print(f"\n[bold]--- {labels} ({backend}) ---[/bold]\n")
                 else:
                     console.print("\n[bold]Assembled prompt:[/bold]\n")
@@ -363,9 +416,9 @@ def main(
         if export:
             export_path = Path(export)
             parts = []
-            for phases, backend, prompt in phase_prompts:
+            for phases, backend, prompt in merged_prompts:
                 label = " + ".join(PHASE_LABELS.get(p, p) for p in phases)
-                if len(phase_prompts) > 1:
+                if len(merged_prompts) > 1:
                     parts.append(f"=== {label} ({backend}) ===\n\n{prompt}")
                 else:
                     parts.append(prompt)
@@ -397,21 +450,81 @@ def main(
             raise typer.Exit(0)
         reset_project_dir(project_dir)
 
-    # Execute each phase group
-    total_groups = len(phase_prompts)
-    for group_idx, (phases, backend, prompt) in enumerate(phase_prompts, 1):
-        labels = " + ".join(PHASE_LABELS.get(p, p) for p in phases)
-        if total_groups > 1:
-            console.print(f"\n[dim]Phase {group_idx}/{total_groups}: {labels} -> {backend}[/dim]")
-        else:
-            console.print(f"[dim]Handing off to {backend}...[/dim]\n")
+    # --- Execute phases: serial first, parallel middle, serial last ---
+    total_phases = len(phase_backends)
+    step = 1
 
+    # Step 1: Run architecture (serial)
+    for phase, backend in serial_first:
+        label = PHASE_LABELS.get(phase, phase)
+        console.print(f"\n[dim]Step {step}/{total_phases}: {label} -> {backend}[/dim]")
+        phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
         effective_model = model or backend_models.get(backend)
-        returncode = run_ai(backend, prompt, project_dir, model=effective_model, verbose=verbose)
-
+        returncode = run_ai(
+            backend, phase_prompt, project_dir,
+            model=effective_model, verbose=verbose, label=label,
+        )
         if returncode != 0:
-            console.print(f"\n[red]{backend} exited with code {returncode} during {labels}.[/red]")
+            console.print(f"\n[red]{backend} exited with code {returncode} during {label}.[/red]")
             raise typer.Exit(returncode)
+        step += 1
+
+    # Step 2: Run middle phases (parallel if multiple, serial if single)
+    if parallel_middle:
+        if can_parallel:
+            labels = " + ".join(
+                f"{PHASE_LABELS.get(p, p)} ({b})" for p, b in parallel_middle
+            )
+            console.print(f"\n[dim]Step {step}/{total_phases}: Running in parallel: {labels}[/dim]")
+
+            parallel_args = []
+            for phase, backend in parallel_middle:
+                phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
+                effective_model = model or backend_models.get(backend)
+                parallel_args.append({
+                    "label": PHASE_LABELS.get(phase, phase),
+                    "backend": backend,
+                    "prompt": phase_prompt,
+                    "model": effective_model,
+                })
+
+            results = run_ai_parallel(parallel_args, project_dir, verbose=verbose)
+            for label, returncode in results:
+                if returncode != 0:
+                    console.print(f"\n[red]{label} failed (exit {returncode}).[/red]")
+                    raise typer.Exit(returncode)
+            step += len(parallel_middle)
+        else:
+            for phase, backend in parallel_middle:
+                label = PHASE_LABELS.get(phase, phase)
+                console.print(f"\n[dim]Step {step}/{total_phases}: {label} -> {backend}[/dim]")
+                phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
+                effective_model = model or backend_models.get(backend)
+                returncode = run_ai(
+                    backend, phase_prompt, project_dir,
+                    model=effective_model, verbose=verbose, label=label,
+                )
+                if returncode != 0:
+                    console.print(
+                        f"\n[red]{backend} exited with code {returncode} during {label}.[/red]"
+                    )
+                    raise typer.Exit(returncode)
+                step += 1
+
+    # Step 3: Run verify (serial)
+    for phase, backend in serial_last:
+        label = PHASE_LABELS.get(phase, phase)
+        console.print(f"\n[dim]Step {step}/{total_phases}: {label} -> {backend}[/dim]")
+        phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
+        effective_model = model or backend_models.get(backend)
+        returncode = run_ai(
+            backend, phase_prompt, project_dir,
+            model=effective_model, verbose=verbose, label=label,
+        )
+        if returncode != 0:
+            console.print(f"\n[red]{backend} exited with code {returncode} during {label}.[/red]")
+            raise typer.Exit(returncode)
+        step += 1
 
     # Post-scaffold: git init, verify, and open editor
     git_ok = ensure_git_init(project_dir)
