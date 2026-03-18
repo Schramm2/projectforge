@@ -387,8 +387,9 @@ EXTRA INSTRUCTIONS FROM USER:
 # ---------------------------------------------------------------------------
 # Phase-specific prompt builders — best variants
 # Used when the ideal/specialist backend handles the phase.
-# These are duplicates of the default variants for now — customize them to
-# lean into each backend's strengths.
+# These apply prompt engineering best practices tuned to each backend's
+# strengths: XML structure, role assignment, self-verification, explicit
+# quality modifiers, and anti-overengineering guidance.
 # ---------------------------------------------------------------------------
 
 
@@ -401,34 +402,348 @@ def build_architecture_prompt_best(
 ) -> str:
     """Build specialist architecture prompt for Claude (ideal backend).
 
-    TODO: Customize to lean into Claude's strengths — complex reasoning,
-    multi-file architecture, self-correction, security awareness.
+    Applies Claude prompting best practices: XML-structured sections, role
+    assignment, long context at top, self-verification, and explicit quality
+    modifiers tuned for Claude's strengths in reasoning and architecture.
     """
-    return build_architecture_prompt(
-        answers,
-        conventions,
-        claude_md_template,
-        exclude_frontend,
-        exclude_tests,
+    stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
+    docker_str = "Yes" if answers["docker"] else "No"
+    extra = answers.get("extra", "").strip() or "None"
+    services = answers.get("services", [])
+    auth_provider = answers.get("auth_provider")
+    ci = answers.get("ci", {})
+
+    stack_section = _build_stack_section(
+        answers["stack"],
+        services,
+        answers["name"],
+        auth_provider=auth_provider,
     )
+    ci_section = "" if exclude_tests else _build_ci_section(ci)
+
+    docker_block = ""
+    if answers["docker"]:
+        docker_block = (
+            "\n<docker>\n"
+            "Include Docker setup: Dockerfile + docker-compose.yml.\n"
+            "Follow the Docker standards in cross-project conventions.\n"
+            "</docker>"
+        )
+
+    claude_md_block = ""
+    if claude_md_template:
+        claude_md_block = (
+            "\n<claude_md_template>\n"
+            "Use this as the base for the project's CLAUDE.md. Adapt "
+            "placeholders to match this project's actual name, stack, "
+            "and structure.\n\n"
+            f"{claude_md_template}\n"
+            "</claude_md_template>"
+        )
+
+    exclusion_lines = []
+    if exclude_frontend:
+        exclusion_lines.append(
+            "- Do NOT create frontend UI components or pages — "
+            "a specialist frontend tool will handle those in the next step."
+        )
+    if exclude_tests:
+        exclusion_lines.append(
+            "- Do NOT create test files or CI configuration — "
+            "a specialist testing tool will handle those in a later step."
+        )
+    exclusion_block = ""
+    if exclusion_lines:
+        exclusion_block = (
+            "\n<scope_boundaries>\n" + "\n".join(exclusion_lines) + "\n</scope_boundaries>"
+        )
+
+    ci_block = ""
+    if ci_section:
+        ci_block = f"\n<ci_guidance>\n{ci_section}\n</ci_guidance>"
+
+    claude_md_hint = (
+        "Use the template above as the base structure."
+        if claude_md_template
+        else "Cover stack, dev commands, project structure, and key patterns."
+    )
+
+    prompt = f"""\
+You are an expert software architect specializing in production-grade project \
+scaffolding. You excel at designing clean, well-reasoned project structures \
+where every file has a clear purpose and every architectural decision is \
+intentional.
+
+Your task: scaffold a new project in the current directory. Go beyond a \
+basic skeleton — create a fully-featured, immediately runnable project with \
+thoughtful defaults that reflect real-world best practices.
+
+<project>
+<name>{answers["name"]}</name>
+<stack>{stack_label}</stack>
+<description>{answers["description"]}</description>
+<docker>{docker_str}</docker>
+</project>
+
+<conventions>
+These are the team's coding standards. Follow them exactly — they override \
+any defaults you would normally use. They exist because the team has learned \
+from experience that these patterns reduce bugs and speed up onboarding.
+
+{conventions}
+</conventions>
+
+<stack_guidance>
+{stack_section}
+</stack_guidance>
+
+<cross_project_standards>
+{CROSS_RECIPE_DEFAULTS}
+</cross_project_standards>{docker_block}{ci_block}{exclusion_block}{claude_md_block}
+
+<instructions>
+1. Create the complete project structure with all configuration files, \
+following the stack guidance layout exactly.
+2. Include a CLAUDE.md at the project root that describes this project for \
+AI coding assistants. {claude_md_hint}
+3. Include an agent_docs/ directory with starter progressive-disclosure docs \
+that align with CLAUDE.md (architecture overview, getting started, etc.).
+4. Include .gitignore, .env.example with real placeholder values, and a \
+README.md with setup instructions.
+5. Initialize with sensible defaults — the user should be able to clone, \
+install, and run the project immediately with no manual config.
+6. Initialize a git repository and make an initial commit.
+</instructions>
+
+<quality_criteria>
+Before finishing, verify your work against these criteria:
+- Every file in the project structure has real, meaningful content (no empty \
+placeholder files).
+- Configuration files (pyproject.toml, tsconfig.json, etc.) are complete and \
+correct — they should pass validation.
+- Import paths are consistent and all cross-references between modules resolve.
+- The conventions are reflected in actual code patterns, not just documented.
+- Dev commands listed in CLAUDE.md actually work with the project as scaffolded.
+</quality_criteria>
+
+<avoid>
+- Do not over-engineer. Only include what the project description requires. \
+A simple API does not need event sourcing or CQRS.
+- Do not add features, abstractions, or configurability beyond what was asked.
+- Do not create empty placeholder files — if a file exists, it should have \
+real content.
+- Do not add excessive comments or docstrings to boilerplate code. Only \
+comment where the logic is non-obvious.
+</avoid>
+
+<extra_instructions>
+{extra}
+</extra_instructions>"""
+
+    return prompt
 
 
 def build_frontend_prompt_best(answers: dict) -> str:
     """Build specialist frontend prompt for Gemini (ideal backend).
 
-    TODO: Customize to lean into Gemini's strengths — richer aesthetics,
-    sophisticated UI components, visual design quality, animations.
+    Applies Gemini 3 prompting best practices: role in <role> tags, context
+    before instructions, plan-execute-validate workflow, self-critique,
+    negative constraints at the end, and XML-structured sections.
     """
-    return build_frontend_prompt(answers)
+    stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
+    extra = answers.get("extra", "").strip() or "None"
+
+    return f"""\
+<role>
+You are an expert frontend engineer and visual designer who creates \
+distinctive, production-quality interfaces. You build frontends that look \
+and feel like they were crafted by a seasoned product designer. You are \
+precise, creative, and persistent.
+</role>
+
+<context>
+A project has been scaffolded in the current directory. The backend code, \
+configuration files, and project structure already exist. Your job is to \
+create the complete frontend UI.
+
+Project name: {answers["name"]}
+Stack: {stack_label}
+Description: {answers["description"]}
+</context>
+
+<task>
+Before writing any code, follow these steps:
+
+1. Plan: Read the existing project structure. Check CLAUDE.md, package.json \
+or pyproject.toml, and any existing frontend files to understand what \
+libraries, frameworks, and conventions are configured. Identify what pages \
+and components the project description implies a real user would need.
+
+2. Execute: Create all pages, routes, and components.
+   - Build responsive layouts that work across mobile, tablet, and desktop.
+   - Use the styling framework already configured in the project.
+   - Connect frontend to any existing API endpoints or data models found in \
+the codebase.
+   - Add meaningful loading states, error states, and empty states.
+   - Use animations for page transitions and micro-interactions. Focus on \
+high-impact moments: one well-orchestrated page load with staggered reveals \
+creates more delight than scattered micro-interactions.
+
+3. Validate: Review your output against these criteria before finishing:
+   - Does every page serve the project description's intent, not just a \
+generic landing page?
+   - Is the visual design cohesive with a clear color palette and typography?
+   - Are interactive elements keyboard-navigable with visible focus states?
+   - Does the design feel distinctive and specific to this product?
+
+4. Format: Ensure all files follow the project's existing conventions and \
+directory structure.
+</task>
+
+<aesthetics>
+Typography: Choose fonts that are beautiful and distinctive. Avoid generic \
+fonts like Arial and Inter. Use choices that elevate the design.
+
+Color and theme: Commit to a cohesive aesthetic. Use CSS variables for \
+consistency. Dominant colors with sharp accents outperform timid, evenly \
+distributed palettes.
+
+Backgrounds: Create atmosphere and depth rather than defaulting to solid \
+colors. Layer CSS gradients, use geometric patterns, or add contextual \
+effects that match the aesthetic.
+
+Layout: Use visual hierarchy to guide the eye. Vary spacing, size, and \
+weight to create rhythm. Avoid uniform grids of identical cards.
+</aesthetics>
+
+<accessibility>
+- Semantic HTML elements (nav, main, article, section, aside)
+- Alt text on all images
+- Keyboard navigation for all interactive elements
+- Sufficient color contrast ratios
+- Focus indicators on interactive elements
+</accessibility>
+
+<extra_instructions>
+{extra}
+</extra_instructions>
+
+<constraints>
+- Do NOT modify backend code, API routes, database models, or infrastructure.
+- Do NOT modify configuration files (pyproject.toml, tsconfig.json, etc.).
+- Do NOT create test files.
+- Focus exclusively on frontend: pages, components, styles, client-side logic.
+- Do NOT use overused font families (Inter, Roboto, Arial, system fonts).
+- Do NOT use purple gradients on white backgrounds.
+- Do NOT create predictable layouts or cookie-cutter component patterns.
+- Do NOT create generic hero sections with stock-photo-style descriptions.
+</constraints>
+
+<final_instruction>
+Based on the project context above, create a complete, visually impressive \
+frontend. Make unexpected design choices that feel genuinely crafted for \
+this specific product. Vary between light and dark themes, different fonts, \
+different aesthetics. Think step-by-step before writing code.
+</final_instruction>"""
 
 
 def build_tests_prompt_best(answers: dict) -> str:
     """Build specialist tests prompt for Codex (ideal backend).
 
-    TODO: Customize to lean into Codex's strengths — mechanical precision,
-    backward compatibility checks, refactoring, exhaustive coverage.
+    Applies GPT-5.4/Codex prompting best practices: XML-structured blocks,
+    completeness contracts, verification loops, dependency checks, autonomy
+    and persistence, compact output, and terminal tool hygiene.
     """
-    return build_tests_prompt(answers)
+    stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
+    extra = answers.get("extra", "").strip() or "None"
+    ci = answers.get("ci", {})
+    ci_section = _build_ci_section(ci)
+    ci_block = ""
+    if ci_section:
+        ci_block = f"\n<ci_guidance>\n{ci_section}\n</ci_guidance>"
+
+    return f"""\
+You are a test engineer and automation specialist. A project has been \
+scaffolded in the current directory. Add comprehensive tests and automation.
+
+<project>
+<name>{answers["name"]}</name>
+<stack>{stack_label}</stack>
+<description>{answers["description"]}</description>
+</project>{ci_block}
+
+<output_contract>
+- Create test files in the test directory matching project conventions.
+- Create CI configuration if requested in ci_guidance above.
+- Do not produce prose explanations. Write code.
+- Keep progress updates to 1-2 sentences between actions.
+</output_contract>
+
+<dependency_checks>
+- Before writing any tests, read the project structure, CLAUDE.md, and the \
+package manager config (pyproject.toml or package.json) to understand what \
+exists, what test frameworks are configured, and what patterns are in use.
+- Identify every module, class, and public function that needs test coverage.
+- Check what test utilities or fixtures already exist before creating new ones.
+- Do not skip this discovery step just because the intended tests seem obvious.
+</dependency_checks>
+
+<completeness_contract>
+- Treat the task as incomplete until every module has test coverage.
+- Keep an internal checklist of modules and functions to cover.
+- Track which modules have been tested as you go.
+- For each module, confirm unit tests exist before moving to the next.
+- If any module cannot be tested due to missing dependencies or unclear \
+interfaces, mark it [blocked] and state exactly what is missing.
+</completeness_contract>
+
+<test_quality>
+- For every function or endpoint, test:
+  1. Happy path with typical inputs
+  2. Edge cases: empty inputs, boundary values, maximum sizes
+  3. Error paths: invalid inputs, missing data, permission failures
+  4. State transitions: before/after side effects, cleanup
+- Do not hard-code expected values that only match one specific input. \
+Verify the logic, not memorized outputs.
+- Do not write tests that test the framework itself.
+- Use real objects where practical. Only mock external services, I/O, and \
+slow dependencies.
+</test_quality>
+
+<backward_compatibility>
+- Check for backward compatibility issues in public interfaces:
+  1. API endpoints: do request/response schemas match what the code produces?
+  2. Exported functions: do type signatures match their documentation?
+  3. Configuration: are all env vars referenced in code documented in \
+.env.example?
+  4. Dependencies: are version constraints in the package config consistent?
+- If you find issues, write a failing test that exposes the problem with a \
+clear description. Do not silently fix application code.
+</backward_compatibility>
+
+<scope_boundaries>
+- Do not modify application code, frontend components, or infrastructure.
+- Do not modify configuration files unless adding test-specific config \
+(e.g., pytest markers, vitest config).
+- If you find bugs in application code, write a failing test that exposes \
+the bug and add a comment explaining what is wrong. Do not fix the bug.
+- Focus exclusively on: test files, CI configuration, and test utilities.
+</scope_boundaries>
+
+<verification_loop>
+Before finalizing:
+- Run the test suite using the dev commands from CLAUDE.md or the package \
+config to confirm tests pass.
+- Check that no test files have syntax errors or missing imports.
+- Verify that test coverage touches every module identified in the \
+dependency_checks step.
+- If any tests fail unexpectedly, investigate and fix the test (not the \
+application code) or mark [blocked] with an explanation.
+</verification_loop>
+
+<extra_instructions>
+{extra}
+</extra_instructions>"""
 
 
 # ---------------------------------------------------------------------------

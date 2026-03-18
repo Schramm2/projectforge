@@ -267,9 +267,6 @@ def main(
             labels = " + ".join(PHASE_LABELS.get(p, p) for p in phases)
             console.print(f"[dim]  {i}. {labels} -> {backend}[/dim]")
 
-    if model:
-        console.print(f"[dim]Model: {model}[/dim]")
-
     # Check that all required backends are installed
     required_backends = {backend for _, backend in merged_groups}
     for backend in required_backends:
@@ -279,6 +276,15 @@ def main(
                 "\n[dim]Install at least one AI CLI (claude, gemini, or codex).[/dim]"
             )
             raise typer.Exit(1)
+
+    # Resolve model per backend: --model overrides everything, else use config
+    backend_models: dict[str, str] = forge_config.get("backend_models", {})
+    if model:
+        console.print(f"[dim]Model override: {model}[/dim]")
+    elif backend_models:
+        for b, m in backend_models.items():
+            if b in required_backends:
+                console.print(f"[dim]Model for {b}: {m}[/dim]")
 
     # Load conventions and CLAUDE.md template
     conventions, conv_warnings = load_conventions()
@@ -387,7 +393,8 @@ def main(
         else:
             console.print(f"[dim]Handing off to {backend}...[/dim]\n")
 
-        returncode = run_ai(backend, prompt, project_dir, model=model, verbose=verbose)
+        effective_model = model or backend_models.get(backend)
+        returncode = run_ai(backend, prompt, project_dir, model=effective_model, verbose=verbose)
 
         if returncode != 0:
             console.print(f"\n[red]{backend} exited with code {returncode} during {labels}.[/red]")

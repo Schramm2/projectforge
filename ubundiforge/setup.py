@@ -15,6 +15,32 @@ from ubundiforge.conventions import CONVENTIONS_PATH, DEFAULT_CONVENTIONS, FORGE
 
 CONFIG_PATH = FORGE_DIR / "config.json"
 
+# Available models per backend — id, description, and whether it's the default.
+# Update these when new models are released.
+BACKEND_MODELS: dict[str, list[dict[str, str | bool]]] = {
+    "claude": [
+        {"id": "claude-opus-4-6", "desc": "Most capable, complex reasoning", "default": True},
+        {"id": "claude-sonnet-4-6", "desc": "Fast, near-Opus quality"},
+        {"id": "claude-opus-4-5", "desc": "Previous-gen flagship"},
+        {"id": "claude-sonnet-4-5", "desc": "Previous-gen balanced"},
+        {"id": "claude-haiku-4-5", "desc": "Fastest, lightweight tasks"},
+    ],
+    "gemini": [
+        {"id": "gemini-2.5-pro", "desc": "Production, strong reasoning", "default": True},
+        {"id": "gemini-2.5-flash", "desc": "Fast and cost-efficient"},
+        {"id": "gemini-3-pro-preview", "desc": "Advanced reasoning (preview)"},
+        {"id": "gemini-3-flash-preview", "desc": "Fast Gemini 3 (preview)"},
+        {"id": "gemini-3.1-pro-preview", "desc": "Latest, most capable (preview)"},
+    ],
+    "codex": [
+        {"id": "gpt-5.4", "desc": "Flagship, best overall", "default": True},
+        {"id": "gpt-5.4-mini", "desc": "Fast, efficient for subagents"},
+        {"id": "gpt-5.3-codex", "desc": "Industry-leading coding model"},
+        {"id": "gpt-5.3-codex-spark", "desc": "Near-instant coding (Pro only)"},
+        {"id": "gpt-5.2-codex", "desc": "Previous-gen coding model"},
+    ],
+}
+
 # (cli_command, display_label, macOS .app bundle name)
 SUPPORTED_EDITORS = [
     ("cursor", "Cursor", "Cursor.app"),
@@ -155,8 +181,68 @@ def run_setup(console: Console) -> dict:
     console.print("[bold]Step 2:[/bold] Backend routing.\n")
     _routing_summary(available, console)
 
-    # --- Step 3: Pick preferred editor ---
-    console.print("[bold]Step 3:[/bold] Detecting editors...\n")
+    # --- Step 3: Model selection per backend ---
+    console.print("[bold]Step 3:[/bold] Model preferences.\n")
+
+    existing_models = load_forge_config().get("backend_models", {})
+    backend_models: dict[str, str] = {}
+
+    if len(available) > 0:
+        console.print("[dim]Choose a model for each backend, or keep the default.[/dim]\n")
+
+        for backend in available:
+            models = BACKEND_MODELS.get(backend, [])
+            if not models:
+                continue
+
+            existing = existing_models.get(backend, "")
+            choices = [
+                questionary.Choice(
+                    f"{m['id']}{' (default)' if m.get('default') else ''} — {m['desc']}",
+                    value=m["id"],
+                )
+                for m in models
+            ]
+            choices.append(questionary.Choice("Custom model ID...", value="_custom"))
+
+            # Find preselect: existing config, else the default model
+            preselect = existing or next((m["id"] for m in models if m.get("default")), None)
+
+            model_val = questionary.select(
+                f"Model for {backend}:",
+                choices=choices,
+                default=preselect,
+            ).ask()
+            if model_val is None:
+                raise SystemExit(0)
+
+            if model_val == "_custom":
+                model_val = questionary.text(
+                    f"Enter custom model ID for {backend}:",
+                    default=existing,
+                ).ask()
+                if model_val is None:
+                    raise SystemExit(0)
+                model_val = model_val.strip()
+
+            # Only save if it's not the default
+            default_id = next((m["id"] for m in models if m.get("default")), None)
+            if model_val and model_val != default_id:
+                backend_models[backend] = model_val
+
+        if backend_models:
+            model_table = Table(show_header=True, header_style="bold")
+            model_table.add_column("Backend")
+            model_table.add_column("Model")
+            for b, m in backend_models.items():
+                model_table.add_row(b, m)
+            console.print(model_table)
+        else:
+            console.print("[dim]Using default models for all backends.[/dim]")
+        console.print()
+
+    # --- Step 4: Pick preferred editor ---
+    console.print("[bold]Step 4:[/bold] Detecting editors...\n")
 
     editor_table = Table(show_header=True, header_style="bold")
     editor_table.add_column("Editor")
@@ -198,8 +284,8 @@ def run_setup(console: Console) -> dict:
             raise SystemExit(0)
         console.print()
 
-    # --- Step 4: Git check ---
-    console.print("[bold]Step 4:[/bold] Checking git...\n")
+    # --- Step 5: Git check ---
+    console.print("[bold]Step 5:[/bold] Checking git...\n")
 
     git_table = Table(show_header=True, header_style="bold")
     git_table.add_column("Check")
@@ -240,8 +326,8 @@ def run_setup(console: Console) -> dict:
             '[dim]  git config --global user.email "you@example.com"[/dim]\n'
         )
 
-    # --- Step 5: Docker check ---
-    console.print("[bold]Step 5:[/bold] Checking Docker...\n")
+    # --- Step 6: Docker check ---
+    console.print("[bold]Step 6:[/bold] Checking Docker...\n")
 
     docker_installed = shutil.which("docker") is not None
     if docker_installed:
@@ -252,8 +338,8 @@ def run_setup(console: Console) -> dict:
             "but scaffolded Dockerfiles won't be testable until Docker is installed.[/dim]\n"
         )
 
-    # --- Step 6: Default project directory ---
-    console.print("[bold]Step 6:[/bold] Default project directory.\n")
+    # --- Step 7: Default project directory ---
+    console.print("[bold]Step 7:[/bold] Default project directory.\n")
 
     existing_dir = load_forge_config().get("projects_dir", "")
     default_dir = existing_dir or ""
@@ -288,8 +374,8 @@ def run_setup(console: Console) -> dict:
     else:
         console.print("[dim]Will use current directory.[/dim]\n")
 
-    # --- Step 7: Conventions file ---
-    console.print("[bold]Step 7:[/bold] Conventions file.\n")
+    # --- Step 8: Conventions file ---
+    console.print("[bold]Step 8:[/bold] Conventions file.\n")
 
     if CONVENTIONS_PATH.exists():
         console.print(f"[dim]Found existing conventions at {CONVENTIONS_PATH}[/dim]\n")
@@ -307,6 +393,7 @@ def run_setup(console: Console) -> dict:
     config = {
         "preferred_editor": preferred_editor,
         "available_backends": available,
+        "backend_models": backend_models,
         "docker_available": docker_installed,
         "projects_dir": projects_dir,
     }
