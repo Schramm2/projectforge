@@ -95,26 +95,62 @@ def reset_project_dir(project_dir: Path) -> None:
     project_dir.mkdir(parents=True, exist_ok=True)
 
 
-def ensure_git_init(project_dir: Path) -> None:
-    """Verify git was initialized in the project dir; if not, init and commit."""
-    git_dir = project_dir / ".git"
-    if git_dir.exists():
-        return
+def ensure_git_init(project_dir: Path) -> bool:
+    """Verify git was initialized with at least one commit; if not, init and commit.
 
-    console.print("[dim]Git not initialized by AI — setting up...[/dim]")
-    subprocess.run(["git", "init"], cwd=project_dir, capture_output=True)
-    subprocess.run(["git", "add", "-A"], cwd=project_dir, capture_output=True)
-    subprocess.run(
-        ["git", "commit", "-m", "Initial commit (via UbundiForge)"],
+    Returns:
+        True if the project has a git repo with at least one commit, False otherwise.
+    """
+    git_dir = project_dir / ".git"
+
+    if not git_dir.exists():
+        console.print("[dim]Git not initialized by AI — setting up...[/dim]")
+        result = subprocess.run(["git", "init"], cwd=project_dir, capture_output=True, text=True)
+        if result.returncode != 0:
+            console.print(f"[yellow]git init failed: {result.stderr.strip()}[/yellow]")
+            return False
+
+    # Check whether there is at least one commit
+    has_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
         cwd=project_dir,
         capture_output=True,
     )
+    if has_commit.returncode == 0:
+        return True
+
+    console.print("[dim]No commits found — creating initial commit...[/dim]")
+    result = subprocess.run(["git", "add", "-A"], cwd=project_dir, capture_output=True, text=True)
+    if result.returncode != 0:
+        console.print(f"[yellow]git add failed: {result.stderr.strip()}[/yellow]")
+        return False
+
+    result = subprocess.run(
+        ["git", "commit", "-m", "Initial commit (via UbundiForge)"],
+        cwd=project_dir,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        console.print(f"[yellow]git commit failed: {result.stderr.strip()}[/yellow]")
+        return False
+
     console.print("[dim]Git initialized with initial commit[/dim]")
+    return True
 
 
-def open_in_editor(project_dir: Path) -> None:
-    """Open the project directory in the user's editor."""
-    for editor in ("cursor", "code"):
+def open_in_editor(project_dir: Path, preferred_editor: str = "") -> None:
+    """Open the project directory in the user's editor.
+
+    Args:
+        project_dir: Path to the project directory.
+        preferred_editor: Editor command from config. Tried first before fallbacks.
+    """
+    candidates = ["cursor", "antigravity", "code"]
+    if preferred_editor:
+        candidates = [preferred_editor] + [c for c in candidates if c != preferred_editor]
+
+    for editor in candidates:
         if shutil.which(editor):
             subprocess.Popen([editor, str(project_dir)])
             console.print(f"[dim]Opened {project_dir} in {editor}[/dim]")

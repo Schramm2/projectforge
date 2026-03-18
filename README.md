@@ -4,10 +4,12 @@ UbundiForge is a Python CLI that scaffolds new projects with AI coding tools whi
 
 ## What It Does
 
+- First-run setup wizard that detects installed AI CLIs and editors
 - Prompts for project name, stack, description, Docker preference, optional auth/CI choices, and extra instructions
-- Routes to a preferred AI backend based on the selected stack
+- Routes to your preferred AI backend (configurable during setup)
 - Falls back to the next available backend if the primary isn't installed
 - Injects shared conventions from `~/.forge/conventions.md`
+- Scans user input for leaked secrets before passing to AI
 - Optionally includes a `CLAUDE.md` template in generated projects
 - Scaffolds `agent_docs/` starter docs to match the `CLAUDE.md` progressive-disclosure flow
 - Creates the target project directory and runs the selected AI CLI inside it
@@ -24,7 +26,7 @@ UbundiForge is a Python CLI that scaffolds new projects with AI coding tools whi
 
 ## Backend Routing
 
-By default, UbundiForge routes every stack to `claude` for now.
+By default, UbundiForge uses the backend you chose during setup (or `claude` if unconfigured).
 
 If the primary backend isn't installed, UbundiForge automatically falls back to the next available one (claude -> gemini -> codex).
 
@@ -33,7 +35,7 @@ You can override the routing with `--use`.
 ## Requirements
 
 - Python 3.12+
-- [`uv`](https://github.com/astral-sh/uv) recommended for environment setup
+- [`uv`](https://github.com/astral-sh/uv) for environment setup
 - At least one installed AI CLI:
   - `claude`
   - `gemini`
@@ -42,35 +44,26 @@ You can override the routing with `--use`.
 ## Installation
 
 ```bash
-./forge --version
-```
-
-The first run bootstraps a local `.venv`, installs the runtime dependencies, and creates a stable
-`forge` launcher that points at the repo source. This avoids the editable-install issue that can
-break the `forge` entrypoint on some Python/uv setups.
-
-If you prefer to install manually:
-
-```bash
-./scripts/install.sh
+uv sync
 source .venv/bin/activate
 forge --version
 ```
 
+On first run, Forge launches a setup wizard that checks for installed AI CLIs and editors, then saves your preferences to `~/.forge/config.json`.
+
 ## Usage
 
-The examples below use `./forge`, which works from a repo checkout without activating `.venv`.
-If you already activated the environment, you can replace `./forge` with `forge`.
+### First-run setup
 
-### Interactive mode
-
-Run the interactive scaffold flow:
+The setup wizard runs automatically on first use. To re-run it:
 
 ```bash
-./forge
+forge --setup
 ```
 
-Or, after activating the virtual environment:
+This detects installed tools, lets you pick a default AI backend and editor, and creates a conventions file if one doesn't exist.
+
+### Interactive mode
 
 ```bash
 forge
@@ -81,29 +74,29 @@ forge
 Skip the questions entirely by providing all required flags:
 
 ```bash
-./forge --name pulse --stack fastapi --description "health check API" --docker
-./forge --name storefront --stack nextjs --description "e-commerce site" --no-docker
-./forge --name platform --stack both --description "fullstack SaaS app"
-./forge --name studio --stack nextjs --description "client portal" --auth-provider clerk --ci --ci-template questionnaire --ci-actions lint,typecheck,unit-tests
+forge --name pulse --stack fastapi --description "health check API" --docker
+forge --name storefront --stack nextjs --description "e-commerce site" --no-docker
+forge --name platform --stack both --description "fullstack SaaS app"
+forge --name studio --stack nextjs --description "client portal" --auth-provider clerk --ci --ci-template questionnaire --ci-actions lint,typecheck,unit-tests
 ```
 
-Stack accepts aliases: `next`, `react`, `python`, `api`, `fullstack`, `monorepo`.
+Stack accepts aliases: `next`, `react`, `api`, `ai`, `fullstack`, `monorepo`, `cli`, `worker`, `library`.
 
 ### Backend and model selection
 
 Force a specific backend:
 
 ```bash
-./forge --use claude
-./forge --use gemini
-./forge --use codex
+forge --use claude
+forge --use gemini
+forge --use codex
 ```
 
 Pass a model to the AI CLI:
 
 ```bash
-./forge --model opus
-./forge --use gemini --model flash
+forge --model opus
+forge --use gemini --model flash
 ```
 
 ### Prompt inspection and export
@@ -111,21 +104,21 @@ Pass a model to the AI CLI:
 Preview the generated prompt without executing:
 
 ```bash
-./forge --dry-run
+forge --dry-run
 ```
 
 Export the prompt to a file:
 
 ```bash
-./forge --export prompt.md
+forge --export prompt.md
 ```
 
 ### Post-scaffold options
 
-Open the project in your editor (Cursor or VS Code) after scaffolding:
+Open the project in your editor after scaffolding (uses the editor chosen during setup):
 
 ```bash
-./forge --open
+forge --open
 ```
 
 ### Debugging
@@ -133,53 +126,60 @@ Open the project in your editor (Cursor or VS Code) after scaffolding:
 Show detailed execution info (command, timing, file sizes):
 
 ```bash
-./forge --verbose
+forge --verbose
 ```
 
 Show the installed version:
 
 ```bash
-./forge --version
+forge --version
 ```
 
 ## How It Works
 
-1. UbundiForge collects answers through an interactive terminal flow (or CLI flags).
-2. It loads your shared conventions and optional `CLAUDE.md` template.
-3. It builds a single scaffold prompt tailored to the chosen stack.
-4. It picks the best AI backend (with automatic fallback if needed).
-5. It launches the selected AI CLI in a new project directory with a progress spinner.
+1. On first run, the setup wizard detects AI CLIs and editors, saves preferences.
+2. UbundiForge collects answers through an interactive terminal flow (or CLI flags).
+3. It loads your shared conventions and optional `CLAUDE.md` template.
+4. It scans user-provided text for secrets before proceeding.
+5. It builds a single scaffold prompt tailored to the chosen stack.
+6. It picks the best AI backend (with automatic fallback if needed).
+7. It launches the selected AI CLI in a new project directory with a progress spinner.
+8. After scaffolding, it ensures git is initialized and opens the project in your editor.
 
 ## Project Structure
 
 ```text
 forge/
 ├── ubundiforge/
-│   ├── cli.py
-│   ├── config.py
-│   ├── conventions.py
-│   ├── prompt_builder.py
-│   ├── prompts.py
-│   ├── router.py
-│   ├── runner.py
-│   └── templates/
-├── tests/
-├── docs/
+│   ├── cli.py               # Typer app, single command entry point
+│   ├── config.py             # Backend availability checks
+│   ├── conventions.py        # Loads conventions from ~/.forge/
+│   ├── forge_entry.py        # Bootstrap entry point (bypasses uv .pth bug)
+│   ├── prompt_builder.py     # Assembles prompt from answers + conventions
+│   ├── prompts.py            # Interactive question flow
+│   ├── router.py             # AI backend routing + fallback
+│   ├── runner.py             # Subprocess execution of AI CLIs
+│   ├── safety.py             # Secret detection
+│   ├── scaffold_options.py   # Auth provider and CI action definitions
+│   ├── setup.py              # First-run setup wizard
+│   ├── stacks.py             # Stack metadata and cross-recipe defaults
+│   └── logo.py               # ASCII art banner
+├── tests/                    # pytest suite
+├── docs/                     # Specs, roadmap, diagrams
+├── research/                 # Discovery research and archives
+├── scripts/                  # Utility scripts
+├── assets/                   # ASCII art and static assets
 ├── pyproject.toml
 └── README.md
 ```
 
 ## Development
 
-Package code changes are picked up immediately because the launcher runs the source tree directly.
-If you change dependencies or delete `.venv`, rerun the installer:
+Code changes are picked up immediately (editable install). If you change dependencies or delete `.venv`:
 
 ```bash
-./scripts/install.sh
+uv sync
 ```
-
-The repo-local launcher also does this automatically when needed, so `./forge` is the safest
-command to use from a checkout.
 
 Run tests:
 
@@ -196,5 +196,6 @@ uv run ruff check ubundiforge/ tests/
 ## Notes
 
 - UbundiForge expects external AI CLIs to already be installed and available on `PATH`.
-- Conventions are loaded from `~/.forge/conventions.md`. If that file does not exist, UbundiForge creates it with defaults. UbundiForge warns if the conventions file is empty or very short.
+- Config and preferences are stored at `~/.forge/config.json`.
+- Conventions are loaded from `~/.forge/conventions.md`. If that file does not exist, the setup wizard creates it with defaults.
 - The bundled `CLAUDE.md` template is loaded from `ubundiforge/templates/claude-md-template.md`.

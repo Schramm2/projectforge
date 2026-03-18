@@ -23,6 +23,7 @@ from ubundiforge.scaffold_options import (
     auth_provider_supported_for_stack,
     ci_action_ids_for_stack,
 )
+from ubundiforge.setup import load_forge_config, needs_setup, run_setup
 
 app = typer.Typer(add_completion=False)
 console = Console()
@@ -77,7 +78,8 @@ def main(
     stack: Annotated[
         str | None,
         typer.Option(
-            "--stack", "-s",
+            "--stack",
+            "-s",
             help="Stack: nextjs, fastapi, fastapi-ai, both, python-cli, ts-package, python-worker.",
         ),
     ] = None,
@@ -125,14 +127,18 @@ def main(
             help="Comma-separated CI actions (e.g. 'lint,typecheck,unit-tests').",
         ),
     ] = None,
+    setup: Annotated[
+        bool,
+        typer.Option("--setup", help="Run the setup wizard."),
+    ] = False,
     verbose: Annotated[
         bool,
         typer.Option("--verbose", help="Show detailed execution info."),
     ] = False,
     open_editor: Annotated[
         bool,
-        typer.Option("--open", help="Open project in editor after scaffolding."),
-    ] = False,
+        typer.Option("--open/--no-open", help="Open project in editor after scaffolding."),
+    ] = True,
     export: Annotated[
         str | None,
         typer.Option("--export", help="Export assembled prompt to a file."),
@@ -143,15 +149,21 @@ def main(
         console.print(f"ubundiforge {__version__}")
         raise typer.Exit()
 
-    if use and use not in SUPPORTED_BACKENDS:
-        backends = ", ".join(SUPPORTED_BACKENDS)
-        console.print(
-            f"[red]Unknown backend '{use}'. Choose from: {backends}[/red]"
-        )
-        raise typer.Exit(1)
-
     print_logo(console)
     console.print(Panel("[bold]UbundiForge[/bold] -- Ubundi Project Scaffolder", style="cyan"))
+
+    # First-run setup wizard (or manual --setup)
+    if setup or needs_setup():
+        run_setup(console)
+        if setup:
+            raise typer.Exit()
+
+    forge_config = load_forge_config()
+
+    if use and use not in SUPPORTED_BACKENDS:
+        backends = ", ".join(SUPPORTED_BACKENDS)
+        console.print(f"[red]Unknown backend '{use}'. Choose from: {backends}[/red]")
+        raise typer.Exit(1)
 
     # Non-interactive mode: all required flags provided
     if name and stack and description:
@@ -189,9 +201,7 @@ def main(
 
         if ci_template and ci_template not in CI_TEMPLATE_MODES:
             valid = ", ".join(CI_TEMPLATE_MODES)
-            console.print(
-                f"[red]Unknown CI template '{ci_template}'. Choose from: {valid}[/red]"
-            )
+            console.print(f"[red]Unknown CI template '{ci_template}'. Choose from: {valid}[/red]")
             raise typer.Exit(1)
 
         ci_requested = ci if ci is not None else bool(ci_template or ci_actions)
@@ -231,20 +241,19 @@ def main(
     else:
         answers = collect_answers()
 
-    # Pick backend with fallback
-    backend, was_fallback = pick_backend_with_fallback(answers["stack"], override=use)
+    # Pick backend with fallback (prefer saved default if no --use override)
+    effective_override = use or forge_config.get("default_backend")
+    backend, was_fallback = pick_backend_with_fallback(
+        answers["stack"], override=effective_override
+    )
 
     if was_fallback:
         from ubundiforge.router import pick_backend
 
         primary = pick_backend(answers["stack"], override=use)
-        console.print(
-            f"\n[yellow]{primary} not found, falling back to {backend}[/yellow]"
-        )
+        console.print(f"\n[yellow]{primary} not found, falling back to {backend}[/yellow]")
     else:
-        console.print(
-            f"\n[dim]Using {backend} ({answers['stack']} project detected)[/dim]"
-        )
+        console.print(f"\n[dim]Using {backend} ({answers['stack']} project detected)[/dim]")
 
     if model:
         console.print(f"[dim]Model: {model}[/dim]")
@@ -271,14 +280,24 @@ def main(
     if claude_md_template:
         console.print("[dim]Loaded CLAUDE.md template[/dim]")
 
-    # Check extra instructions for secrets
-    extra_text = answers.get("extra", "")
-    if extra_text:
-        secret_warnings = check_for_secrets(extra_text)
+    # Check all user-supplied text for secrets before passing to AI
+    fields_to_scan = {
+        "name": answers.get("name", ""),
+        "description": answers.get("description", ""),
+        "extra": answers.get("extra", ""),
+    }
+    svc_list = answers.get("services", [])
+    if svc_list:
+        fields_to_scan["services"] = " ".join(svc_list)
+
+    for field_name, text in fields_to_scan.items():
+        if not text:
+            continue
+        secret_warnings = check_for_secrets(text)
         if secret_warnings:
             types = ", ".join(secret_warnings)
             console.print(
-                f"\n[red bold]Possible secrets detected in extra instructions: "
+                f"\n[red bold]Possible secrets detected in {field_name}: "
                 f"{types}[/red bold]"
                 "\n[red]Remove credentials before passing them to an AI CLI.[/red]"
             )
@@ -312,9 +331,7 @@ def main(
         )
         import questionary
 
-        confirm = questionary.confirm(
-            "Overwrite existing directory?", default=False
-        ).ask()
+        confirm = questionary.confirm("Overwrite existing directory?", default=False).ask()
         if not confirm:
             console.print("[dim]Aborted.[/dim]")
             raise typer.Exit(0)
@@ -324,13 +341,23 @@ def main(
     returncode = run_ai(backend, prompt, project_dir, model=model, verbose=verbose)
 
     if returncode == 0:
-        ensure_git_init(project_dir)
-        console.print(
-            f"\n[green bold]Done![/green bold] "
-            f"Project created at [bold]{project_dir}[/bold]"
-        )
+        git_ok = ensure_git_init(project_dir)
+        if git_ok:
+            console.print(
+                f"\n[green bold]Done![/green bold] Project created at [bold]{project_dir}[/bold]"
+            )
+        else:
+            console.print(
+                f"\n[yellow bold]Project created at [bold]{project_dir}[/bold], "
+                f"but git initialization failed.[/yellow bold]"
+                "\n[yellow]Run 'git init && git add -A && git commit -m \"Initial commit\"' "
+                "manually to finish setup.[/yellow]"
+            )
         if open_editor:
-            open_in_editor(project_dir)
+            preferred = forge_config.get("preferred_editor", "")
+            open_in_editor(project_dir, preferred_editor=preferred)
+        else:
+            console.print(f"[dim]Run your editor manually: cd {project_dir}[/dim]")
     else:
         console.print(f"\n[red]{backend} exited with code {returncode}.[/red]")
         raise typer.Exit(returncode)

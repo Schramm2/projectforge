@@ -16,13 +16,14 @@ dependencies = [
 ]
 
 [project.scripts]
-forge = "ubundiforge.cli:app"
+forge = "forge_entry:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["ubundiforge"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "assets/ascii-art.txt" = "assets/ascii-art.txt"
+"ubundiforge/forge_entry.py" = "forge_entry.py"
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -35,3 +36,9 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff>=0.15.6",
+]
