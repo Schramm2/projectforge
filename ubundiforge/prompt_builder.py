@@ -144,22 +144,6 @@ def build_prompt(
     auth_provider = answers.get("auth_provider")
     ci = answers.get("ci", {})
 
-    docker_instruction = ""
-    if answers["docker"]:
-        docker_instruction = "- Include Docker setup (Dockerfile + docker-compose.yml)\n"
-
-    if claude_md_template:
-        claude_md_instruction = (
-            "- Include a CLAUDE.md at the project root using the template below "
-            "as the base structure. Adapt the placeholders to match this project's "
-            "actual name, stack, and structure.\n"
-        )
-    else:
-        claude_md_instruction = (
-            "- Include a CLAUDE.md at the root that describes this project "
-            "for AI coding assistants\n"
-        )
-
     stack_section = _build_stack_section(
         answers["stack"],
         services,
@@ -167,44 +151,108 @@ def build_prompt(
         auth_provider=auth_provider,
     )
     ci_section = _build_ci_section(ci)
-    guidance_sections = "\n\n".join(section for section in (stack_section, ci_section) if section)
+
+    docker_block = ""
+    if answers["docker"]:
+        docker_block = (
+            "\n<docker>\n"
+            "Include Docker setup: Dockerfile + docker-compose.yml.\n"
+            "Follow the Docker standards in cross-project conventions.\n"
+            "</docker>"
+        )
+
+    claude_md_block = ""
+    if claude_md_template:
+        claude_md_block = (
+            "\n<claude_md_template>\n"
+            "Use this as the base for the project's CLAUDE.md. Adapt "
+            "placeholders to match this project's actual name, stack, "
+            "and structure.\n\n"
+            f"{claude_md_template}\n"
+            "</claude_md_template>"
+        )
+
+    ci_block = ""
+    if ci_section:
+        ci_block = f"\n<ci_guidance>\n{ci_section}\n</ci_guidance>"
+
+    claude_md_hint = (
+        "Use the template above as the base structure."
+        if claude_md_template
+        else "Cover stack, dev commands, project structure, and key patterns."
+    )
 
     prompt = f"""\
-You are scaffolding a new project. Create the full project in the current directory.
+You are an expert software architect specializing in production-grade project \
+scaffolding. You excel at designing clean, well-reasoned project structures \
+where every file has a clear purpose and every architectural decision is \
+intentional.
 
-PROJECT DETAILS:
-- Name: {answers["name"]}
-- Stack: {stack_label}
-- Description: {answers["description"]}
-- Docker: {docker_str}
+Your task: scaffold a new project in the current directory. Go beyond a \
+basic skeleton — create a fully-featured, immediately runnable project with \
+thoughtful defaults that reflect real-world best practices.
 
-{guidance_sections}
+<project>
+<name>{answers["name"]}</name>
+<stack>{stack_label}</stack>
+<description>{answers["description"]}</description>
+<docker>{docker_str}</docker>
+</project>
 
-{CROSS_RECIPE_DEFAULTS}
+<conventions>
+These are the team's coding standards. Follow them exactly — they override \
+any defaults you would normally use. They exist because the team has learned \
+from experience that these patterns reduce bugs and speed up onboarding.
 
-CONVENTIONS (follow these exactly):
 {conventions}
+</conventions>
 
-INSTRUCTIONS:
-- Create a complete, working project structure with all config files
-{claude_md_instruction}\
-- Include an agent_docs/ directory with starter progressive-disclosure docs
-  that align with CLAUDE.md
-- Include appropriate .gitignore, .env.example, README.md
-{docker_instruction}\
-- Initialize with sensible defaults — the user should be able to run the project immediately
-- Follow the stack-specific guidance above for structure, libraries, and commands
-- Follow the conventions above strictly for all styling, structure, and coding patterns
-- Initialize a git repository and make an initial commit
+<stack_guidance>
+{stack_section}
+</stack_guidance>
 
-EXTRA INSTRUCTIONS FROM USER:
-{extra}"""
+<cross_project_standards>
+{CROSS_RECIPE_DEFAULTS}
+</cross_project_standards>{docker_block}{ci_block}{claude_md_block}
 
-    if claude_md_template:
-        prompt += f"""
+<instructions>
+1. Create the complete project structure with all configuration files, \
+following the stack guidance layout exactly.
+2. Include a CLAUDE.md at the project root that describes this project for \
+AI coding assistants. {claude_md_hint}
+3. Include an agent_docs/ directory with starter progressive-disclosure docs \
+that align with CLAUDE.md (architecture overview, getting started, etc.).
+4. Include .gitignore, .env.example with real placeholder values, and a \
+README.md with setup instructions.
+5. Initialize with sensible defaults — the user should be able to clone, \
+install, and run the project immediately with no manual config.
+6. Initialize a git repository and make an initial commit.
+</instructions>
 
-CLAUDE.MD TEMPLATE (use this as the base for the project's CLAUDE.md):
-{claude_md_template}"""
+<quality_criteria>
+Before finishing, verify your work against these criteria:
+- Every file in the project structure has real, meaningful content (no empty \
+placeholder files).
+- Configuration files (pyproject.toml, tsconfig.json, etc.) are complete and \
+correct — they should pass validation.
+- Import paths are consistent and all cross-references between modules resolve.
+- The conventions are reflected in actual code patterns, not just documented.
+- Dev commands listed in CLAUDE.md actually work with the project as scaffolded.
+</quality_criteria>
+
+<avoid>
+- Do not over-engineer. Only include what the project description requires. \
+A simple API does not need event sourcing or CQRS.
+- Do not add features, abstractions, or configurability beyond what was asked.
+- Do not create empty placeholder files — if a file exists, it should have \
+real content.
+- Do not add excessive comments or docstrings to boilerplate code. Only \
+comment where the logic is non-obvious.
+</avoid>
+
+<extra_instructions>
+{extra}
+</extra_instructions>"""
 
     return prompt
 
@@ -234,22 +282,6 @@ def build_architecture_prompt(
     auth_provider = answers.get("auth_provider")
     ci = answers.get("ci", {})
 
-    docker_instruction = ""
-    if answers["docker"]:
-        docker_instruction = "- Include Docker setup (Dockerfile + docker-compose.yml)\n"
-
-    if claude_md_template:
-        claude_md_instruction = (
-            "- Include a CLAUDE.md at the project root using the template below "
-            "as the base structure. Adapt the placeholders to match this project's "
-            "actual name, stack, and structure.\n"
-        )
-    else:
-        claude_md_instruction = (
-            "- Include a CLAUDE.md at the root that describes this project "
-            "for AI coding assistants\n"
-        )
-
     stack_section = _build_stack_section(
         answers["stack"],
         services,
@@ -257,58 +289,125 @@ def build_architecture_prompt(
         auth_provider=auth_provider,
     )
     ci_section = "" if exclude_tests else _build_ci_section(ci)
-    guidance_sections = "\n\n".join(section for section in (stack_section, ci_section) if section)
 
-    exclusions = []
+    docker_block = ""
+    if answers["docker"]:
+        docker_block = (
+            "\n<docker>\n"
+            "Include Docker setup: Dockerfile + docker-compose.yml.\n"
+            "Follow the Docker standards in cross-project conventions.\n"
+            "</docker>"
+        )
+
+    claude_md_block = ""
+    if claude_md_template:
+        claude_md_block = (
+            "\n<claude_md_template>\n"
+            "Use this as the base for the project's CLAUDE.md. Adapt "
+            "placeholders to match this project's actual name, stack, "
+            "and structure.\n\n"
+            f"{claude_md_template}\n"
+            "</claude_md_template>"
+        )
+
+    exclusion_lines = []
     if exclude_frontend:
-        exclusions.append(
+        exclusion_lines.append(
             "- Do NOT create frontend UI components or pages — "
-            "a specialist frontend tool will handle those in the next step"
+            "a specialist frontend tool will handle those in the next step."
         )
     if exclude_tests:
-        exclusions.append(
+        exclusion_lines.append(
             "- Do NOT create test files or CI configuration — "
-            "a specialist testing tool will handle those in a later step"
+            "a specialist testing tool will handle those in a later step."
         )
-    exclusion_block = "\n".join(exclusions) + "\n" if exclusions else ""
+    exclusion_block = ""
+    if exclusion_lines:
+        exclusion_block = (
+            "\n<scope_boundaries>\n" + "\n".join(exclusion_lines) + "\n</scope_boundaries>"
+        )
+
+    ci_block = ""
+    if ci_section:
+        ci_block = f"\n<ci_guidance>\n{ci_section}\n</ci_guidance>"
+
+    claude_md_hint = (
+        "Use the template above as the base structure."
+        if claude_md_template
+        else "Cover stack, dev commands, project structure, and key patterns."
+    )
 
     prompt = f"""\
-You are scaffolding a new project. Create the full project structure in the current directory.
+You are an expert software architect specializing in production-grade project \
+scaffolding. You excel at designing clean, well-reasoned project structures \
+where every file has a clear purpose and every architectural decision is \
+intentional.
 
-PROJECT DETAILS:
-- Name: {answers["name"]}
-- Stack: {stack_label}
-- Description: {answers["description"]}
-- Docker: {docker_str}
+Your task: scaffold a new project in the current directory. Go beyond a \
+basic skeleton — create a fully-featured, immediately runnable project with \
+thoughtful defaults that reflect real-world best practices.
 
-{guidance_sections}
+<project>
+<name>{answers["name"]}</name>
+<stack>{stack_label}</stack>
+<description>{answers["description"]}</description>
+<docker>{docker_str}</docker>
+</project>
 
-{CROSS_RECIPE_DEFAULTS}
+<conventions>
+These are the team's coding standards. Follow them exactly — they override \
+any defaults you would normally use. They exist because the team has learned \
+from experience that these patterns reduce bugs and speed up onboarding.
 
-CONVENTIONS (follow these exactly):
 {conventions}
+</conventions>
 
-INSTRUCTIONS:
-- Create a complete, working project structure with all config files
-{claude_md_instruction}\
-- Include an agent_docs/ directory with starter progressive-disclosure docs
-  that align with CLAUDE.md
-- Include appropriate .gitignore, .env.example, README.md
-{docker_instruction}\
-{exclusion_block}\
-- Initialize with sensible defaults — the user should be able to run the project immediately
-- Follow the stack-specific guidance above for structure, libraries, and commands
-- Follow the conventions above strictly for all styling, structure, and coding patterns
-- Initialize a git repository and make an initial commit
+<stack_guidance>
+{stack_section}
+</stack_guidance>
 
-EXTRA INSTRUCTIONS FROM USER:
-{extra}"""
+<cross_project_standards>
+{CROSS_RECIPE_DEFAULTS}
+</cross_project_standards>{docker_block}{ci_block}{exclusion_block}{claude_md_block}
 
-    if claude_md_template:
-        prompt += f"""
+<instructions>
+1. Create the complete project structure with all configuration files, \
+following the stack guidance layout exactly.
+2. Include a CLAUDE.md at the project root that describes this project for \
+AI coding assistants. {claude_md_hint}
+3. Include an agent_docs/ directory with starter progressive-disclosure docs \
+that align with CLAUDE.md (architecture overview, getting started, etc.).
+4. Include .gitignore, .env.example with real placeholder values, and a \
+README.md with setup instructions.
+5. Initialize with sensible defaults — the user should be able to clone, \
+install, and run the project immediately with no manual config.
+6. Initialize a git repository and make an initial commit.
+</instructions>
 
-CLAUDE.MD TEMPLATE (use this as the base for the project's CLAUDE.md):
-{claude_md_template}"""
+<quality_criteria>
+Before finishing, verify your work against these criteria:
+- Every file in the project structure has real, meaningful content (no empty \
+placeholder files).
+- Configuration files (pyproject.toml, tsconfig.json, etc.) are complete and \
+correct — they should pass validation.
+- Import paths are consistent and all cross-references between modules resolve.
+- The conventions are reflected in actual code patterns, not just documented.
+- Dev commands listed in CLAUDE.md actually work with the project as scaffolded.
+</quality_criteria>
+
+<avoid>
+- Do not over-engineer. Only include what the project description requires. \
+A simple API does not need event sourcing or CQRS.
+- Do not add features, abstractions, or configurability beyond what was asked.
+- Do not create empty placeholder files — if a file exists, it should have \
+real content.
+- Do not add excessive comments or docstrings to boilerplate code. Only \
+comment where the logic is non-obvious.
+</avoid>
+
+<extra_instructions>
+{extra}
+</extra_instructions>"""
 
     return prompt
 
@@ -323,28 +422,70 @@ def build_frontend_prompt(answers: dict) -> str:
     extra = answers.get("extra", "").strip() or "None"
 
     return f"""\
-A project has been scaffolded in the current directory. Your job is to create \
-and enhance the frontend UI.
+You are an expert frontend engineer and visual designer who creates \
+distinctive, production-quality interfaces. You build frontends that look \
+and feel like they were crafted by a seasoned product designer.
 
-PROJECT DETAILS:
-- Name: {answers["name"]}
-- Stack: {stack_label}
-- Description: {answers["description"]}
+A project has been scaffolded in the current directory. The backend code, \
+configuration files, and project structure already exist. Your job is to \
+create the complete frontend UI.
 
-Review the existing project structure and code, then:
-- Create polished, production-quality frontend components with strong visual design
-- Build responsive, well-styled UI pages with modern aesthetics
-- Implement proper routing and navigation
-- Connect frontend to any existing API endpoints or data models
-- Follow the project's existing conventions and patterns (check CLAUDE.md and conventions)
-- Use the libraries and styling framework already configured in the project
-- Ensure accessibility basics (semantic HTML, alt text, keyboard navigation)
+<project>
+<name>{answers["name"]}</name>
+<stack>{stack_label}</stack>
+<description>{answers["description"]}</description>
+</project>
 
-Do NOT modify backend code, configuration files, tests, or infrastructure.
-Focus exclusively on creating an excellent frontend user experience.
+<instructions>
+1. Read the existing project structure first. Check CLAUDE.md, package.json \
+or pyproject.toml, and any existing frontend files to understand what \
+libraries, frameworks, and conventions are configured.
+2. Create all pages, routes, and components that the project description implies.
+   - Build responsive layouts that work across mobile, tablet, and desktop.
+   - Use the styling framework already configured in the project.
+   - Connect frontend to any existing API endpoints or data models.
+   - Add meaningful loading states, error states, and empty states.
+   - Use animations for page transitions and micro-interactions where appropriate.
+3. Ensure accessibility: semantic HTML, alt text, keyboard navigation, \
+sufficient color contrast, and visible focus indicators.
+</instructions>
 
-EXTRA INSTRUCTIONS FROM USER:
-{extra}"""
+<aesthetics>
+- Typography: Choose fonts that are beautiful and distinctive. Avoid generic \
+fonts like Arial and Inter.
+- Color and theme: Commit to a cohesive aesthetic. Use CSS variables for \
+consistency. Dominant colors with sharp accents outperform timid palettes.
+- Backgrounds: Create atmosphere and depth rather than defaulting to solid \
+colors. Layer CSS gradients or contextual effects.
+- Layout: Use visual hierarchy to guide the eye. Vary spacing, size, and \
+weight to create rhythm.
+</aesthetics>
+
+<quality_criteria>
+Before finishing, verify:
+- Does every page serve the project description's intent?
+- Is the visual design cohesive with a clear color palette and typography?
+- Are interactive elements keyboard-navigable with visible focus states?
+- Does the design feel distinctive and specific to this product?
+</quality_criteria>
+
+<scope_boundaries>
+- Do NOT modify backend code, API routes, database models, or infrastructure.
+- Do NOT modify configuration files (pyproject.toml, tsconfig.json, etc.).
+- Do NOT create test files.
+- Focus exclusively on frontend: pages, components, styles, client-side logic.
+</scope_boundaries>
+
+<avoid>
+- Do not use overused font families (Inter, Roboto, Arial, system fonts).
+- Do not use purple gradients on white backgrounds.
+- Do not create predictable layouts or cookie-cutter component patterns.
+- Do not create generic hero sections with stock-photo-style descriptions.
+</avoid>
+
+<extra_instructions>
+{extra}
+</extra_instructions>"""
 
 
 def build_tests_prompt(answers: dict) -> str:
@@ -360,28 +501,62 @@ def build_tests_prompt(answers: dict) -> str:
     ci_block = f"\n{ci_section}\n" if ci_section else ""
 
     return f"""\
-A project has been scaffolded in the current directory. Your job is to add \
-comprehensive tests and automation.
+You are a test engineer and automation specialist. A project has been \
+scaffolded in the current directory. Your job is to add comprehensive tests \
+and automation.
 
-PROJECT DETAILS:
-- Name: {answers["name"]}
-- Stack: {stack_label}
-- Description: {answers["description"]}
-{ci_block}
-Review the existing project structure and code, then:
-- Create comprehensive unit tests for all modules and functions
-- Add integration tests for API endpoints, data flows, and key workflows
-- Ensure tests cover edge cases and error paths, not just happy paths
-- Check for backward compatibility issues in any public interfaces
-- Add CI configuration if requested above
-- Follow the project's existing test patterns and conventions (check CLAUDE.md)
-- Use the testing frameworks already configured in the project (check pyproject.toml / package.json)
+<project>
+<name>{answers["name"]}</name>
+<stack>{stack_label}</stack>
+<description>{answers["description"]}</description>
+</project>{ci_block}
 
-Do NOT modify application code, frontend components, or infrastructure files.
-Focus exclusively on test coverage, CI configuration, and automation.
+<dependency_checks>
+Before writing any tests:
+- Read the project structure, CLAUDE.md, and the package manager config \
+(pyproject.toml or package.json) to understand what exists and what test \
+frameworks are configured.
+- Identify every module, class, and public function that needs test coverage.
+- Check what test utilities or fixtures already exist before creating new ones.
+</dependency_checks>
 
-EXTRA INSTRUCTIONS FROM USER:
-{extra}"""
+<instructions>
+1. Create comprehensive unit tests for all modules and functions.
+2. Add integration tests for API endpoints, data flows, and key workflows.
+3. For each function or endpoint, test:
+   - Happy path with typical inputs
+   - Edge cases: empty inputs, boundary values, maximum sizes
+   - Error paths: invalid inputs, missing data, permission failures
+4. Add CI configuration if requested in ci_guidance above.
+5. Use the testing frameworks already configured in the project.
+6. Follow the project's existing test patterns and conventions (check CLAUDE.md).
+</instructions>
+
+<quality_criteria>
+- Do not hard-code expected values that only match one specific input. \
+Verify the logic, not memorized outputs.
+- Use real objects where practical. Only mock external services, I/O, and \
+slow dependencies.
+- Do not write tests that test the framework itself.
+</quality_criteria>
+
+<verification>
+Before finalizing:
+- Run the test suite to confirm tests pass.
+- Check that no test files have syntax errors or missing imports.
+- Verify that test coverage touches every module identified above.
+</verification>
+
+<scope_boundaries>
+- Do NOT modify application code, frontend components, or infrastructure.
+- If you find bugs in application code, write a failing test that exposes \
+the bug and add a comment explaining what is wrong. Do not fix the bug.
+- Focus exclusively on: test files, CI configuration, and test utilities.
+</scope_boundaries>
+
+<extra_instructions>
+{extra}
+</extra_instructions>"""
 
 
 # ---------------------------------------------------------------------------

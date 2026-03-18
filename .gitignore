@@ -26,3 +26,6 @@ dist/
 .coverage.*
 htmlcov/
 
+# Scaffolded projects (created by forge during testing)
+pulse-dashboard/
+

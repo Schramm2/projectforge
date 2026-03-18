@@ -29,6 +29,7 @@ from ubundiforge.scaffold_options import (
     ci_action_ids_for_stack,
 )
 from ubundiforge.setup import load_forge_config, needs_setup, run_setup
+from ubundiforge.verify import print_report, verify_scaffold
 
 app = typer.Typer(add_completion=False)
 console = Console()
@@ -143,6 +144,10 @@ def main(
     open_editor: Annotated[
         bool,
         typer.Option("--open/--no-open", help="Open project in editor after scaffolding."),
+    ] = True,
+    verify: Annotated[
+        bool,
+        typer.Option("--verify/--no-verify", help="Run post-scaffold verification checks."),
     ] = True,
     export: Annotated[
         str | None,
@@ -400,8 +405,18 @@ def main(
             console.print(f"\n[red]{backend} exited with code {returncode} during {labels}.[/red]")
             raise typer.Exit(returncode)
 
-    # Post-scaffold: git init and open editor
+    # Post-scaffold: git init, verify, and open editor
     git_ok = ensure_git_init(project_dir)
+
+    if verify:
+        report = verify_scaffold(answers["stack"], project_dir, verbose=verbose)
+        print_report(report, console)
+        if not report.all_passed:
+            console.print(
+                "[yellow]Some verification checks failed. "
+                "The project was still created successfully.[/yellow]"
+            )
+
     if git_ok:
         console.print(
             f"\n[green bold]Done![/green bold] Project created at [bold]{project_dir}[/bold]"

@@ -28,9 +28,7 @@ BACKEND_MODELS: dict[str, list[dict[str, str | bool]]] = {
     "gemini": [
         {"id": "gemini-2.5-pro", "desc": "Production, strong reasoning", "default": True},
         {"id": "gemini-2.5-flash", "desc": "Fast and cost-efficient"},
-        {"id": "gemini-3-pro-preview", "desc": "Advanced reasoning (preview)"},
-        {"id": "gemini-3-flash-preview", "desc": "Fast Gemini 3 (preview)"},
-        {"id": "gemini-3.1-pro-preview", "desc": "Latest, most capable (preview)"},
+        {"id": "gemini-2.5-flash-lite", "desc": "Lightest, simple routing tasks"},
     ],
     "codex": [
         {"id": "gpt-5.4", "desc": "Flagship, best overall", "default": True},
@@ -225,9 +223,9 @@ def run_setup(console: Console) -> dict:
                     raise SystemExit(0)
                 model_val = model_val.strip()
 
-            # Only save if it's not the default
-            default_id = next((m["id"] for m in models if m.get("default")), None)
-            if model_val and model_val != default_id:
+            # Always save the selected model so it gets passed via --model
+            # to the CLI tool (which may have its own different default)
+            if model_val:
                 backend_models[backend] = model_val
 
         if backend_models:
