@@ -26,6 +26,7 @@ Python projects:
 - Line length: 100
 - Python target: 3.12
 - Package manager: uv
+- MyPy with --strict for type checking
 - pytest for testing, pytest-cov for coverage
 - Include a .pre-commit-config.yaml with ruff hooks
 - No ORM — use raw SQL via asyncpg for database access
@@ -34,6 +35,11 @@ Python projects:
 - Structured error responses: use Pydantic models for error bodies
 - FastAPI exception handlers for consistent error formatting across all routes
 - Tests in three tiers: tests/unit/, tests/integration/, tests/manual/ (optional)
+- PEP 8 naming: snake_case (modules, functions, variables),
+  PascalCase (classes, Pydantic models), UPPER_SNAKE_CASE (constants)
+- Import order: stdlib → third-party → local application. No wildcard imports.
+- Docstrings (triple double quotes) on all public modules, functions, classes, and methods
+- Service Layer: business logic in Service Classes with DI via __init__, not standalone functions
 
 TypeScript projects:
 - tsconfig.json with strict mode enabled
@@ -54,20 +60,29 @@ STACK_META: dict[str, StackMeta] = {
     "fastapi": StackMeta(
         package_manager="uv",
         default_structure=[
-            "api/          # FastAPI routes, schemas, middleware",
-            "api/routes/   # Route modules",
-            "src/          # Core runtime / domain logic",
-            "tests/        # Test suites",
-            "tests/unit/   # Fast isolated tests",
-            "tests/integration/  # Multi-component tests",
-            "scripts/      # Utility scripts",
-            "docs/         # Documentation",
-            "agent_docs/   # Progressive disclosure docs for AI assistants",
-            ".env.example  # Environment template",
-            "Dockerfile    # Docker image definition",
-            "CLAUDE.md     # AI assistant instructions",
-            "pyproject.toml # Project metadata + tool config",
-            ".pre-commit-config.yaml # Git hooks for ruff",
+            "api/              # Presentation layer — FastAPI routes, schemas, middleware",
+            "api/routes/       # Route modules",
+            "api/schemas/      # Request/Response models",
+            "domain/           # Core business logic — entities, value objects, interfaces",
+            "domain/models/    # Domain models (Pydantic/dataclass)",
+            "domain/services/  # Domain logic",
+            "domain/interfaces/ # Abstract repositories (Protocols)",
+            "application/      # Use cases and orchestration",
+            "infrastructure/   # External implementations — DB repos, API clients, config",
+            "infrastructure/persistence/ # Repository implementations",
+            "infrastructure/external/    # Third-party integrations",
+            "shared/           # Cross-cutting utilities",
+            "dependencies.py   # Singleton factories (@lru_cache) for DI",
+            "tests/unit/       # Fast isolated tests",
+            "tests/integration/ # Multi-component tests",
+            "scripts/          # Utility scripts",
+            "docs/             # Documentation",
+            "agent_docs/       # Progressive disclosure docs for AI assistants",
+            ".env.example",
+            "Dockerfile",
+            "CLAUDE.md",
+            "pyproject.toml",
+            ".pre-commit-config.yaml",
         ],
         common_libraries={
             "pydantic": "Data validation and serialization",
@@ -80,9 +95,9 @@ STACK_META: dict[str, StackMeta] = {
             "pytest-cov": "Coverage reporting (dev)",
         },
         dev_commands={
-            "lint": "uv run ruff check src api",
-            "format": "uv run ruff format src api",
-            "typecheck": "uv run mypy src",
+            "lint": "uv run ruff check .",
+            "format": "uv run ruff format .",
+            "typecheck": "uv run mypy --strict .",
             "test": "uv run pytest tests/unit/ -v --tb=short",
             "run": "uvicorn api.app:app --host 0.0.0.0 --port 8000",
         },
@@ -105,23 +120,30 @@ STACK_META: dict[str, StackMeta] = {
     "fastapi-ai": StackMeta(
         package_manager="uv",
         default_structure=[
-            "api/          # FastAPI routes, schemas, middleware",
-            "api/routes/   # Route modules",
-            "src/          # Core runtime / domain logic",
-            "src/shared/   # LLM wrapper, embeddings service",
-            "src/retrieve/ # Retrieval pipeline",
-            "src/extract/  # Extraction pipeline",
-            "tests/        # Test suites",
-            "tests/unit/   # Fast isolated tests",
-            "tests/integration/  # Multi-component tests",
-            "scripts/      # Utility scripts",
-            "docs/         # Documentation",
-            "agent_docs/   # Progressive disclosure docs for AI assistants",
-            ".env.example  # Environment template",
-            "Dockerfile    # Docker image definition",
-            "CLAUDE.md     # AI assistant instructions",
-            "pyproject.toml # Project metadata + tool config",
-            ".pre-commit-config.yaml # Git hooks for ruff",
+            "api/              # Presentation layer — FastAPI routes, schemas, middleware",
+            "api/routes/       # Route modules",
+            "api/schemas/      # Request/Response models",
+            "domain/           # Core business logic — entities, value objects, interfaces",
+            "domain/models/    # Domain models (Pydantic/dataclass)",
+            "domain/services/  # Domain logic (retrieval, extraction)",
+            "application/      # Use cases and orchestration",
+            "application/retrieve/ # Retrieval pipeline use cases",
+            "application/extract/  # Extraction pipeline use cases",
+            "infrastructure/   # External implementations — DB repos, API clients, config",
+            "infrastructure/persistence/ # Repository implementations (asyncpg, pgvector)",
+            "infrastructure/external/    # LLM providers, embedding services",
+            "shared/           # Cross-cutting utilities (LLM wrapper, token counting)",
+            "dependencies.py   # Singleton factories (@lru_cache) for DI",
+            "tests/unit/       # Fast isolated tests",
+            "tests/integration/ # Multi-component tests",
+            "scripts/          # Utility scripts",
+            "docs/             # Documentation",
+            "agent_docs/       # Progressive disclosure docs for AI assistants",
+            ".env.example",
+            "Dockerfile",
+            "CLAUDE.md",
+            "pyproject.toml",
+            ".pre-commit-config.yaml",
         ],
         common_libraries={
             "pydantic": "Data validation and serialization",
@@ -140,9 +162,9 @@ STACK_META: dict[str, StackMeta] = {
             "pytest-cov": "Coverage reporting (dev)",
         },
         dev_commands={
-            "lint": "uv run ruff check src api",
-            "format": "uv run ruff format src api",
-            "typecheck": "uv run mypy src",
+            "lint": "uv run ruff check .",
+            "format": "uv run ruff format .",
+            "typecheck": "uv run mypy --strict .",
             "test": "uv run pytest tests/unit/ -v --tb=short",
             "run": "uvicorn api.app:app --host 0.0.0.0 --port 8000",
         },
@@ -201,19 +223,24 @@ STACK_META: dict[str, StackMeta] = {
     "both": StackMeta(
         package_manager="uv + npm",
         default_structure=[
-            "api/           # FastAPI backend",
+            "api/           # Presentation layer — FastAPI routes, schemas",
+            "api/routes/    # Route modules",
+            "api/schemas/   # Request/Response models",
             "frontend/      # Next.js frontend",
-            "domain/        # Shared domain logic (Python)",
-            "application/   # Business orchestration (Python)",
-            "infrastructure/ # External service adapters (Python)",
-            "tests/         # Backend tests",
+            "domain/        # Core business logic — entities, value objects, interfaces",
+            "application/   # Use cases and orchestration",
+            "infrastructure/ # External implementations — DB repos, API clients",
+            "shared/        # Cross-cutting utilities",
+            "dependencies.py # Singleton factories for DI",
+            "tests/unit/    # Fast isolated tests",
+            "tests/integration/ # Multi-component tests",
             "scripts/       # Utility scripts",
             "docker/        # Docker configs",
             "agent_docs/    # Progressive disclosure docs for AI assistants",
             "docker-compose.yml",
             ".env.example",
             "CLAUDE.md",
-            ".pre-commit-config.yaml # Git hooks for ruff",
+            ".pre-commit-config.yaml",
         ],
         common_libraries={
             "fastapi": "Web framework",

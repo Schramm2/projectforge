@@ -25,6 +25,13 @@ Follow these conventions when generating any project files.
 - Components should be modern, clean, minimal
 - No heavy shadows. Use subtle borders with opacity
 
+## Frontend Communication Patterns
+
+- One user action = one API call. Combine related sequential calls into single endpoints.
+- Use response data directly — don't discard it and refetch the same information.
+- Atomic state updates: update all related state from a single response to prevent flickering.
+- API client methods named after user actions, not backend structure.
+
 ## Coding Standards
 
 ### TypeScript / Next.js
@@ -38,12 +45,47 @@ Follow these conventions when generating any project files.
 - Type hints on all functions and variables
 - Pydantic models for all data structures
 - Async endpoints where possible
-- Structure: api/ for routes + a domain-named package for core logic
 - No ORM — use raw SQL via asyncpg
 - API routes prefixed with /v1/
 - Structured error responses using Pydantic models for error bodies
 - FastAPI exception handlers for consistent error formatting
 - Ruff for linting and formatting
+- Docstrings (triple double quotes) on all public modules, functions, classes, and methods
+- Imports ordered: stdlib → third-party → local application. No wildcard imports.
+
+## Python Architecture
+
+Follow Clean Architecture (Onion Architecture). Dependencies point inward.
+
+### Layer Structure
+- domain/: Core business logic — entities, value objects, domain services,
+  interfaces (Protocols). Depends on NOTHING (stdlib only).
+- application/: Use cases and orchestration. Depends only on domain.
+- infrastructure/: External implementations — DB repositories, API clients,
+  config loading. Implements interfaces defined in domain.
+- api/: Presentation layer — FastAPI routes, request/response schemas.
+  Depends on application.
+- shared/: Cross-cutting utilities used across layers. Keep minimal.
+
+### Dependency Flow
+Presentation (api/) → Application → Domain ← Infrastructure
+
+### Service Layer Pattern
+- Encapsulate business logic in Service Classes (e.g., UserService), not standalone functions.
+- Inject dependencies via __init__ (database sessions, external clients).
+- No global state — all state passed through constructor or method params.
+
+### FastAPI Patterns
+- Use @lru_cache for singleton services in a dedicated dependencies.py file.
+- Load state once per request: load → process → persist. No repeated DB queries for the same data.
+- Inject services into route handlers — never instantiate inline.
+- Combined endpoints: if the frontend always calls two endpoints in sequence, combine them.
+
+### File Naming
+- Models: *_model.py (e.g., user_model.py)
+- Services: *_service.py (e.g., payment_service.py)
+- Repositories: *_repository.py (e.g., user_repository.py)
+- Tests: test_*.py (e.g., test_payment_service.py)
 
 ## Always Include
 - .gitignore appropriate to the stack
@@ -54,8 +96,12 @@ Follow these conventions when generating any project files.
   project-specific notes. Write it as a direct briefing, not documentation.
 
 ## Git
-- Use conventional commit style
+
+- GitHub Flow: main branch always deployable, short-lived feature branches
+- Branch naming: type/description (e.g., feat/user-login, fix/header-alignment, docs/update-readme)
+- Conventional commit messages (e.g., feat: add login, fix: resolve crash)
 - Initialize git on project creation
+- PR template: Summary, Type of Change, Testing, Screenshots (if UI)
 """
 
 
@@ -89,9 +135,7 @@ def load_conventions() -> tuple[str, list[str]]:
     if not content.strip():
         warnings.append("Conventions file is empty — scaffolds will lack guidance.")
     elif len(content.strip()) < MIN_CONVENTIONS_LENGTH:
-        warnings.append(
-            "Conventions file is very short — consider adding more detail."
-        )
+        warnings.append("Conventions file is very short — consider adding more detail.")
 
     return content, warnings
 
