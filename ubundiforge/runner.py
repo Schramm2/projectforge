@@ -34,6 +34,9 @@ def _build_cmd(backend: str, prompt: str, model: str | None = None) -> list[str]
     return cmd
 
 
+_PHASE_TIMEOUT = 600  # 10 minutes per phase
+
+
 def run_ai(
     backend: str,
     prompt: str,
@@ -44,7 +47,8 @@ def run_ai(
     """Execute the AI CLI with the assembled prompt.
 
     Creates the project directory if it doesn't exist, then runs the chosen
-    AI CLI inside it with a progress spinner.
+    AI CLI inside it. Output streams to the terminal in real-time to avoid
+    pipe-buffer deadlocks (which caused hangs with Codex).
 
     Args:
         backend: Which CLI to use (claude, gemini, codex).
@@ -70,18 +74,24 @@ def run_ai(
 
     start = time.monotonic()
 
-    with console.status(
-        f"[cyan]{backend} is scaffolding your project...[/cyan]",
-        spinner="dots",
-    ):
-        result = subprocess.run(cmd, cwd=project_dir, capture_output=True, text=True)
+    # Stream output directly to terminal instead of capturing it.
+    # capture_output=True caused hangs when backends (especially Codex)
+    # spawned child processes that inherited the pipes.
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=project_dir,
+            timeout=_PHASE_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        elapsed = time.monotonic() - start
+        console.print(
+            f"\n[yellow]{backend} timed out after {elapsed:.0f}s. "
+            f"The phase may have stalled.[/yellow]"
+        )
+        return 1
 
     elapsed = time.monotonic() - start
-
-    if result.stdout:
-        console.print(result.stdout)
-    if result.stderr:
-        console.print(result.stderr, style="dim")
 
     if verbose:
         console.print(f"[dim]Completed in {elapsed:.1f}s (exit code {result.returncode})[/dim]")

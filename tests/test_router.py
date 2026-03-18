@@ -125,13 +125,26 @@ def test_override_forces_single_backend(mock_check):
 
 
 @patch("ubundiforge.router.check_backend_installed", return_value=True)
-def test_description_keywords_route_architecture_to_codex(mock_check):
+def test_description_phrases_route_architecture_to_codex(mock_check):
     result = pick_phase_backends("fastapi", description="a CI pipeline automation tool")
     assert result[0] == ("architecture", "codex")
 
 
 @patch("ubundiforge.router.check_backend_installed", return_value=True)
-def test_description_keywords_no_match_keeps_claude(mock_check):
+def test_description_phrases_testing_framework_routes_to_codex(mock_check):
+    result = pick_phase_backends("fastapi", description="a testing framework for APIs")
+    assert result[0] == ("architecture", "codex")
+
+
+@patch("ubundiforge.router.check_backend_installed", return_value=True)
+def test_description_phrases_no_false_positive_on_pipeline(mock_check):
+    """'deal pipeline' is a CRM concept, not CI — should NOT route to Codex."""
+    result = pick_phase_backends("fastapi", description="CRM with deal pipeline boards")
+    assert result[0] == ("architecture", "claude")
+
+
+@patch("ubundiforge.router.check_backend_installed", return_value=True)
+def test_description_phrases_no_match_keeps_claude(mock_check):
     result = pick_phase_backends("fastapi", description="a customer dashboard")
     assert result[0] == ("architecture", "claude")
 

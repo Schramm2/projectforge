@@ -44,16 +44,32 @@ PHASE_IDEAL_BACKEND: dict[str, str] = {
     PHASE_VERIFY: "claude",
 }
 
-# Description keywords that signal a testing/automation project → Codex for architecture
-_CODEX_KEYWORDS = {"test", "testing", "ci/cd", "ci", "automation", "pipeline", "refactor"}
+# Phrases that signal a testing/automation project → Codex for architecture.
+# Uses phrases instead of single words to avoid false positives like "deal pipeline".
+_CODEX_PHRASES = [
+    "ci/cd",
+    "ci pipeline",
+    "cd pipeline",
+    "test framework",
+    "test runner",
+    "test suite",
+    "test harness",
+    "testing tool",
+    "testing framework",
+    "automation tool",
+    "automation framework",
+    "code refactoring",
+    "linting tool",
+    "lint tool",
+]
 
 FALLBACK_ORDER = ("claude", "gemini", "codex")
 
 
 def _detect_codex_project(description: str) -> bool:
     """Check if the project description suggests a testing/automation project."""
-    words = set(description.lower().split())
-    return bool(words & _CODEX_KEYWORDS)
+    desc_lower = description.lower()
+    return any(phrase in desc_lower for phrase in _CODEX_PHRASES)
 
 
 def pick_phase_backends(
