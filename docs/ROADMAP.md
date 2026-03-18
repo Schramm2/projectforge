@@ -134,7 +134,7 @@ Items marked with [DONE] have been implemented.
 - **Plugin system**: Third-party plugins that add new stacks, backends, or post-scaffold hooks. Simple Python entry points.
 - **Shell completions**: Tab completion for `--use`, `--stack`, `--preset`, `--conventions` values.
 - [DONE] **Verbose mode**: `forge --verbose` shows the full subprocess command, conventions file size, prompt length, and execution timing.
-- **Config file**: `~/.forge/config.toml` for persistent preferences (default backend, default Docker=yes, preferred editor, etc).
+- [DONE] **Config file**: `~/.forge/config.json` for persistent preferences (default backend, preferred editor, Docker availability, default project directory). Set up via the first-run setup wizard or `forge --setup`.
 - **Update checker**: Notify when a new version of Forge is available.
 
 ---
@@ -148,9 +148,21 @@ Items marked with [DONE] have been implemented.
 
 ---
 
-## Deployment & Distribution
+## Deployment & Distribution (Priority)
 
-- **Homebrew formula**: `brew install forge` for easy installation on macOS.
-- **pipx support**: `pipx install forge-cli` for isolated global install.
-- **Docker image**: Run Forge itself in a container with all three AI CLIs pre-installed.
+This is the key milestone — getting Forge into the hands of Ubundi team members with a single command.
+
+The target workflow:
+1. Team member runs `brew install ubundiforge`
+2. Runs `forge` from any directory
+3. Setup wizard runs on first use (detects tools, configures preferences)
+4. Projects scaffold into their configured directory with Ubundi conventions baked in
+
+Steps to ship:
+- **Publish to PyPI**: `uv build && uv publish` (needs PyPI account + API token)
+- **Create Homebrew tap**: `Ubundi/homebrew-tap` repo on GitHub with a formula pointing at the PyPI package
+- **Homebrew formula**: `brew tap ubundi/tap && brew install ubundiforge`
+- Transfer repo from `matthewubundi/UbundiForge` to `Ubundi/ubundiforge` when ready
+- **pipx support**: `pipx install ubundiforge` for isolated global install (works automatically once on PyPI)
 - **Auto-update**: `forge update` pulls the latest version.
+- **Docker image**: Run Forge itself in a container with all three AI CLIs pre-installed.

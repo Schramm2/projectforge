@@ -71,6 +71,43 @@ def save_forge_config(config: dict) -> None:
     CONFIG_PATH.write_text(json.dumps(config, indent=2) + "\n")
 
 
+def _routing_summary(available: list[str], console: Console) -> None:
+    """Print a summary of how multi-backend routing will work."""
+    has_claude = "claude" in available
+    has_gemini = "gemini" in available
+    has_codex = "codex" in available
+
+    if has_claude and has_gemini and has_codex:
+        console.print(
+            "[green]All three backends detected — optimal routing enabled.[/green]\n"
+            "[dim]  Architecture & backend code -> claude[/dim]\n"
+            "[dim]  Frontend & UI              -> gemini[/dim]\n"
+            "[dim]  Tests & automation         -> codex[/dim]\n"
+        )
+    elif has_claude and has_gemini:
+        console.print(
+            "[dim]claude + gemini detected.[/dim]\n"
+            "[dim]  Architecture, backend & tests -> claude[/dim]\n"
+            "[dim]  Frontend & UI                 -> gemini[/dim]\n"
+        )
+    elif has_claude and has_codex:
+        console.print(
+            "[dim]claude + codex detected.[/dim]\n"
+            "[dim]  Architecture & backend -> claude[/dim]\n"
+            "[dim]  Tests & automation     -> codex[/dim]\n"
+        )
+    elif has_claude:
+        console.print(
+            "[dim]Only claude detected — it will handle all scaffolding.[/dim]\n"
+            "[dim]Install gemini and/or codex to enable specialist routing.[/dim]\n"
+        )
+    else:
+        backend = available[0] if available else "?"
+        console.print(f"[dim]Only {backend} detected — it will handle all scaffolding.[/dim]\n")
+
+    console.print("[dim]Use --use to override routing for any run.[/dim]\n")
+
+
 def run_setup(console: Console) -> dict:
     """Run the interactive setup wizard. Returns the saved config dict."""
     console.print()
@@ -84,16 +121,24 @@ def run_setup(console: Console) -> dict:
 
     table = Table(show_header=True, header_style="bold")
     table.add_column("Tool")
+    table.add_column("Strength")
     table.add_column("Status")
+
+    strengths = {
+        "claude": "Architecture & backend",
+        "gemini": "Frontend & UI",
+        "codex": "Tests & automation",
+    }
 
     available: list[str] = []
     for backend in SUPPORTED_BACKENDS:
         installed = check_backend_installed(backend)
+        strength = strengths.get(backend, "")
         if installed:
             available.append(backend)
-            table.add_row(backend, "[green]Installed[/green]")
+            table.add_row(backend, strength, "[green]Installed[/green]")
         else:
-            table.add_row(backend, "[dim]Not found[/dim]")
+            table.add_row(backend, strength, "[dim]Not found[/dim]")
 
     console.print(table)
     console.print()
@@ -106,24 +151,9 @@ def run_setup(console: Console) -> dict:
         )
         raise SystemExit(1)
 
-    # --- Step 2: Pick default backend ---
-    console.print("[bold]Step 2:[/bold] Choose your default AI backend.\n")
-
-    if len(available) == 1:
-        default_backend = available[0]
-        console.print(f"[dim]Only {default_backend} is installed — using it as default.[/dim]\n")
-    else:
-        existing = load_forge_config().get("default_backend")
-        preselect = existing if existing in available else None
-        choices = [questionary.Choice(b, value=b) for b in available]
-        default_backend = questionary.select(
-            "Which AI tool should Forge use by default?",
-            choices=choices,
-            default=preselect,
-        ).ask()
-        if default_backend is None:
-            raise SystemExit(0)
-        console.print()
+    # --- Step 2: Routing summary ---
+    console.print("[bold]Step 2:[/bold] Backend routing.\n")
+    _routing_summary(available, console)
 
     # --- Step 3: Pick preferred editor ---
     console.print("[bold]Step 3:[/bold] Detecting editors...\n")
@@ -156,18 +186,10 @@ def run_setup(console: Console) -> dict:
         )
     elif len(available_editors) == 1:
         preferred_editor = available_editors[0][0]
-        console.print(
-            f"[dim]Only {available_editors[0][1]} found "
-            f"— using it as default.[/dim]\n"
-        )
+        console.print(f"[dim]Only {available_editors[0][1]} found — using it as default.[/dim]\n")
     else:
-        choices = [
-            questionary.Choice(label, value=cmd)
-            for cmd, label in available_editors
-        ]
-        choices.append(
-            questionary.Choice("None — I'll open projects manually", value="")
-        )
+        choices = [questionary.Choice(label, value=cmd) for cmd, label in available_editors]
+        choices.append(questionary.Choice("None — I'll open projects manually", value=""))
         preferred_editor = questionary.select(
             "Which editor should Forge open projects in?",
             choices=choices,
@@ -214,8 +236,8 @@ def run_setup(console: Console) -> dict:
             "[yellow]Git user.name or user.email is not configured.[/yellow]\n"
             "[dim]Forge runs git init + commit on scaffolded projects. "
             "Set them with:[/dim]\n"
-            "[dim]  git config --global user.name \"Your Name\"[/dim]\n"
-            "[dim]  git config --global user.email \"you@example.com\"[/dim]\n"
+            '[dim]  git config --global user.name "Your Name"[/dim]\n'
+            '[dim]  git config --global user.email "you@example.com"[/dim]\n'
         )
 
     # --- Step 5: Docker check ---
@@ -283,7 +305,6 @@ def run_setup(console: Console) -> dict:
 
     # --- Save config ---
     config = {
-        "default_backend": default_backend,
         "preferred_editor": preferred_editor,
         "available_backends": available,
         "docker_available": docker_installed,

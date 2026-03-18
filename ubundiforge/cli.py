@@ -11,9 +11,14 @@ from ubundiforge import __version__
 from ubundiforge.config import SUPPORTED_BACKENDS, check_backend_installed
 from ubundiforge.conventions import load_claude_md_template, load_conventions
 from ubundiforge.logo import print_logo
-from ubundiforge.prompt_builder import build_prompt
+from ubundiforge.prompt_builder import build_phase_prompt
 from ubundiforge.prompts import collect_answers
-from ubundiforge.router import pick_backend_with_fallback
+from ubundiforge.router import (
+    PHASE_LABELS,
+    STACK_PHASES,
+    merge_adjacent_phases,
+    pick_phase_backends,
+)
 from ubundiforge.runner import ensure_git_init, open_in_editor, reset_project_dir, run_ai
 from ubundiforge.safety import check_for_secrets
 from ubundiforge.scaffold_options import (
@@ -243,30 +248,37 @@ def main(
             docker_available=forge_config.get("docker_available", True),
         )
 
-    # Pick backend with fallback (prefer saved default if no --use override)
-    effective_override = use or forge_config.get("default_backend")
-    backend, was_fallback = pick_backend_with_fallback(
-        answers["stack"], override=effective_override
+    # --- Multi-backend phase routing ---
+    phase_backends = pick_phase_backends(
+        answers["stack"],
+        override=use,
+        description=answers.get("description", ""),
     )
+    merged_groups = merge_adjacent_phases(phase_backends)
+    all_phases = STACK_PHASES.get(answers["stack"], ["architecture", "tests"])
 
-    if was_fallback:
-        from ubundiforge.router import pick_backend
-
-        primary = pick_backend(answers["stack"], override=use)
-        console.print(f"\n[yellow]{primary} not found, falling back to {backend}[/yellow]")
+    # Show routing plan
+    if len(merged_groups) == 1:
+        _, backend = merged_groups[0]
+        console.print(f"\n[dim]Using {backend} for all scaffolding[/dim]")
     else:
-        console.print(f"\n[dim]Using {backend} ({answers['stack']} project detected)[/dim]")
+        console.print("\n[dim]Multi-backend routing:[/dim]")
+        for i, (phases, backend) in enumerate(merged_groups, 1):
+            labels = " + ".join(PHASE_LABELS.get(p, p) for p in phases)
+            console.print(f"[dim]  {i}. {labels} -> {backend}[/dim]")
 
     if model:
         console.print(f"[dim]Model: {model}[/dim]")
 
-    # Check backend is installed (fallback may still fail if nothing is installed)
-    if not check_backend_installed(backend):
-        console.print(
-            f"\n[red bold]{backend}[/red bold] [red]is not installed or not on PATH.[/red]"
-            "\n[dim]Install at least one AI CLI (claude, gemini, or codex).[/dim]"
-        )
-        raise typer.Exit(1)
+    # Check that all required backends are installed
+    required_backends = {backend for _, backend in merged_groups}
+    for backend in required_backends:
+        if not check_backend_installed(backend):
+            console.print(
+                f"\n[red bold]{backend}[/red bold] [red]is not installed or not on PATH.[/red]"
+                "\n[dim]Install at least one AI CLI (claude, gemini, or codex).[/dim]"
+            )
+            raise typer.Exit(1)
 
     # Load conventions and CLAUDE.md template
     conventions, conv_warnings = load_conventions()
@@ -305,23 +317,49 @@ def main(
             )
             raise typer.Exit(1)
 
-    # Build prompt
-    prompt = build_prompt(answers, conventions, claude_md_template)
+    # Build prompts for each phase group
+    phase_prompts: list[tuple[list[str], str, str]] = []
+    for phases, backend in merged_groups:
+        prompt = build_phase_prompt(
+            phases,
+            all_phases,
+            answers,
+            conventions,
+            backend=backend,
+            claude_md_template=claude_md_template,
+        )
+        phase_prompts.append((phases, backend, prompt))
+
+    # Dry run / export: show all phase prompts
+    if dry_run or export:
+        for phases, backend, prompt in phase_prompts:
+            labels = " + ".join(PHASE_LABELS.get(p, p) for p in phases)
+            if dry_run:
+                if len(phase_prompts) > 1:
+                    console.print(f"\n[bold]--- {labels} ({backend}) ---[/bold]\n")
+                else:
+                    console.print("\n[bold]Assembled prompt:[/bold]\n")
+                console.print(prompt)
+
+        if export:
+            export_path = Path(export)
+            parts = []
+            for phases, backend, prompt in phase_prompts:
+                label = " + ".join(PHASE_LABELS.get(p, p) for p in phases)
+                if len(phase_prompts) > 1:
+                    parts.append(f"=== {label} ({backend}) ===\n\n{prompt}")
+                else:
+                    parts.append(prompt)
+            all_text = "\n\n".join(parts)
+            export_path.write_text(all_text)
+            console.print(f"\n[green]Prompt exported to {export_path}[/green]")
+
+        raise typer.Exit()
 
     if verbose:
-        console.print(f"[dim]Prompt length: {len(prompt)} chars[/dim]")
-
-    # Export prompt to file
-    if export:
-        export_path = Path(export)
-        export_path.write_text(prompt)
-        console.print(f"\n[green]Prompt exported to {export_path}[/green]")
-        raise typer.Exit()
-
-    if dry_run:
-        console.print("\n[bold]Assembled prompt:[/bold]\n")
-        console.print(prompt)
-        raise typer.Exit()
+        total_chars = sum(len(prompt) for _, _, prompt in phase_prompts)
+        n = len(phase_prompts)
+        console.print(f"[dim]Total prompt length: {total_chars} chars across {n} phase(s)[/dim]")
 
     # Run — use saved projects_dir if set, otherwise CWD
     base_dir = Path(forge_config.get("projects_dir") or Path.cwd())
@@ -340,27 +378,36 @@ def main(
             raise typer.Exit(0)
         reset_project_dir(project_dir)
 
-    console.print(f"[dim]Handing off to {backend}...[/dim]\n")
-    returncode = run_ai(backend, prompt, project_dir, model=model, verbose=verbose)
+    # Execute each phase group
+    total_groups = len(phase_prompts)
+    for group_idx, (phases, backend, prompt) in enumerate(phase_prompts, 1):
+        labels = " + ".join(PHASE_LABELS.get(p, p) for p in phases)
+        if total_groups > 1:
+            console.print(f"\n[dim]Phase {group_idx}/{total_groups}: {labels} -> {backend}[/dim]")
+        else:
+            console.print(f"[dim]Handing off to {backend}...[/dim]\n")
 
-    if returncode == 0:
-        git_ok = ensure_git_init(project_dir)
-        if git_ok:
-            console.print(
-                f"\n[green bold]Done![/green bold] Project created at [bold]{project_dir}[/bold]"
-            )
-        else:
-            console.print(
-                f"\n[yellow bold]Project created at [bold]{project_dir}[/bold], "
-                f"but git initialization failed.[/yellow bold]"
-                "\n[yellow]Run 'git init && git add -A && git commit -m \"Initial commit\"' "
-                "manually to finish setup.[/yellow]"
-            )
-        if open_editor:
-            preferred = forge_config.get("preferred_editor", "")
-            open_in_editor(project_dir, preferred_editor=preferred)
-        else:
-            console.print(f"[dim]Run your editor manually: cd {project_dir}[/dim]")
+        returncode = run_ai(backend, prompt, project_dir, model=model, verbose=verbose)
+
+        if returncode != 0:
+            console.print(f"\n[red]{backend} exited with code {returncode} during {labels}.[/red]")
+            raise typer.Exit(returncode)
+
+    # Post-scaffold: git init and open editor
+    git_ok = ensure_git_init(project_dir)
+    if git_ok:
+        console.print(
+            f"\n[green bold]Done![/green bold] Project created at [bold]{project_dir}[/bold]"
+        )
     else:
-        console.print(f"\n[red]{backend} exited with code {returncode}.[/red]")
-        raise typer.Exit(returncode)
+        console.print(
+            f"\n[yellow bold]Project created at [bold]{project_dir}[/bold], "
+            f"but git initialization failed.[/yellow bold]"
+            "\n[yellow]Run 'git init && git add -A && git commit -m \"Initial commit\"' "
+            "manually to finish setup.[/yellow]"
+        )
+    if open_editor:
+        preferred = forge_config.get("preferred_editor", "")
+        open_in_editor(project_dir, preferred_editor=preferred)
+    else:
+        console.print(f"[dim]Run your editor manually: cd {project_dir}[/dim]")

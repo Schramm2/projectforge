@@ -19,9 +19,7 @@ CHAR_DENSITY = {
     "#": 6,
     "%": 7,
 }
-LOGO_PATHS = (
-    Path(__file__).resolve().parent.parent / "assets" / "ascii-art.txt",
-)
+LOGO_PATHS = (Path(__file__).resolve().parent.parent / "assets" / "ascii-art.txt",)
 FALLBACK_LOGO = """\
  #%%%%%%%         %%%%%%%%
 +%%%  -%%+        %%%  =%%%

@@ -27,6 +27,7 @@ packages = ["ubundiforge"]
 
 [tool.hatch.build.targets.sdist]
 include = [
+    "ubundiforge/",
     "assets/ascii-art.txt",
 ]
 

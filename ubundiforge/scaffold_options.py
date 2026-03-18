@@ -142,10 +142,7 @@ STACK_CI_ACTIONS: dict[str, list[str]] = {
 def auth_provider_choices_for_stack(stack: str) -> list[tuple[str, str]]:
     """Return ordered auth provider choices for a stack."""
     provider_ids = auth_provider_ids_for_stack(stack)
-    return [
-        (provider_id, AUTH_PROVIDER_OPTIONS[provider_id].label)
-        for provider_id in provider_ids
-    ]
+    return [(provider_id, AUTH_PROVIDER_OPTIONS[provider_id].label) for provider_id in provider_ids]
 
 
 def auth_provider_ids_for_stack(stack: str) -> list[str]:
