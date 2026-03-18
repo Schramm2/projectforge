@@ -39,6 +39,23 @@ STACK_LABELS = {
 }
 
 
+def _build_design_template_block(answers: dict) -> str:
+    """Return the selected design template block if one was loaded."""
+    content = (answers.get("design_template_content") or "").strip()
+    if not content:
+        return ""
+
+    label = answers.get("design_template_label") or answers.get("design_template") or "Selected"
+    return (
+        "\n<design_template>\n"
+        "Treat this design template as the source of truth for brand direction, "
+        "design tokens, typography, component styling, and reusable UI patterns.\n\n"
+        f"Template: {label}\n\n"
+        f"{content}\n"
+        "</design_template>"
+    )
+
+
 def _demo_mode_section(answers: dict) -> str:
     """Return the demo mode instruction block if enabled, else empty string."""
     if answers.get("demo_mode"):
@@ -174,6 +191,7 @@ def build_prompt(
         auth_provider=auth_provider,
     )
     ci_section = _build_ci_section(ci)
+    design_template_block = _build_design_template_block(answers)
 
     docker_block = ""
     if answers["docker"]:
@@ -229,6 +247,7 @@ from experience that these patterns reduce bugs and speed up onboarding.
 
 {conventions}
 </conventions>
+{design_template_block}
 
 <stack_guidance>
 {stack_section}
@@ -312,6 +331,7 @@ def build_architecture_prompt(
         auth_provider=auth_provider,
     )
     ci_section = "" if exclude_tests else _build_ci_section(ci)
+    design_template_block = "" if exclude_frontend else _build_design_template_block(answers)
 
     docker_block = ""
     if answers["docker"]:
@@ -384,6 +404,7 @@ from experience that these patterns reduce bugs and speed up onboarding.
 
 {conventions}
 </conventions>
+{design_template_block}
 
 <stack_guidance>
 {stack_section}
@@ -443,6 +464,7 @@ def build_frontend_prompt(answers: dict) -> str:
     """
     stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
     extra = answers.get("extra", "").strip() or "None"
+    design_template_block = _build_design_template_block(answers)
 
     return f"""\
 You are an expert frontend engineer and visual designer who creates \
@@ -458,6 +480,7 @@ create the complete frontend UI.
 <stack>{stack_label}</stack>
 <description>{answers["description"]}</description>
 </project>
+{design_template_block}
 
 <instructions>
 1. Read the existing project structure first. Check CLAUDE.md, package.json \
@@ -466,6 +489,8 @@ libraries, frameworks, and conventions are configured.
 2. Create all pages, routes, and components that the project description implies.
    - Build responsive layouts that work across mobile, tablet, and desktop.
    - Use the styling framework already configured in the project.
+   - If a design template is provided above, translate it into reusable tokens, \
+CSS variables, component variants, and page motifs instead of one-off styles.
    - Connect frontend to any existing API endpoints or data models.
    - Add meaningful loading states, error states, and empty states.
    - Use animations for page transitions and micro-interactions where appropriate.
@@ -475,7 +500,7 @@ sufficient color contrast, and visible focus indicators.
 
 <aesthetics>
 - Typography: Choose fonts that are beautiful and distinctive. Avoid generic \
-fonts like Arial and Inter.
+fonts like Arial and Inter unless the selected design template explicitly calls for them.
 - Color and theme: Commit to a cohesive aesthetic. Use CSS variables for \
 consistency. Dominant colors with sharp accents outperform timid palettes.
 - Backgrounds: Create atmosphere and depth rather than defaulting to solid \
@@ -500,7 +525,8 @@ Before finishing, verify:
 </scope_boundaries>
 
 <avoid>
-- Do not use overused font families (Inter, Roboto, Arial, system fonts).
+- Do not use overused font families (Inter, Roboto, Arial, system fonts) unless \
+the selected design template explicitly calls for them.
 - Do not use purple gradients on white backgrounds.
 - Do not create predictable layouts or cookie-cutter component patterns.
 - Do not create generic hero sections with stock-photo-style descriptions.
@@ -618,6 +644,7 @@ def build_architecture_prompt_best(
         auth_provider=auth_provider,
     )
     ci_section = "" if exclude_tests else _build_ci_section(ci)
+    design_template_block = "" if exclude_frontend else _build_design_template_block(answers)
 
     docker_block = ""
     if answers["docker"]:
@@ -690,6 +717,7 @@ from experience that these patterns reduce bugs and speed up onboarding.
 
 {conventions}
 </conventions>
+{design_template_block}
 
 <stack_guidance>
 {stack_section}
@@ -750,6 +778,7 @@ def build_frontend_prompt_best(answers: dict) -> str:
     """
     stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
     extra = answers.get("extra", "").strip() or "None"
+    design_template_block = _build_design_template_block(answers)
 
     return f"""\
 <role>
@@ -768,6 +797,7 @@ Project name: {answers["name"]}
 Stack: {stack_label}
 Description: {answers["description"]}
 </context>
+{design_template_block}
 
 <task>
 Before writing any code, follow these steps:
@@ -780,6 +810,9 @@ and components the project description implies a real user would need.
 2. Execute: Create all pages, routes, and components.
    - Build responsive layouts that work across mobile, tablet, and desktop.
    - Use the styling framework already configured in the project.
+   - If a design template is provided above, convert it into reusable tokens, \
+CSS variables, component variants, and layout patterns instead of sprinkling \
+isolated styling decisions across files.
    - Connect frontend to any existing API endpoints or data models found in \
 the codebase.
    - Add meaningful loading states, error states, and empty states.
@@ -800,7 +833,8 @@ directory structure.
 
 <aesthetics>
 Typography: Choose fonts that are beautiful and distinctive. Avoid generic \
-fonts like Arial and Inter. Use choices that elevate the design.
+fonts like Arial and Inter unless the selected design template explicitly \
+calls for them. Use choices that elevate the design.
 
 Color and theme: Commit to a cohesive aesthetic. Use CSS variables for \
 consistency. Dominant colors with sharp accents outperform timid, evenly \
@@ -831,7 +865,8 @@ weight to create rhythm. Avoid uniform grids of identical cards.
 - Do NOT modify configuration files (pyproject.toml, tsconfig.json, etc.).
 - Do NOT create test files.
 - Focus exclusively on frontend: pages, components, styles, client-side logic.
-- Do NOT use overused font families (Inter, Roboto, Arial, system fonts).
+- Do NOT use overused font families (Inter, Roboto, Arial, system fonts) \
+unless the selected design template explicitly calls for them.
 - Do NOT use purple gradients on white backgrounds.
 - Do NOT create predictable layouts or cookie-cutter component patterns.
 - Do NOT create generic hero sections with stock-photo-style descriptions.

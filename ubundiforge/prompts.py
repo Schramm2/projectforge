@@ -4,6 +4,10 @@ import re
 
 import questionary
 
+from ubundiforge.design_templates import (
+    DESIGN_TEMPLATE_OPTIONS,
+    design_template_choices_for_stack,
+)
 from ubundiforge.scaffold_options import (
     AUTH_PROVIDER_OPTIONS,
     CI_ACTION_OPTIONS,
@@ -82,6 +86,37 @@ def _ask_auth_provider(stack: str) -> str | None:
         raise SystemExit(0)
 
     return provider
+
+
+def _ask_design_template(stack: str) -> str | None:
+    """Ask whether to apply a design template, then which one to use."""
+    choices = design_template_choices_for_stack(stack)
+    if not choices:
+        return None
+
+    include_design_template = questionary.confirm(
+        "Apply a design template / brand guide?",
+        default=False,
+    ).ask()
+    if include_design_template is None:
+        raise SystemExit(0)
+    if not include_design_template:
+        return None
+
+    template_id = questionary.select(
+        "Which design template should Forge use?",
+        choices=[
+            questionary.Choice(
+                f"{label} — {DESIGN_TEMPLATE_OPTIONS[value].prompt_description}",
+                value=value,
+            )
+            for value, label in choices
+        ],
+    ).ask()
+    if template_id is None:
+        raise SystemExit(0)
+
+    return template_id
 
 
 def _ask_ci_config(stack: str) -> dict:
@@ -171,6 +206,8 @@ def collect_answers(docker_available: bool = True) -> dict:
         if docker is None:
             raise SystemExit(0)
 
+    design_template = _ask_design_template(stack)
+
     customize = questionary.confirm(
         "Customize further? (auth, services, CI, extras)",
         default=False,
@@ -208,6 +245,7 @@ def collect_answers(docker_available: bool = True) -> dict:
         "stack": stack,
         "description": description.strip(),
         "docker": docker,
+        "design_template": design_template,
         "auth_provider": auth_provider,
         "services": services,
         "ci": ci,

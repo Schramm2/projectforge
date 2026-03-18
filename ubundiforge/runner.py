@@ -101,6 +101,7 @@ def run_ai(
             cmd,
             cwd=project_dir,
             stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
         )
 
         with Live(spinner, console=console, refresh_per_second=10) as live:
@@ -223,7 +224,12 @@ def run_ai_parallel(
             trackers[label].start = start
 
         try:
-            proc = subprocess.Popen(cmd, cwd=project_dir, stdout=subprocess.PIPE)
+            proc = subprocess.Popen(
+                cmd,
+                cwd=project_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+            )
         except FileNotFoundError:
             with lock:
                 trackers[label].returncode = 1

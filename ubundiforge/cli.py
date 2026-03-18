@@ -10,6 +10,12 @@ from rich.panel import Panel
 from ubundiforge import __version__
 from ubundiforge.config import SUPPORTED_BACKENDS, check_backend_installed
 from ubundiforge.conventions import load_claude_md_template, load_conventions
+from ubundiforge.design_templates import (
+    DESIGN_TEMPLATE_OPTIONS,
+    design_template_ids_for_stack,
+    design_template_supported_for_stack,
+    load_design_template,
+)
 from ubundiforge.logo import print_logo
 from ubundiforge.prompt_builder import build_phase_prompt
 from ubundiforge.prompts import collect_answers
@@ -98,6 +104,13 @@ def main(
     description: Annotated[
         str | None,
         typer.Option("--description", "-d", help="Project description."),
+    ] = None,
+    design_template: Annotated[
+        str | None,
+        typer.Option(
+            "--design-template",
+            help="Optional design template / brand guide for frontend-capable stacks.",
+        ),
     ] = None,
     docker: Annotated[
         bool | None,
@@ -222,6 +235,29 @@ def main(
                 )
             raise typer.Exit(1)
 
+        if design_template and design_template not in DESIGN_TEMPLATE_OPTIONS:
+            valid = ", ".join(sorted(DESIGN_TEMPLATE_OPTIONS))
+            console.print(
+                f"[red]Unknown design template '{design_template}'. Choose from: {valid}[/red]"
+            )
+            raise typer.Exit(1)
+        if design_template and not design_template_supported_for_stack(
+            resolved_stack, design_template
+        ):
+            allowed = design_template_ids_for_stack(resolved_stack)
+            if allowed:
+                valid = ", ".join(allowed)
+                console.print(
+                    "[red]Design template "
+                    f"'{design_template}' is not supported for stack '{resolved_stack}'. "
+                    f"Choose from: {valid}[/red]"
+                )
+            else:
+                console.print(
+                    f"[red]Stack '{resolved_stack}' does not support --design-template.[/red]"
+                )
+            raise typer.Exit(1)
+
         if ci_template and ci_template not in CI_TEMPLATE_MODES:
             valid = ", ".join(CI_TEMPLATE_MODES)
             console.print(f"[red]Unknown CI template '{ci_template}'. Choose from: {valid}[/red]")
@@ -252,6 +288,7 @@ def main(
             "stack": resolved_stack,
             "description": description.strip(),
             "docker": docker_val,
+            "design_template": design_template,
             "auth_provider": auth_provider,
             "services": svc_list,
             "ci": {
@@ -352,6 +389,21 @@ def main(
     claude_md_template = load_claude_md_template()
     if claude_md_template:
         console.print("[dim]Loaded CLAUDE.md template[/dim]")
+
+    selected_design_template = answers.get("design_template")
+    if selected_design_template:
+        design_template_content, template_warnings = load_design_template(selected_design_template)
+        for warning in template_warnings:
+            console.print(f"[yellow]{warning}[/yellow]")
+        if design_template_content:
+            answers["design_template_content"] = design_template_content
+            answers["design_template_label"] = DESIGN_TEMPLATE_OPTIONS[
+                selected_design_template
+            ].label
+            console.print(
+                "[dim]Loaded design template: "
+                f"{answers['design_template_label']}[/dim]"
+            )
 
     # Check all user-supplied text for secrets before passing to AI
     fields_to_scan = {

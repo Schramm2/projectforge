@@ -6,6 +6,7 @@ UbundiForge is a Python CLI that scaffolds new projects with AI coding tools whi
 
 - First-run setup wizard that detects installed AI CLIs and editors
 - Prompts for project name, stack, description, Docker preference, optional auth/CI choices, and extra instructions
+- Supports selectable design templates / brand guides for frontend-capable scaffolds
 - Routes to your preferred AI backend (configurable during setup)
 - Falls back to the next available backend if the primary isn't installed
 - Injects shared conventions from `~/.forge/conventions.md`
@@ -78,6 +79,7 @@ forge --name pulse --stack fastapi --description "health check API" --docker
 forge --name storefront --stack nextjs --description "e-commerce site" --no-docker
 forge --name platform --stack both --description "fullstack SaaS app"
 forge --name studio --stack nextjs --description "client portal" --auth-provider clerk --ci --ci-template questionnaire --ci-actions lint,typecheck,unit-tests
+forge --name ubundi-site --stack nextjs --description "brand site" --design-template ubundi-brand-guide
 ```
 
 Stack accepts aliases: `next`, `react`, `api`, `ai`, `fullstack`, `monorepo`, `cli`, `worker`, `library`.
@@ -112,6 +114,19 @@ Export the prompt to a file:
 ```bash
 forge --export prompt.md
 ```
+
+### Design templates
+
+Forge can inject a reusable design template / brand guide into scaffold prompts for `nextjs` and `both` stacks.
+
+- Built-in template: `ubundi-brand-guide`
+- CLI flag: `--design-template ubundi-brand-guide`
+- Interactive mode: choose `Apply a design template / brand guide?`
+- Override the built-in template locally for your own machine or repo:
+  - `~/.forge/design-templates/ubundi-brand-guide.md`
+  - `.forge/design-templates/ubundi-brand-guide.md`
+
+The intended workflow is to encode the brand guide as prompt-ready tokens and rules in that markdown file, so every new scaffold inherits the same palette, typography, components, and layout language by default.
 
 ### Post-scaffold options
 

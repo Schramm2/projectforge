@@ -61,6 +61,30 @@ def test_build_prompt_blank_ci_template_uses_placeholder_language():
     assert "blank starter template" in prompt
 
 
+def test_build_prompt_includes_selected_design_template():
+    prompt = build_prompt(
+        {
+            "name": "studio",
+            "stack": "nextjs",
+            "description": "A branded marketing site",
+            "docker": False,
+            "design_template": "ubundi-brand-guide",
+            "design_template_label": "Ubundi Brand Guide",
+            "design_template_content": "Primary canvas: #1A2332",
+            "auth_provider": None,
+            "services": [],
+            "ci": {"include": False, "mode": None, "actions": []},
+            "extra": "",
+        },
+        conventions="Use strict typing.",
+        claude_md_template=None,
+    )
+
+    assert "<design_template>" in prompt
+    assert "Template: Ubundi Brand Guide" in prompt
+    assert "Primary canvas: #1A2332" in prompt
+
+
 # --- Phase-specific prompt tests ---
 
 _BASE_ANSWERS = {
@@ -100,10 +124,18 @@ def test_architecture_prompt_includes_tests_when_not_excluded():
 
 
 def test_frontend_prompt_focuses_on_ui():
-    prompt = build_frontend_prompt(_BASE_ANSWERS)
+    prompt = build_frontend_prompt(
+        {
+            **_BASE_ANSWERS,
+            "design_template": "ubundi-brand-guide",
+            "design_template_label": "Ubundi Brand Guide",
+            "design_template_content": "Accent color: #0FA5A5",
+        }
+    )
     assert "frontend UI" in prompt
     assert "Do NOT modify backend code" in prompt
     assert "Use Tailwind v4" in prompt
+    assert "Accent color: #0FA5A5" in prompt
 
 
 def test_tests_prompt_focuses_on_testing():
