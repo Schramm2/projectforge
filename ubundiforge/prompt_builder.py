@@ -12,6 +12,22 @@ from ubundiforge.router import PHASE_IDEAL_BACKEND
 from ubundiforge.scaffold_options import AUTH_PROVIDER_OPTIONS, CI_ACTION_OPTIONS
 from ubundiforge.stacks import CROSS_RECIPE_DEFAULTS, STACK_META
 
+DEMO_MODE_BLOCK = """\
+
+DEMO MODE (critical — the project MUST run out of the box without real secrets):
+- The project must start and render without any .env.local or real API keys
+- For auth providers (Clerk, Auth0, etc.): wrap in a conditional that checks if the
+  env var is set. When missing, bypass auth entirely and render the app without it.
+  Add a visible banner like "Auth disabled — set CLERK_PUBLISHABLE_KEY to enable"
+- For databases: use an in-memory fallback or mock data when the connection string
+  is missing. The app should show sample/seed data, not crash
+- For external APIs (OpenAI, Stripe, etc.): return mock responses when the key is
+  missing. Never crash or block startup due to a missing optional secret
+- .env.example should list all vars with placeholder values and comments explaining
+  which are required vs optional
+- The goal: `git clone && npm install && npm run dev` (or `uv sync && uv run ...`)
+  must produce a working, visible app with no manual setup"""
+
 STACK_LABELS = {
     "nextjs": "Next.js + React",
     "fastapi": "Python API (FastAPI)",
@@ -21,6 +37,13 @@ STACK_LABELS = {
     "ts-package": "TypeScript npm Package",
     "python-worker": "Python Worker / Scheduled Service",
 }
+
+
+def _demo_mode_section(answers: dict) -> str:
+    """Return the demo mode instruction block if enabled, else empty string."""
+    if answers.get("demo_mode"):
+        return DEMO_MODE_BLOCK
+    return ""
 
 
 def _format_env_hint(hint: str, project_name: str) -> str:
@@ -249,7 +272,7 @@ real content.
 - Do not add excessive comments or docstrings to boilerplate code. Only \
 comment where the logic is non-obvious.
 </avoid>
-
+{_demo_mode_section(answers)}
 <extra_instructions>
 {extra}
 </extra_instructions>"""
@@ -404,7 +427,7 @@ real content.
 - Do not add excessive comments or docstrings to boilerplate code. Only \
 comment where the logic is non-obvious.
 </avoid>
-
+{_demo_mode_section(answers)}
 <extra_instructions>
 {extra}
 </extra_instructions>"""
@@ -710,7 +733,7 @@ real content.
 - Do not add excessive comments or docstrings to boilerplate code. Only \
 comment where the logic is non-obvious.
 </avoid>
-
+{_demo_mode_section(answers)}
 <extra_instructions>
 {extra}
 </extra_instructions>"""
@@ -921,6 +944,183 @@ application code) or mark [blocked] with an explanation.
 </extra_instructions>"""
 
 
+def build_verify_prompt(answers: dict) -> str:
+    """Build prompt for the verify/fix phase.
+
+    Runs as the final phase. Reviews the entire project, fixes integration
+    issues, and optionally ensures demo mode works.
+    """
+    stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
+    extra = answers.get("extra", "").strip() or "None"
+    demo = answers.get("demo_mode", False)
+
+    if demo:
+        goal = (
+            "Your job is to review the entire project, fix any issues, "
+            "and ensure it runs out of the box without real API keys or secrets."
+        )
+        demo_instructions = """\
+5. Ensure the project runs WITHOUT any real API keys or .env.local:
+   - Auth providers (Clerk, Auth0, etc.) must be wrapped in conditionals \
+that gracefully skip auth when env vars are missing. Show a visible banner \
+like "Auth disabled — set CLERK_PUBLISHABLE_KEY to enable" instead of crashing.
+   - Database connections must fall back to mock/seed data when the \
+connection string is missing.
+   - External API calls must return mock responses when keys are missing.
+6. Verify that .env.example documents all required and optional vars.
+7. Make a final git commit with all fixes."""
+        quality_items = """\
+- The dev server starts without errors and without .env.local
+- The app renders visible content in the browser (not a crash page)"""
+    else:
+        goal = (
+            "Your job is to review the entire project, fix any integration "
+            "issues between phases, and ensure all checks pass."
+        )
+        demo_instructions = """\
+5. Verify that .env.example documents all required vars.
+6. Make a final git commit with all fixes."""
+        quality_items = """\
+- The dev server starts without errors (with .env.local configured)"""
+
+    return f"""\
+A project has been scaffolded in the current directory by multiple AI tools. \
+{goal}
+
+<project>
+<name>{answers["name"]}</name>
+<stack>{stack_label}</stack>
+<description>{answers["description"]}</description>
+</project>
+
+<instructions>
+1. Read CLAUDE.md, package.json or pyproject.toml, and scan the full project \
+structure to understand what was built.
+2. Try to start the project using the dev command from CLAUDE.md. If it \
+fails, fix the issue and try again.
+3. Run the test suite. Fix any failing tests caused by integration issues \
+between phases (broken imports, missing dependencies, type errors).
+4. Run lint and typecheck. Fix any errors.
+{demo_instructions}
+</instructions>
+
+<scope>
+You CAN modify any file in the project — application code, frontend, tests, \
+config. This is the integration and QA phase.
+</scope>
+
+<quality_gate>
+The project is not done until ALL of these pass:
+{quality_items}
+- The test suite passes (or failures are documented with clear reasons)
+- Lint and typecheck pass
+- No orphaned imports or missing dependencies
+</quality_gate>
+
+<extra_instructions>
+{extra}
+</extra_instructions>"""
+
+
+def build_verify_prompt_best(answers: dict) -> str:
+    """Build specialist verify prompt for Claude (ideal backend).
+
+    Applies Claude prompting best practices for the QA/verification phase.
+    """
+    stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
+    extra = answers.get("extra", "").strip() or "None"
+    demo = answers.get("demo_mode", False)
+
+    if demo:
+        goal = (
+            "Your job is to integrate everything, fix cross-phase issues, "
+            "and ensure the project runs out of the box in a demo state "
+            "without real API keys."
+        )
+        demo_instructions = """\
+5. Critical: ensure the project runs WITHOUT any real API keys or .env.local:
+   - Auth providers (Clerk, Auth0, etc.) must be conditionally loaded. When \
+the publishable key env var is missing, bypass auth entirely and render the \
+app without it. Add a visible dev banner: "Auth disabled — set \
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable".
+   - Database connections must fall back to in-memory mock data or seed data \
+when connection strings are missing. The app should display sample content.
+   - External API calls (OpenAI, Stripe, analytics, etc.) must return mock \
+responses when keys are missing. Never crash or block startup.
+6. Verify .env.example lists all vars with comments marking required vs \
+optional.
+7. Make a final git commit with all integration fixes."""
+        quality_items = """\
+- Dev server starts without errors and without .env.local present
+- The app renders visible, meaningful content (not a crash or blank page)"""
+    else:
+        goal = (
+            "Your job is to integrate everything, fix cross-phase issues, "
+            "and ensure all checks pass."
+        )
+        demo_instructions = """\
+5. Verify .env.example lists all required vars.
+6. Make a final git commit with all integration fixes."""
+        quality_items = """\
+- Dev server starts without errors (with .env.local configured)"""
+
+    return f"""\
+You are a senior QA engineer reviewing a freshly scaffolded project. Multiple \
+AI tools built different parts of this project — architecture, frontend, and \
+tests were each created by a different tool. {goal}
+
+<project>
+<name>{answers["name"]}</name>
+<stack>{stack_label}</stack>
+<description>{answers["description"]}</description>
+</project>
+
+<conventions>
+Read the project's CLAUDE.md for conventions, dev commands, and structure. \
+That file is the source of truth for how this project should work.
+</conventions>
+
+<instructions>
+1. Read CLAUDE.md, the package manager config, and scan the full project \
+structure. Build a mental model of what exists.
+2. Start the project using the dev command from CLAUDE.md. If it fails, \
+diagnose and fix the root cause. Repeat until it starts.
+3. Run the test suite. Fix any failures caused by integration issues \
+between the phases (broken imports, missing deps, type mismatches, stale \
+references to files that were renamed or moved).
+4. Run lint and typecheck. Fix all errors.
+{demo_instructions}
+</instructions>
+
+<scope>
+You have full permission to modify ANY file: application code, frontend \
+components, tests, configuration, styles. This is the integration phase — \
+fix whatever is broken across phase boundaries.
+</scope>
+
+<quality_criteria>
+Before finishing, verify ALL of these pass:
+{quality_items}
+- The test suite passes (document any legitimate failures with reasons)
+- Lint passes with zero errors
+- Typecheck passes with zero errors
+- No orphaned imports, missing dependencies, or unresolved references
+- .env.example is complete and accurate
+</quality_criteria>
+
+<avoid>
+- Do not add new features or refactor working code. Only fix what is broken.
+- Do not remove tests that were created by the testing phase. Fix them \
+instead, or add a skip with a clear reason.
+- Do not change the project's visual design or styling.
+- Keep fixes minimal and targeted.
+</avoid>
+
+<extra_instructions>
+{extra}
+</extra_instructions>"""
+
+
 # ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
@@ -988,6 +1188,12 @@ def build_phase_prompt(
         if _is_ideal_backend("tests", backend):
             return build_tests_prompt_best(answers)
         return build_tests_prompt(answers)
+
+    # Standalone verify phase
+    if "verify" in phase_set:
+        if _is_ideal_backend("verify", backend):
+            return build_verify_prompt_best(answers)
+        return build_verify_prompt(answers)
 
     # Shouldn't happen, but fallback to full prompt
     return build_prompt(answers, conventions, claude_md_template)

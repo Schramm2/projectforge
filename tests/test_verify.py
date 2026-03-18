@@ -1,7 +1,6 @@
 """Tests for the post-scaffold verification module."""
 
 import subprocess
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from rich.console import Console
@@ -15,7 +14,6 @@ from ubundiforge.verify import (
     print_report,
     verify_scaffold,
 )
-
 
 # --- CheckResult / VerifyReport ---
 

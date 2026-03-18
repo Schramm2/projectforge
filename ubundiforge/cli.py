@@ -133,6 +133,13 @@ def main(
             help="Comma-separated CI actions (e.g. 'lint,typecheck,unit-tests').",
         ),
     ] = None,
+    demo: Annotated[
+        bool,
+        typer.Option(
+            "--demo/--no-demo",
+            help="Demo mode: project runs without real API keys.",
+        ),
+    ] = True,
     setup: Annotated[
         bool,
         typer.Option("--setup", help="Run the setup wizard."),
@@ -247,6 +254,7 @@ def main(
                 "actions": action_ids,
             },
             "extra": (extra or "").strip(),
+            "demo_mode": demo,
         }
     else:
         answers = collect_answers(
@@ -428,6 +436,25 @@ def main(
             "\n[yellow]Run 'git init && git add -A && git commit -m \"Initial commit\"' "
             "manually to finish setup.[/yellow]"
         )
+
+    # Next steps
+    console.print("\n[bold]Next steps:[/bold]")
+    console.print(f"  [dim]cd {project_dir}[/dim]")
+
+    from ubundiforge.stacks import STACK_META
+
+    meta = STACK_META.get(answers["stack"])
+    if meta and meta.env_hints:
+        console.print("  [dim]Copy .env.example to .env.local and fill in your secrets[/dim]")
+    if meta and meta.dev_commands:
+        run_cmd = meta.dev_commands.get("run") or meta.dev_commands.get("dev")
+        if run_cmd:
+            console.print(f"  [dim]{run_cmd}[/dim]")
+        test_cmd = meta.dev_commands.get("test")
+        if test_cmd:
+            console.print(f"  [dim]{test_cmd}[/dim]")
+    console.print()
+
     if open_editor:
         preferred = forge_config.get("preferred_editor", "")
         open_in_editor(project_dir, preferred_editor=preferred)

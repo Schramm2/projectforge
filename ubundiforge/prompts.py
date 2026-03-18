@@ -196,6 +196,13 @@ def collect_answers(docker_available: bool = True) -> dict:
             raise SystemExit(0)
         extra = extra.strip()
 
+    demo_mode = questionary.confirm(
+        "Enable demo mode? (project runs without real API keys/secrets)",
+        default=True,
+    ).ask()
+    if demo_mode is None:
+        raise SystemExit(0)
+
     return {
         "name": name.strip(),
         "stack": stack,
@@ -205,4 +212,5 @@ def collect_answers(docker_available: bool = True) -> dict:
         "services": services,
         "ci": ci,
         "extra": extra,
+        "demo_mode": demo_mode,
     }

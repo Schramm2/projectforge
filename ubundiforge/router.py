@@ -16,22 +16,24 @@ from ubundiforge.config import check_backend_installed
 PHASE_ARCHITECTURE = "architecture"
 PHASE_FRONTEND = "frontend"
 PHASE_TESTS = "tests"
+PHASE_VERIFY = "verify"
 
 PHASE_LABELS = {
     PHASE_ARCHITECTURE: "Architecture & Core",
     PHASE_FRONTEND: "Frontend & UI",
     PHASE_TESTS: "Tests & Automation",
+    PHASE_VERIFY: "Verify & Fix",
 }
 
 # Which phases each stack needs
 STACK_PHASES: dict[str, list[str]] = {
-    "nextjs": [PHASE_ARCHITECTURE, PHASE_FRONTEND, PHASE_TESTS],
-    "fastapi": [PHASE_ARCHITECTURE, PHASE_TESTS],
-    "fastapi-ai": [PHASE_ARCHITECTURE, PHASE_TESTS],
-    "both": [PHASE_ARCHITECTURE, PHASE_FRONTEND, PHASE_TESTS],
-    "python-cli": [PHASE_ARCHITECTURE, PHASE_TESTS],
-    "ts-package": [PHASE_ARCHITECTURE, PHASE_TESTS],
-    "python-worker": [PHASE_ARCHITECTURE, PHASE_TESTS],
+    "nextjs": [PHASE_ARCHITECTURE, PHASE_FRONTEND, PHASE_TESTS, PHASE_VERIFY],
+    "fastapi": [PHASE_ARCHITECTURE, PHASE_TESTS, PHASE_VERIFY],
+    "fastapi-ai": [PHASE_ARCHITECTURE, PHASE_TESTS, PHASE_VERIFY],
+    "both": [PHASE_ARCHITECTURE, PHASE_FRONTEND, PHASE_TESTS, PHASE_VERIFY],
+    "python-cli": [PHASE_ARCHITECTURE, PHASE_TESTS, PHASE_VERIFY],
+    "ts-package": [PHASE_ARCHITECTURE, PHASE_TESTS, PHASE_VERIFY],
+    "python-worker": [PHASE_ARCHITECTURE, PHASE_TESTS, PHASE_VERIFY],
 }
 
 # Ideal backend for each phase
@@ -39,6 +41,7 @@ PHASE_IDEAL_BACKEND: dict[str, str] = {
     PHASE_ARCHITECTURE: "claude",
     PHASE_FRONTEND: "gemini",
     PHASE_TESTS: "codex",
+    PHASE_VERIFY: "claude",
 }
 
 # Description keywords that signal a testing/automation project → Codex for architecture

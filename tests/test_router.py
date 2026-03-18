@@ -58,21 +58,23 @@ def test_fallback_returns_primary_when_nothing_installed(mock_check):
 
 
 @patch("ubundiforge.router.check_backend_installed", return_value=True)
-def test_all_three_installed_nextjs_gets_three_backends(mock_check):
+def test_all_three_installed_nextjs_gets_four_phases(mock_check):
     result = pick_phase_backends("nextjs")
     assert result == [
         ("architecture", "claude"),
         ("frontend", "gemini"),
         ("tests", "codex"),
+        ("verify", "claude"),
     ]
 
 
 @patch("ubundiforge.router.check_backend_installed", return_value=True)
-def test_all_three_installed_fastapi_gets_two_backends(mock_check):
+def test_all_three_installed_fastapi_gets_three_phases(mock_check):
     result = pick_phase_backends("fastapi")
     assert result == [
         ("architecture", "claude"),
         ("tests", "codex"),
+        ("verify", "claude"),
     ]
 
 
@@ -83,6 +85,7 @@ def test_only_claude_handles_everything(mock_check):
         ("architecture", "claude"),
         ("frontend", "claude"),
         ("tests", "claude"),
+        ("verify", "claude"),
     ]
 
 
@@ -96,6 +99,7 @@ def test_claude_gemini_routes_frontend_to_gemini(mock_check):
         ("architecture", "claude"),
         ("frontend", "gemini"),
         ("tests", "claude"),
+        ("verify", "claude"),
     ]
 
 
@@ -105,6 +109,7 @@ def test_claude_codex_routes_tests_to_codex(mock_check):
     assert result == [
         ("architecture", "claude"),
         ("tests", "codex"),
+        ("verify", "claude"),
     ]
 
 
@@ -115,6 +120,7 @@ def test_override_forces_single_backend(mock_check):
         ("architecture", "gemini"),
         ("frontend", "gemini"),
         ("tests", "gemini"),
+        ("verify", "gemini"),
     ]
 
 
