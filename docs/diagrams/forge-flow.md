@@ -6,7 +6,22 @@ How a developer goes from idea to running project with Forge.
 
 ```mermaid
 flowchart TD
-    Start([Developer runs **forge**]) --> Describe
+    Start([Developer runs **forge**]) --> FirstRun{First time?}
+
+    FirstRun -- Yes --> Setup
+    FirstRun -- No --> Describe
+
+    subgraph Setup["0 — Setup wizard"]
+        direction TB
+        DetectAI[Detects installed AI tools<br/>Claude / Gemini / Codex]
+        PickAI[Pick default AI backend]
+        DetectEditor[Detects installed editors<br/>Cursor / VS Code / Antigravity / Zed]
+        PickEditor[Pick default editor]
+        Conventions[Creates conventions file<br/>~/.forge/conventions.md]
+        DetectAI --> PickAI --> DetectEditor --> PickEditor --> Conventions
+    end
+
+    Setup --> Describe
 
     subgraph Describe["1 — Describe your project"]
         Q1[Name your project]
@@ -48,6 +63,7 @@ flowchart TD
         Code ~~~ Git ~~~ Editor
     end
 
+    style Setup fill:#fce4ec,stroke:#E91E63,color:#1a1a1a
     style Describe fill:#e8f4f8,stroke:#2196F3,color:#1a1a1a
     style Options fill:#fff3e0,stroke:#FF9800,color:#1a1a1a
     style Generate fill:#e8f5e9,stroke:#4CAF50,color:#1a1a1a

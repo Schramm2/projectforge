@@ -1,7 +1,10 @@
 """First-run setup wizard for UbundiForge."""
 
 import json
+import platform
 import shutil
+import subprocess
+from pathlib import Path
 
 import questionary
 from rich.console import Console
@@ -12,13 +15,42 @@ from ubundiforge.conventions import CONVENTIONS_PATH, DEFAULT_CONVENTIONS, FORGE
 
 CONFIG_PATH = FORGE_DIR / "config.json"
 
+# (cli_command, display_label, macOS .app bundle name)
 SUPPORTED_EDITORS = [
-    ("cursor", "Cursor"),
-    ("code", "VS Code"),
-    ("antigravity", "Antigravity"),
-    ("windsurf", "Windsurf"),
-    ("zed", "Zed"),
+    ("cursor", "Cursor", "Cursor.app"),
+    ("code", "VS Code", "Visual Studio Code.app"),
+    ("antigravity", "Antigravity", "Antigravity.app"),
+    ("windsurf", "Windsurf", "Windsurf.app"),
+    ("zed", "Zed", "Zed.app"),
 ]
+
+
+def _check_editor_installed(cli_cmd: str, app_bundle: str) -> tuple[bool, bool]:
+    """Check if an editor is available via CLI and/or as a macOS .app bundle.
+
+    Returns:
+        (cli_available, app_installed) tuple.
+    """
+    cli_available = shutil.which(cli_cmd) is not None
+
+    app_installed = False
+    if platform.system() == "Darwin":
+        app_installed = Path(f"/Applications/{app_bundle}").exists()
+
+    return cli_available, app_installed
+
+
+def _get_git_config(key: str) -> str:
+    """Read a git config value, returning empty string if unset."""
+    try:
+        result = subprocess.run(
+            ["git", "config", "--global", key],
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+    except FileNotFoundError:
+        return ""
 
 
 def needs_setup() -> bool:
@@ -81,11 +113,13 @@ def run_setup(console: Console) -> dict:
         default_backend = available[0]
         console.print(f"[dim]Only {default_backend} is installed — using it as default.[/dim]\n")
     else:
+        existing = load_forge_config().get("default_backend")
+        preselect = existing if existing in available else None
         choices = [questionary.Choice(b, value=b) for b in available]
         default_backend = questionary.select(
             "Which AI tool should Forge use by default?",
             choices=choices,
-            default=available[0],
+            default=preselect,
         ).ask()
         if default_backend is None:
             raise SystemExit(0)
@@ -99,8 +133,13 @@ def run_setup(console: Console) -> dict:
     editor_table.add_column("Status")
 
     available_editors: list[tuple[str, str]] = []
-    for cmd, label in SUPPORTED_EDITORS:
-        if shutil.which(cmd):
+
+    for cmd, label, app_bundle in SUPPORTED_EDITORS:
+        cli_ok, app_ok = _check_editor_installed(cmd, app_bundle)
+        if cli_ok:
+            available_editors.append((cmd, label))
+            editor_table.add_row(label, "[green]Installed[/green]")
+        elif app_ok:
             available_editors.append((cmd, label))
             editor_table.add_row(label, "[green]Installed[/green]")
         else:
@@ -112,7 +151,7 @@ def run_setup(console: Console) -> dict:
     if not available_editors:
         preferred_editor = ""
         console.print(
-            "[dim]No supported editors found. "
+            "[dim]No editors with CLI access found. "
             "You can open projects manually after scaffolding.[/dim]\n"
         )
     elif len(available_editors) == 1:
@@ -137,8 +176,98 @@ def run_setup(console: Console) -> dict:
             raise SystemExit(0)
         console.print()
 
-    # --- Step 4: Conventions file ---
-    console.print("[bold]Step 4:[/bold] Conventions file.\n")
+    # --- Step 4: Git check ---
+    console.print("[bold]Step 4:[/bold] Checking git...\n")
+
+    git_table = Table(show_header=True, header_style="bold")
+    git_table.add_column("Check")
+    git_table.add_column("Status")
+
+    git_installed = shutil.which("git") is not None
+    git_table.add_row(
+        "git",
+        "[green]Installed[/green]" if git_installed else "[red]Not found[/red]",
+    )
+
+    if git_installed:
+        git_name = _get_git_config("user.name")
+        git_email = _get_git_config("user.email")
+        git_table.add_row(
+            "user.name",
+            f"[green]{git_name}[/green]" if git_name else "[yellow]Not set[/yellow]",
+        )
+        git_table.add_row(
+            "user.email",
+            f"[green]{git_email}[/green]" if git_email else "[yellow]Not set[/yellow]",
+        )
+
+    console.print(git_table)
+    console.print()
+
+    if not git_installed:
+        console.print(
+            "[red]Git is not installed. Forge uses git init on every scaffold.[/red]\n"
+            "[dim]Install git and run [bold]forge --setup[/bold] again.[/dim]\n"
+        )
+    elif not git_name or not git_email:
+        console.print(
+            "[yellow]Git user.name or user.email is not configured.[/yellow]\n"
+            "[dim]Forge runs git init + commit on scaffolded projects. "
+            "Set them with:[/dim]\n"
+            "[dim]  git config --global user.name \"Your Name\"[/dim]\n"
+            "[dim]  git config --global user.email \"you@example.com\"[/dim]\n"
+        )
+
+    # --- Step 5: Docker check ---
+    console.print("[bold]Step 5:[/bold] Checking Docker...\n")
+
+    docker_installed = shutil.which("docker") is not None
+    if docker_installed:
+        console.print("[green]Docker is installed.[/green]\n")
+    else:
+        console.print(
+            "[dim]Docker not found. Forge will still offer the Docker option,\n"
+            "but scaffolded Dockerfiles won't be testable until Docker is installed.[/dim]\n"
+        )
+
+    # --- Step 6: Default project directory ---
+    console.print("[bold]Step 6:[/bold] Default project directory.\n")
+
+    existing_dir = load_forge_config().get("projects_dir", "")
+    default_dir = existing_dir or ""
+
+    console.print(
+        "[dim]Where should Forge create new projects?\n"
+        "Leave empty to use the current directory each time.[/dim]\n"
+    )
+    projects_dir = questionary.text(
+        "Default project directory:",
+        default=default_dir,
+    ).ask()
+    if projects_dir is None:
+        raise SystemExit(0)
+    projects_dir = projects_dir.strip()
+
+    if projects_dir:
+        expanded = Path(projects_dir).expanduser().resolve()
+        if not expanded.exists():
+            create = questionary.confirm(
+                f"{expanded} doesn't exist. Create it?",
+                default=True,
+            ).ask()
+            if create is None:
+                raise SystemExit(0)
+            if create:
+                expanded.mkdir(parents=True, exist_ok=True)
+                console.print(f"[green]Created {expanded}[/green]\n")
+        else:
+            console.print(f"[dim]Using {expanded}[/dim]\n")
+        projects_dir = str(expanded)
+    else:
+        console.print("[dim]Will use current directory.[/dim]\n")
+
+    # --- Step 7: Conventions file ---
+    console.print("[bold]Step 7:[/bold] Conventions file.\n")
 
     if CONVENTIONS_PATH.exists():
         console.print(f"[dim]Found existing conventions at {CONVENTIONS_PATH}[/dim]\n")
@@ -157,6 +286,8 @@ def run_setup(console: Console) -> dict:
         "default_backend": default_backend,
         "preferred_editor": preferred_editor,
         "available_backends": available,
+        "docker_available": docker_installed,
+        "projects_dir": projects_dir,
     }
     save_forge_config(config)
 

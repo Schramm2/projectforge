@@ -139,7 +139,7 @@ def _ask_ci_config(stack: str) -> dict:
     }
 
 
-def collect_answers() -> dict:
+def collect_answers(docker_available: bool = True) -> dict:
     """Run the interactive prompt flow and return answers as a dict."""
     name = questionary.text(
         "Project name:",
@@ -160,10 +160,16 @@ def collect_answers() -> dict:
         raise SystemExit(0)
 
     meta = STACK_META.get(stack)
-    docker_default = meta.docker_default if meta else True
-    docker = questionary.confirm("Include Docker setup?", default=docker_default).ask()
-    if docker is None:
-        raise SystemExit(0)
+    if not docker_available:
+        docker = False
+        from rich.console import Console
+
+        Console().print("[dim]Docker not detected — skipping Docker setup.[/dim]")
+    else:
+        docker_default = meta.docker_default if meta else True
+        docker = questionary.confirm("Include Docker setup?", default=docker_default).ask()
+        if docker is None:
+            raise SystemExit(0)
 
     customize = questionary.confirm(
         "Customize further? (auth, services, CI, extras)",

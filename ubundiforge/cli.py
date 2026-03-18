@@ -239,7 +239,9 @@ def main(
             "extra": (extra or "").strip(),
         }
     else:
-        answers = collect_answers()
+        answers = collect_answers(
+            docker_available=forge_config.get("docker_available", True),
+        )
 
     # Pick backend with fallback (prefer saved default if no --use override)
     effective_override = use or forge_config.get("default_backend")
@@ -321,8 +323,9 @@ def main(
         console.print(prompt)
         raise typer.Exit()
 
-    # Run
-    project_dir = Path.cwd() / answers["name"]
+    # Run — use saved projects_dir if set, otherwise CWD
+    base_dir = Path(forge_config.get("projects_dir") or Path.cwd())
+    project_dir = base_dir / answers["name"]
 
     # Check if directory already exists
     if project_dir.exists() and any(project_dir.iterdir()):

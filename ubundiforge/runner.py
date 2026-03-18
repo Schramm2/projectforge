@@ -1,5 +1,6 @@
 """Executes the AI CLI subprocess with the assembled prompt."""
 
+import platform
 import shutil
 import subprocess
 import sys
@@ -139,8 +140,34 @@ def ensure_git_init(project_dir: Path) -> bool:
     return True
 
 
+# Maps CLI command to macOS .app bundle name for fallback via `open -a`
+_EDITOR_APP_BUNDLES = {
+    "cursor": "Cursor",
+    "code": "Visual Studio Code",
+    "antigravity": "Antigravity",
+    "windsurf": "Windsurf",
+    "zed": "Zed",
+}
+
+
+def _try_open_via_app(editor: str, project_dir: Path) -> bool:
+    """Try opening a project using macOS `open -a` with the .app bundle."""
+    if platform.system() != "Darwin":
+        return False
+    app_name = _EDITOR_APP_BUNDLES.get(editor)
+    if not app_name:
+        return False
+    app_path = Path(f"/Applications/{app_name}.app")
+    if not app_path.exists():
+        return False
+    subprocess.Popen(["open", "-a", app_name, str(project_dir)])
+    return True
+
+
 def open_in_editor(project_dir: Path, preferred_editor: str = "") -> None:
     """Open the project directory in the user's editor.
+
+    Tries the CLI command first, then falls back to macOS `open -a`.
 
     Args:
         project_dir: Path to the project directory.
@@ -155,5 +182,8 @@ def open_in_editor(project_dir: Path, preferred_editor: str = "") -> None:
             subprocess.Popen([editor, str(project_dir)])
             console.print(f"[dim]Opened {project_dir} in {editor}[/dim]")
             return
+        if _try_open_via_app(editor, project_dir):
+            console.print(f"[dim]Opened {project_dir} in {editor}[/dim]")
+            return
 
-    console.print("[yellow]No editor found (tried cursor, code). Open manually.[/yellow]")
+    console.print("[yellow]No editor found. Open the project manually.[/yellow]")
