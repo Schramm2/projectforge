@@ -1,6 +1,6 @@
 .DS_Store
 
-# Python
+# Python bytecode and caches
 __pycache__/
 *.py[cod]
 *.pyo
@@ -10,23 +10,28 @@ __pycache__/
 # Virtual environments
 .venv/
 venv/
+env/
 
 # Tool caches
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.hypothesis/
+.pyre/
+.tox/
+.nox/
 
 # Packaging
 build/
 dist/
 *.egg-info/
+.eggs/
+pip-wheel-metadata/
 
 # Coverage
 .coverage
 .coverage.*
 htmlcov/
 
-# Scaffolded projects
+# Generated scaffold outputs
 projects/
-pulse-dashboard/
-atlas-crm/

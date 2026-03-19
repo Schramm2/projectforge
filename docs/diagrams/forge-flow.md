@@ -35,13 +35,14 @@ flowchart TD
 
     subgraph Options["2 — Choose options"]
         Docker[Docker setup?]
+        Design[Design template?<br/>brand guide for frontend stacks]
         Demo[Demo mode?<br/>runs without real API keys]
         Customize{Want to customize?}
         Auth[Authentication<br/>Clerk / NextAuth / Supabase]
         Svc[Services<br/>PostgreSQL, OpenAI, AWS...]
         CI[CI/CD pipeline?]
         Extra[Any special instructions?]
-        Docker --> Demo --> Customize
+        Docker --> Design --> Demo --> Customize
         Customize -- Yes --> Auth --> Svc --> CI --> Extra
         Customize -- No --> Skip[ ]
     end
@@ -62,7 +63,7 @@ flowchart TD
         direction TB
         Conv[Loads your team's<br/>coding conventions]
         Prompt[Assembles phase-specific<br/>AI brief with specialist prompts]
-        AI["Runs each phase sequentially<br/>streaming output to terminal"]
+        AI["Runs phases: arch serial,<br/>frontend+tests parallel,<br/>verify serial"]
         Conv --> Prompt --> AI
     end
 
@@ -125,6 +126,11 @@ flowchart LR
         Template[Load CLAUDE.md<br/>template]
     end
 
+    subgraph DesignTpl["design_templates.py"]
+        TplMeta[Template metadata<br/>+ stack compatibility]
+        TplLoad[Load template<br/>local → global → bundled]
+    end
+
     subgraph Safety["safety.py"]
         Scan[Regex secret<br/>detection]
     end
@@ -141,11 +147,11 @@ flowchart LR
     end
 
     subgraph Builder["prompt_builder.py"]
-        PhasePrompt[Phase-specific prompts<br/>with specialist variants<br/>+ demo mode block]
+        PhasePrompt[Phase-specific prompts<br/>with specialist variants<br/>+ demo mode block<br/>+ design template block]
     end
 
     subgraph Runner["runner.py"]
-        Exec[Build subprocess cmd<br/>stream output to terminal]
+        Exec[Build subprocess cmd<br/>serial + parallel execution]
         GitInit[Ensure git init]
         EditorOpen[Open in editor]
     end
@@ -162,12 +168,14 @@ flowchart LR
     Interactive --> Stacks
 
     Entry --> Conv
+    Entry --> DesignTpl
     Entry --> Safety
     Entry --> Router
 
     Router --> Config
     Router --> Merge
     Conv --> Builder
+    DesignTpl --> Builder
     Stacks --> Builder
     ScaffoldOpts --> Builder
     Safety -->|pass| Builder
@@ -191,6 +199,7 @@ flowchart TD
         CrossDefaults[Cross-recipe defaults<br/>Python / TS / Docker<br/>standards]
         CIConfig[CI configuration<br/>mode + selected actions]
         AuthMeta[Auth provider metadata<br/>libraries + env hints]
+        DesignTplInput[Design template<br/>brand guide, tokens,<br/>typography, components]
         ClaudeMD[CLAUDE.md template<br/>optional]
         DemoFlag[Demo mode flag<br/>zero-config env fallbacks]
         PhaseCtx[Phase context<br/>which phases, position<br/>in pipeline, prior work]
@@ -210,6 +219,7 @@ flowchart TD
         CISection[CI GUIDANCE<br/>workflow actions or<br/>blank template]
         CrossSection[CROSS-PROJECT STANDARDS<br/>tooling, naming, testing,<br/>docker best practices]
         ConvSection[CONVENTIONS<br/>full conventions.md content]
+        DesignTplSection[DESIGN TEMPLATE<br/>brand tokens, typography,<br/>component patterns]
         Instructions[INSTRUCTIONS<br/>phase-specific tasks]
         ExtraSection[EXTRA INSTRUCTIONS<br/>user's freeform input]
         TemplateSection[CLAUDE.MD TEMPLATE<br/>if provided]
@@ -222,6 +232,7 @@ flowchart TD
     CIConfig --> CISection
     CrossDefaults --> CrossSection
     ConvFile --> ConvSection
+    DesignTplInput --> DesignTplSection
     PhaseCtx --> Instructions
     Answers --> ExtraSection
     ClaudeMD --> TemplateSection
@@ -234,6 +245,7 @@ flowchart TD
     CISection --> Prompt
     CrossSection --> Prompt
     ConvSection --> Prompt
+    DesignTplSection --> Prompt
     Instructions --> Prompt
     ExtraSection --> Prompt
     TemplateSection --> Prompt
@@ -279,5 +291,16 @@ flowchart TD
     Use --> MergeStep
     FallbackChain --> MergeStep
 
+    MergeStep --> ExecStrategy
+
+    subgraph ExecStrategy["Execution Strategy"]
+        direction TB
+        Serial1["Step 1: Architecture<br/>serial — creates project structure"]
+        Parallel["Step 2: Frontend + Tests<br/>parallel — independent directories"]
+        Serial2["Step 3: Verify<br/>serial — needs all prior work"]
+        Serial1 --> Parallel --> Serial2
+    end
+
     style MergeStep fill:#e0f2f1,stroke:#009688,color:#1a1a1a
+    style ExecStrategy fill:#e8f5e9,stroke:#4CAF50,color:#1a1a1a
 ```

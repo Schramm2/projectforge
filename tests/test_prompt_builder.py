@@ -35,6 +35,7 @@ def test_build_prompt_includes_requested_auth_ci_and_agent_docs():
     assert "Lint: Run the repo lint command and fail on violations." in prompt
     assert "agent_docs/" in prompt
     assert "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=" in prompt
+    assert "This is a scaffold, not a fully built product." in prompt
 
 
 def test_build_prompt_blank_ci_template_uses_placeholder_language():
@@ -136,6 +137,7 @@ def test_frontend_prompt_focuses_on_ui():
     assert "Do NOT modify backend code" in prompt
     assert "Use Tailwind v4" in prompt
     assert "Accent color: #0FA5A5" in prompt
+    assert "essential pages, routes, and components" in prompt
 
 
 def test_tests_prompt_focuses_on_testing():
@@ -158,6 +160,21 @@ def test_phase_prompt_all_phases_returns_full_prompt():
     assert phase_prompt == full_prompt
 
 
+def test_phase_prompt_all_phases_uses_codex_guidance_for_codex_backend():
+    all_phases = ["architecture", "frontend", "tests"]
+    prompt = build_phase_prompt(
+        all_phases,
+        all_phases,
+        _BASE_ANSWERS,
+        "conventions",
+        backend="codex",
+    )
+    assert "<output_contract>" in prompt
+    assert "<verification_loop>" in prompt
+    assert "Do not produce prose explanations." in prompt
+    assert "Persist until the starter project is complete" in prompt
+
+
 def test_phase_prompt_architecture_only():
     all_phases = ["architecture", "frontend", "tests"]
     prompt = build_phase_prompt(
@@ -168,6 +185,21 @@ def test_phase_prompt_architecture_only():
     )
     assert "Do NOT create frontend UI components" in prompt
     assert "Do NOT create test files" in prompt
+
+
+def test_phase_prompt_architecture_only_uses_codex_guidance_for_codex_backend():
+    all_phases = ["architecture", "frontend", "tests"]
+    prompt = build_phase_prompt(
+        ["architecture"],
+        all_phases,
+        _BASE_ANSWERS,
+        "conventions",
+        backend="codex",
+    )
+    assert "<completeness_contract>" in prompt
+    assert "<verification_loop>" in prompt
+    assert "Do not produce prose explanations." in prompt
+    assert "a separate phase will handle those" in prompt
 
 
 def test_phase_prompt_frontend_only():
@@ -192,3 +224,17 @@ def test_phase_prompt_tests_only():
     )
     assert "comprehensive tests" in prompt
     assert "Do NOT modify application code" in prompt
+
+
+def test_phase_prompt_verify_only_uses_codex_guidance_for_codex_backend():
+    prompt = build_phase_prompt(
+        ["verify"],
+        ["architecture", "frontend", "tests", "verify"],
+        {**_BASE_ANSWERS, "demo_mode": True},
+        "conventions",
+        backend="codex",
+    )
+    assert "<dependency_checks>" in prompt
+    assert "<verification_loop>" in prompt
+    assert "Keep progress updates brief and task-focused." in prompt
+    assert "Ensure the project runs without real API keys or .env.local." in prompt

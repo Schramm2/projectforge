@@ -148,10 +148,10 @@ Items marked with [DONE] have been implemented.
 
 ## Testing & Reliability
 
-- **Integration tests**: Spin up a test scaffold with `--dry-run` and validate the prompt contains expected sections.
-- **Snapshot tests**: Store expected prompt outputs and diff against them on changes.
-- **CI pipeline**: GitHub Actions running lint, tests, and a dry-run scaffold on every push.
-- **Mock backends**: Test the full flow without requiring actual AI CLIs installed.
+- [DONE] **Integration tests**: Spin up a test scaffold with `--dry-run` and validate the prompt contains expected sections.
+- [DONE] **Snapshot tests**: Store expected prompt outputs and diff against them on changes.
+- [DONE] **CI pipeline**: GitHub Actions running Ruff, the full pytest suite, package builds, and a `forge --dry-run` smoke check on pushes and PRs.
+- [DONE] **Mock backends**: Test the full flow without requiring actual AI CLIs installed.
 
 ---
 

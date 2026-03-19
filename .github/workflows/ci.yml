@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: python -m pip install --upgrade pip uv
+
+      - name: Sync dependencies
+        run: uv sync --dev
+
+      - name: Lint
+        run: uv run ruff check ubundiforge tests
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Build package
+        run: uv build
+
+      - name: Smoke-test forge dry run
+        run: |
+          uv run python -m ubundiforge \
+            --dry-run \
+            --name ci-smoke \
+            --stack fastapi \
+            --description "CI smoke test" \
+            --no-docker \
+            --no-open \
+            --no-verify > /tmp/forge-dry-run.txt
+          grep -q "CI smoke test" /tmp/forge-dry-run.txt

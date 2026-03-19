@@ -155,6 +155,17 @@ def test_codex_only_handles_all_phases(mock_check):
     assert all(backend == "codex" for _, backend in result)
 
 
+@patch("ubundiforge.router.check_backend_installed", return_value=False)
+def test_prompt_only_routing_uses_ideal_backends_even_when_none_installed(mock_check):
+    result = pick_phase_backends("nextjs", prefer_installed_backends=False)
+    assert result == [
+        ("architecture", "claude"),
+        ("frontend", "gemini"),
+        ("tests", "codex"),
+        ("verify", "claude"),
+    ]
+
+
 # --- Phase merging tests ---
 
 

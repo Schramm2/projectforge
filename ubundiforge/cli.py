@@ -181,6 +181,8 @@ def main(
     ] = None,
 ) -> None:
     """UbundiForge — Ubundi Project Scaffolder. Scaffold projects with AI + your conventions."""
+    prompt_only = dry_run or bool(export)
+
     if version:
         console.print(f"ubundiforge {__version__}")
         raise typer.Exit()
@@ -189,7 +191,7 @@ def main(
     console.print(Panel("[bold]UbundiForge[/bold] -- Ubundi Project Scaffolder", style="cyan"))
 
     # First-run setup wizard (or manual --setup)
-    if setup or needs_setup():
+    if setup or (not prompt_only and needs_setup()):
         run_setup(console)
         if setup:
             raise typer.Exit()
@@ -309,6 +311,7 @@ def main(
         answers["stack"],
         override=use,
         description=answers.get("description", ""),
+        prefer_installed_backends=not prompt_only,
     )
     merged_groups = merge_adjacent_phases(phase_backends)
     all_phases = STACK_PHASES.get(answers["stack"], ["architecture", "tests"])
@@ -359,13 +362,14 @@ def main(
 
     # Check that all required backends are installed
     required_backends = {backend for _, backend in phase_backends}
-    for backend in required_backends:
-        if not check_backend_installed(backend):
-            console.print(
-                f"\n[red bold]{backend}[/red bold] [red]is not installed or not on PATH.[/red]"
-                "\n[dim]Install at least one AI CLI (claude, gemini, or codex).[/dim]"
-            )
-            raise typer.Exit(1)
+    if not prompt_only:
+        for backend in required_backends:
+            if not check_backend_installed(backend):
+                console.print(
+                    f"\n[red bold]{backend}[/red bold] [red]is not installed or not on PATH.[/red]"
+                    "\n[dim]Install at least one AI CLI (claude, gemini, or codex).[/dim]"
+                )
+                raise typer.Exit(1)
 
     # Resolve model per backend: --model overrides everything, else use config
     backend_models: dict[str, str] = forge_config.get("backend_models", {})

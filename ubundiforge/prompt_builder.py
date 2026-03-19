@@ -229,9 +229,9 @@ scaffolding. You excel at designing clean, well-reasoned project structures \
 where every file has a clear purpose and every architectural decision is \
 intentional.
 
-Your task: scaffold a new project in the current directory. Go beyond a \
-basic skeleton — create a fully-featured, immediately runnable project with \
-thoughtful defaults that reflect real-world best practices.
+Your task: scaffold a new project in the current directory. Create a lean, \
+immediately runnable starter project with thoughtful defaults that reflect \
+real-world best practices. This is a scaffold, not a fully built product.
 
 <project>
 <name>{answers["name"]}</name>
@@ -258,7 +258,7 @@ from experience that these patterns reduce bugs and speed up onboarding.
 </cross_project_standards>{docker_block}{ci_block}{claude_md_block}
 
 <instructions>
-1. Create the complete project structure with all configuration files, \
+1. Create the starter project structure with all required configuration files, \
 following the stack guidance layout exactly.
 2. Include a CLAUDE.md at the project root that describes this project for \
 AI coding assistants. {claude_md_hint}
@@ -285,6 +285,8 @@ correct — they should pass validation.
 <avoid>
 - Do not over-engineer. Only include what the project description requires. \
 A simple API does not need event sourcing or CQRS.
+- Do not treat this scaffold like a finished product. Build a strong foundation \
+with representative starter flows, not a full feature set.
 - Do not add features, abstractions, or configurability beyond what was asked.
 - Do not create empty placeholder files — if a file exists, it should have \
 real content.
@@ -386,9 +388,9 @@ scaffolding. You excel at designing clean, well-reasoned project structures \
 where every file has a clear purpose and every architectural decision is \
 intentional.
 
-Your task: scaffold a new project in the current directory. Go beyond a \
-basic skeleton — create a fully-featured, immediately runnable project with \
-thoughtful defaults that reflect real-world best practices.
+Your task: scaffold a new project in the current directory. Create a lean, \
+immediately runnable starter project with thoughtful defaults that reflect \
+real-world best practices. This is a scaffold, not a fully built product.
 
 <project>
 <name>{answers["name"]}</name>
@@ -415,7 +417,7 @@ from experience that these patterns reduce bugs and speed up onboarding.
 </cross_project_standards>{docker_block}{ci_block}{exclusion_block}{claude_md_block}
 
 <instructions>
-1. Create the complete project structure with all configuration files, \
+1. Create the starter project structure with all required configuration files, \
 following the stack guidance layout exactly.
 2. Include a CLAUDE.md at the project root that describes this project for \
 AI coding assistants. {claude_md_hint}
@@ -442,6 +444,8 @@ correct — they should pass validation.
 <avoid>
 - Do not over-engineer. Only include what the project description requires. \
 A simple API does not need event sourcing or CQRS.
+- Do not treat this scaffold like a finished product. Build a strong foundation \
+with representative starter flows, not a full feature set.
 - Do not add features, abstractions, or configurability beyond what was asked.
 - Do not create empty placeholder files — if a file exists, it should have \
 real content.
@@ -473,7 +477,7 @@ and feel like they were crafted by a seasoned product designer.
 
 A project has been scaffolded in the current directory. The backend code, \
 configuration files, and project structure already exist. Your job is to \
-create the complete frontend UI.
+create the starter frontend UI that best demonstrates the scaffold.
 
 <project>
 <name>{answers["name"]}</name>
@@ -486,12 +490,14 @@ create the complete frontend UI.
 1. Read the existing project structure first. Check CLAUDE.md, package.json \
 or pyproject.toml, and any existing frontend files to understand what \
 libraries, frameworks, and conventions are configured.
-2. Create all pages, routes, and components that the project description implies.
+2. Create only the essential pages, routes, and components needed for a \
+credible starter scaffold.
    - Build responsive layouts that work across mobile, tablet, and desktop.
    - Use the styling framework already configured in the project.
    - If a design template is provided above, translate it into reusable tokens, \
 CSS variables, component variants, and page motifs instead of one-off styles.
-   - Connect frontend to any existing API endpoints or data models.
+   - Connect frontend to any existing API endpoints or data models when needed \
+to support the starter flows.
    - Add meaningful loading states, error states, and empty states.
    - Use animations for page transitions and micro-interactions where appropriate.
 3. Ensure accessibility: semantic HTML, alt text, keyboard navigation, \
@@ -530,6 +536,7 @@ the selected design template explicitly calls for them.
 - Do not use purple gradients on white backgrounds.
 - Do not create predictable layouts or cookie-cutter component patterns.
 - Do not create generic hero sections with stock-photo-style descriptions.
+- Do not build extra pages or product features just because they would be nice to have.
 </avoid>
 
 <extra_instructions>
@@ -699,9 +706,9 @@ scaffolding. You excel at designing clean, well-reasoned project structures \
 where every file has a clear purpose and every architectural decision is \
 intentional.
 
-Your task: scaffold a new project in the current directory. Go beyond a \
-basic skeleton — create a fully-featured, immediately runnable project with \
-thoughtful defaults that reflect real-world best practices.
+Your task: scaffold a new project in the current directory. Create a lean, \
+immediately runnable starter project with thoughtful defaults that reflect \
+real-world best practices. This is a scaffold, not a fully built product.
 
 <project>
 <name>{answers["name"]}</name>
@@ -728,7 +735,7 @@ from experience that these patterns reduce bugs and speed up onboarding.
 </cross_project_standards>{docker_block}{ci_block}{exclusion_block}{claude_md_block}
 
 <instructions>
-1. Create the complete project structure with all configuration files, \
+1. Create the starter project structure with all required configuration files, \
 following the stack guidance layout exactly.
 2. Include a CLAUDE.md at the project root that describes this project for \
 AI coding assistants. {claude_md_hint}
@@ -755,6 +762,8 @@ correct — they should pass validation.
 <avoid>
 - Do not over-engineer. Only include what the project description requires. \
 A simple API does not need event sourcing or CQRS.
+- Do not treat this scaffold like a finished product. Build a strong foundation \
+with representative starter flows, not a full feature set.
 - Do not add features, abstractions, or configurability beyond what was asked.
 - Do not create empty placeholder files — if a file exists, it should have \
 real content.
@@ -791,7 +800,7 @@ precise, creative, and persistent.
 <context>
 A project has been scaffolded in the current directory. The backend code, \
 configuration files, and project structure already exist. Your job is to \
-create the complete frontend UI.
+create the starter frontend UI that best demonstrates the scaffold.
 
 Project name: {answers["name"]}
 Stack: {stack_label}
@@ -807,14 +816,15 @@ or pyproject.toml, and any existing frontend files to understand what \
 libraries, frameworks, and conventions are configured. Identify what pages \
 and components the project description implies a real user would need.
 
-2. Execute: Create all pages, routes, and components.
+2. Execute: Create only the essential pages, routes, and components needed \
+for a credible starter scaffold.
    - Build responsive layouts that work across mobile, tablet, and desktop.
    - Use the styling framework already configured in the project.
    - If a design template is provided above, convert it into reusable tokens, \
 CSS variables, component variants, and layout patterns instead of sprinkling \
 isolated styling decisions across files.
    - Connect frontend to any existing API endpoints or data models found in \
-the codebase.
+the codebase when needed to support the starter flows.
    - Add meaningful loading states, error states, and empty states.
    - Use animations for page transitions and micro-interactions. Focus on \
 high-impact moments: one well-orchestrated page load with staggered reveals \
@@ -870,13 +880,14 @@ unless the selected design template explicitly calls for them.
 - Do NOT use purple gradients on white backgrounds.
 - Do NOT create predictable layouts or cookie-cutter component patterns.
 - Do NOT create generic hero sections with stock-photo-style descriptions.
+- Do NOT build extra pages or product features just because they would be nice to have.
 </constraints>
 
 <final_instruction>
-Based on the project context above, create a complete, visually impressive \
-frontend. Make unexpected design choices that feel genuinely crafted for \
-this specific product. Vary between light and dark themes, different fonts, \
-different aesthetics. Think step-by-step before writing code.
+Based on the project context above, create a polished starter frontend that \
+shows the scaffold's direction clearly without overbuilding. Make intentional \
+design choices that feel genuinely crafted for this specific product. Think \
+step-by-step before writing code.
 </final_instruction>"""
 
 
@@ -911,6 +922,20 @@ scaffolded in the current directory. Add comprehensive tests and automation.
 - Do not produce prose explanations. Write code.
 - Keep progress updates to 1-2 sentences between actions.
 </output_contract>
+
+<autonomy_and_persistence>
+Persist until every module has test coverage or is explicitly marked \
+[blocked]. Do not stop after partial coverage — carry changes through \
+implementation, test execution, and verification. If you encounter \
+challenges, attempt to resolve them yourself before reporting.
+</autonomy_and_persistence>
+
+<terminal_tool_hygiene>
+- Only run shell commands via the terminal tool.
+- If a patch or edit tool exists, use it directly; do not attempt it in bash.
+- After writing tests, run the test suite to verify they pass before \
+declaring the task done.
+</terminal_tool_hygiene>
 
 <dependency_checks>
 - Before writing any tests, read the project structure, CLAUDE.md, and the \
@@ -973,6 +998,534 @@ dependency_checks step.
 - If any tests fail unexpectedly, investigate and fix the test (not the \
 application code) or mark [blocked] with an explanation.
 </verification_loop>
+
+<extra_instructions>
+{extra}
+</extra_instructions>"""
+
+
+def build_prompt_codex(
+    answers: dict,
+    conventions: str,
+    claude_md_template: str | None = None,
+) -> str:
+    """Build a Codex-aligned full-project scaffold prompt."""
+    stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
+    docker_str = "Yes" if answers["docker"] else "No"
+    extra = answers.get("extra", "").strip() or "None"
+    services = answers.get("services", [])
+    auth_provider = answers.get("auth_provider")
+    ci = answers.get("ci", {})
+
+    stack_section = _build_stack_section(
+        answers["stack"],
+        services,
+        answers["name"],
+        auth_provider=auth_provider,
+    )
+    ci_section = _build_ci_section(ci)
+    design_template_block = _build_design_template_block(answers)
+
+    docker_block = ""
+    if answers["docker"]:
+        docker_block = (
+            "\n<docker>\n"
+            "Include Docker setup: Dockerfile + docker-compose.yml.\n"
+            "Follow the Docker standards in cross-project conventions.\n"
+            "</docker>"
+        )
+
+    claude_md_block = ""
+    if claude_md_template:
+        claude_md_block = (
+            "\n<claude_md_template>\n"
+            "Use this as the base for the project's CLAUDE.md. Adapt "
+            "placeholders to match this project's actual name, stack, "
+            "and structure.\n\n"
+            f"{claude_md_template}\n"
+            "</claude_md_template>"
+        )
+
+    ci_block = ""
+    if ci_section:
+        ci_block = f"\n<ci_guidance>\n{ci_section}\n</ci_guidance>"
+
+    claude_md_hint = (
+        "Use the template above as the base structure."
+        if claude_md_template
+        else "Cover stack, dev commands, project structure, and key patterns."
+    )
+
+    return f"""\
+You are an expert software architect and implementation agent specializing in \
+production-grade project scaffolding. Work directly in the current directory \
+and carry the scaffold through to a runnable starter project.
+
+<project>
+<name>{answers["name"]}</name>
+<stack>{stack_label}</stack>
+<description>{answers["description"]}</description>
+<docker>{docker_str}</docker>
+</project>
+
+<conventions>
+These are the team's coding standards. Follow them exactly — they override \
+your defaults.
+
+{conventions}
+</conventions>
+{design_template_block}
+
+<stack_guidance>
+{stack_section}
+</stack_guidance>
+
+<cross_project_standards>
+{CROSS_RECIPE_DEFAULTS}
+</cross_project_standards>{docker_block}{ci_block}{claude_md_block}
+
+<output_contract>
+- Create the scaffold directly in the current directory.
+- Include a CLAUDE.md at the project root. {claude_md_hint}
+- Include an agent_docs/ directory with starter progressive-disclosure docs \
+aligned to CLAUDE.md.
+- Include .gitignore, .env.example with real placeholder values, and a \
+README.md with setup instructions.
+- If CI is requested, create the workflow files as part of the scaffold.
+- Initialize a git repository and make an initial commit.
+- Do not produce prose explanations. Make the required file changes and run \
+the necessary commands.
+- Keep any progress updates brief and task-focused.
+</output_contract>
+
+<default_follow_through_policy>
+- If the next step is reversible and low-risk, proceed without asking.
+- Ask only if required information is missing and cannot be discovered from \
+the repo, or if a choice would materially change the scaffold outcome.
+- Persist until the starter project is complete or explicitly [blocked].
+</default_follow_through_policy>
+
+<autonomy_and_persistence>
+Persist until the scaffold is fully handled end-to-end. Do not stop at \
+analysis or partial fixes — carry changes through implementation, \
+verification, and completion. Assume the user wants code changes and tool \
+execution to complete the scaffold. If you encounter challenges or blockers, \
+attempt to resolve them yourself before reporting.
+</autonomy_and_persistence>
+
+<dependency_checks>
+- Inspect the current directory before editing so you understand whether it is \
+empty, partially scaffolded, or already contains relevant files.
+- Read any existing CLAUDE.md, package manager config, and top-level config \
+files before creating overlapping files.
+- Use the project conventions, stack guidance, and CI guidance as the source \
+of truth for file layout and tooling.
+- Do not skip discovery just because the intended scaffold seems obvious.
+</dependency_checks>
+
+<completeness_contract>
+- Treat the task as incomplete until every required starter file is created or \
+updated with meaningful content.
+- Keep an internal checklist for: project structure, configuration, CLAUDE.md, \
+agent_docs, README, env example, optional Docker, optional CI, and git init.
+- If a requested item cannot be completed, mark it [blocked] and state exactly \
+what is missing.
+</completeness_contract>
+
+<quality_criteria>
+- Every file in the scaffold has real, useful content.
+- Configuration files are complete and internally consistent.
+- Import paths resolve and cross-references match the generated structure.
+- The conventions are reflected in actual code and configuration, not merely documented.
+- The project starts with sensible defaults and supports the documented dev commands.
+</quality_criteria>
+
+<verification_loop>
+Before finalizing:
+- Check that the scaffold matches the requested stack and project description.
+- Validate that package/config files and referenced scripts are consistent.
+- Run the most relevant verification commands available for the scaffold \
+(for example install, test, lint, or typecheck) when those commands exist.
+- Confirm the dev commands documented in CLAUDE.md and README match the files you created.
+- If verification fails, fix the issue or mark it [blocked] with the reason.
+</verification_loop>
+
+<terminal_tool_hygiene>
+- Only run shell commands via the terminal tool.
+- Never "run" tool names as shell commands.
+- If a patch or edit tool exists, use it directly; do not attempt it in bash.
+- After changes, run a lightweight verification step (ls, tests, or build) \
+before declaring the task done.
+</terminal_tool_hygiene>
+
+<avoid>
+- Do not over-engineer or add features the project description did not ask for.
+- Do not create empty placeholder files.
+- Do not add excessive comments or docstrings to boilerplate code.
+- Do not stop after a partial scaffold if more required work remains.
+</avoid>
+{_demo_mode_section(answers)}
+<extra_instructions>
+{extra}
+</extra_instructions>"""
+
+
+def build_architecture_prompt_codex(
+    answers: dict,
+    conventions: str,
+    claude_md_template: str | None = None,
+    exclude_frontend: bool = False,
+    exclude_tests: bool = False,
+) -> str:
+    """Build a Codex-aligned architecture/core scaffold prompt."""
+    stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
+    docker_str = "Yes" if answers["docker"] else "No"
+    extra = answers.get("extra", "").strip() or "None"
+    services = answers.get("services", [])
+    auth_provider = answers.get("auth_provider")
+    ci = answers.get("ci", {})
+
+    stack_section = _build_stack_section(
+        answers["stack"],
+        services,
+        answers["name"],
+        auth_provider=auth_provider,
+    )
+    ci_section = "" if exclude_tests else _build_ci_section(ci)
+    design_template_block = "" if exclude_frontend else _build_design_template_block(answers)
+
+    docker_block = ""
+    if answers["docker"]:
+        docker_block = (
+            "\n<docker>\n"
+            "Include Docker setup: Dockerfile + docker-compose.yml.\n"
+            "Follow the Docker standards in cross-project conventions.\n"
+            "</docker>"
+        )
+
+    claude_md_block = ""
+    if claude_md_template:
+        claude_md_block = (
+            "\n<claude_md_template>\n"
+            "Use this as the base for the project's CLAUDE.md. Adapt "
+            "placeholders to match this project's actual name, stack, "
+            "and structure.\n\n"
+            f"{claude_md_template}\n"
+            "</claude_md_template>"
+        )
+
+    exclusion_lines = []
+    if exclude_frontend:
+        exclusion_lines.append(
+            "- Do NOT create frontend UI components or pages — "
+            "a separate phase will handle those."
+        )
+    if exclude_tests:
+        exclusion_lines.append(
+            "- Do NOT create test files or CI configuration — "
+            "a separate phase will handle those."
+        )
+    exclusion_block = ""
+    if exclusion_lines:
+        exclusion_block = (
+            "\n<scope_boundaries>\n" + "\n".join(exclusion_lines) + "\n</scope_boundaries>"
+        )
+
+    ci_block = ""
+    if ci_section:
+        ci_block = f"\n<ci_guidance>\n{ci_section}\n</ci_guidance>"
+
+    claude_md_hint = (
+        "Use the template above as the base structure."
+        if claude_md_template
+        else "Cover stack, dev commands, project structure, and key patterns."
+    )
+
+    return f"""\
+You are an expert software architect specializing in production-grade project \
+scaffolding. Focus on architecture, configuration, backend/core code, and the \
+project's foundational documentation.
+
+<project>
+<name>{answers["name"]}</name>
+<stack>{stack_label}</stack>
+<description>{answers["description"]}</description>
+<docker>{docker_str}</docker>
+</project>
+
+<conventions>
+These are the team's coding standards. Follow them exactly — they override \
+your defaults.
+
+{conventions}
+</conventions>
+{design_template_block}
+
+<stack_guidance>
+{stack_section}
+</stack_guidance>
+
+<cross_project_standards>
+{CROSS_RECIPE_DEFAULTS}
+</cross_project_standards>{docker_block}{ci_block}{exclusion_block}{claude_md_block}
+
+<output_contract>
+- Create the architecture/core scaffold directly in the current directory.
+- Include a CLAUDE.md at the project root. {claude_md_hint}
+- Include an agent_docs/ directory with starter architecture and onboarding docs.
+- Include .gitignore, .env.example with real placeholder values, and a \
+README.md with setup instructions.
+- Initialize a git repository and make an initial commit.
+- Do not produce prose explanations. Write code and configuration.
+- Keep progress updates brief and task-focused.
+</output_contract>
+
+<autonomy_and_persistence>
+Persist until the architecture scaffold is complete end-to-end. Do not stop \
+at analysis or partial output — carry changes through implementation and \
+verification. If you encounter challenges, attempt to resolve them yourself \
+before reporting.
+</autonomy_and_persistence>
+
+<dependency_checks>
+- Inspect the existing project structure before editing.
+- Read any existing CLAUDE.md, package manager config, and top-level config files.
+- Use stack guidance and conventions to determine the correct layout and libraries.
+- Do not skip discovery just because the intended foundation seems obvious.
+</dependency_checks>
+
+<completeness_contract>
+- Treat the task as incomplete until the requested structure, configuration, \
+documentation, and core flows are in place.
+- Keep an internal checklist for config files, starter source files, CLAUDE.md, \
+agent_docs, README, env example, optional Docker, and any requested services/auth.
+- If something cannot be completed, mark it [blocked] and state exactly why.
+</completeness_contract>
+
+<quality_criteria>
+- Every created file has meaningful content.
+- Configuration files are complete and internally consistent.
+- Import paths and cross-references resolve.
+- The conventions are reflected in code patterns, not just documentation.
+- Dev commands documented in CLAUDE.md correspond to the scaffolded files.
+</quality_criteria>
+
+<verification_loop>
+Before finalizing:
+- Check that the scaffold matches the requested stack and project description.
+- Validate config files and referenced scripts.
+- Confirm that excluded work was left for later phases when scope boundaries are present.
+- Verify the documented dev commands match the files created in this phase.
+- If verification fails, fix the issue or mark it [blocked].
+</verification_loop>
+
+<terminal_tool_hygiene>
+- Only run shell commands via the terminal tool.
+- If a patch or edit tool exists, use it directly; do not attempt it in bash.
+- After changes, run a lightweight verification step before declaring done.
+</terminal_tool_hygiene>
+
+<avoid>
+- Do not over-engineer.
+- Do not create empty placeholder files.
+- Do not add unnecessary comments or abstractions.
+- Do not drift into frontend or testing work when those are excluded above.
+</avoid>
+{_demo_mode_section(answers)}
+<extra_instructions>
+{extra}
+</extra_instructions>"""
+
+
+def build_frontend_prompt_codex(answers: dict) -> str:
+    """Build a Codex-aligned frontend prompt."""
+    stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
+    extra = answers.get("extra", "").strip() or "None"
+    design_template_block = _build_design_template_block(answers)
+
+    return f"""\
+You are an expert frontend engineer working inside an existing scaffold. Build \
+the minimum set of pages, routes, components, and styles needed for a polished \
+starter UI.
+
+<project>
+<name>{answers["name"]}</name>
+<stack>{stack_label}</stack>
+<description>{answers["description"]}</description>
+</project>
+{design_template_block}
+
+<output_contract>
+- Create or update frontend files only.
+- Build the essential pages, routes, and components needed for a credible starter scaffold.
+- Do not produce prose explanations. Write code and styles.
+- Keep progress updates brief and task-focused.
+</output_contract>
+
+<dependency_checks>
+- Read CLAUDE.md, package.json or pyproject.toml, and the existing frontend files first.
+- Identify the styling system, routing structure, available API/data hooks, and project conventions.
+- Do not invent a new frontend architecture if the scaffold already establishes one.
+</dependency_checks>
+
+<completeness_contract>
+- Treat the task as incomplete until the starter flows have the pages and components they need.
+- Include responsive behavior for mobile and desktop.
+- Include meaningful loading, error, and empty states where the starter flows need them.
+- If a design template is provided, translate it into reusable tokens,
+  variables, and component patterns.
+</completeness_contract>
+
+<frontend_tasks>
+When building frontend pages, avoid generic, overbuilt layouts.
+- One composition: the first viewport must read as one composition, not a \
+dashboard, unless it is a dashboard.
+- Brand first: on branded pages, the brand or product name must be a \
+hero-level signal, not just nav text.
+- Full-bleed hero only: on landing pages, the hero image should be a \
+dominant edge-to-edge visual plane. Do not default to inset or rounded \
+media cards unless the design system requires them.
+- Hero budget: the first viewport should contain only the brand, one \
+headline, one short supporting sentence, one CTA group, and one dominant \
+image. Do not place stats, schedules, or secondary marketing content there.
+- Cards: default to no cards. Never use cards in the hero. If removing a \
+border, shadow, or radius does not hurt interaction, it should not be a card.
+- One job per section: each section should have one purpose and one headline.
+- Reduce clutter: avoid pill clusters, stat strips, icon rows, and \
+competing text blocks.
+- Use motion to create presence and hierarchy, not noise. Ship 2-3 \
+intentional motions and prefer Framer Motion when available.
+</frontend_tasks>
+
+<quality_criteria>
+- The UI reflects the project description rather than a generic landing page.
+- Interactive elements are keyboard-navigable with visible focus states.
+- Visual design is cohesive and intentionally styled for this product.
+- Imports resolve and routes/components fit the existing scaffold structure.
+</quality_criteria>
+
+<verification_loop>
+Before finalizing:
+- Check that the new routes and components are wired into the existing app correctly.
+- Verify imports, assets, and styling references resolve.
+- Confirm the UI remains within the configured frontend stack and styling system.
+- If something is blocked by missing backend support, keep the UI functional
+  with sensible scaffold states.
+</verification_loop>
+
+<scope_boundaries>
+- Do NOT modify backend code, API routes, database models, or infrastructure.
+- Do NOT modify configuration files (pyproject.toml, tsconfig.json, etc.).
+- Do NOT create test files.
+- Focus exclusively on frontend: pages, components, styles, client-side logic.
+</scope_boundaries>
+
+<avoid>
+- Do not create predictable or cookie-cutter layouts.
+- Do not use overused font families unless the design template explicitly calls for them.
+- Do not use purple gradients on white backgrounds.
+- Do not build extra pages or product features that were not requested.
+</avoid>
+
+<extra_instructions>
+{extra}
+</extra_instructions>"""
+
+
+def build_verify_prompt_codex(answers: dict) -> str:
+    """Build a Codex-aligned verify/fix prompt."""
+    stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
+    extra = answers.get("extra", "").strip() or "None"
+    demo = answers.get("demo_mode", False)
+
+    if demo:
+        demo_block = """\
+- Ensure the project runs without real API keys or .env.local.
+- Auth providers must degrade gracefully with a visible banner instead of crashing.
+- Databases must fall back to mock or seed data when connections are missing.
+- External APIs must return mock responses when keys are missing.
+- Verify .env.example documents required and optional variables clearly."""
+        startup_goal = (
+            "Start the project and confirm it renders visible content in demo mode."
+        )
+    else:
+        demo_block = "- Verify .env.example documents all required variables."
+        startup_goal = "Start the project and confirm the normal development flow works."
+
+    return f"""\
+You are a senior QA and integration engineer reviewing a scaffolded project \
+that may have been built across multiple phases. Fix integration issues and \
+carry the project through to a working, verified state.
+
+<project>
+<name>{answers["name"]}</name>
+<stack>{stack_label}</stack>
+<description>{answers["description"]}</description>
+</project>
+
+<output_contract>
+- Make the required code and configuration changes directly in the project.
+- Do not produce prose explanations while working.
+- Keep progress updates brief and task-focused.
+- Finish with the project in a verified state or explicitly mark remaining blockers.
+</output_contract>
+
+<autonomy_and_persistence>
+Persist until the project reaches a verified, working state. Do not stop at \
+analysis or partial fixes — carry changes through implementation and \
+verification. If you encounter challenges, attempt to resolve them yourself \
+before reporting.
+</autonomy_and_persistence>
+
+<dependency_checks>
+- Read CLAUDE.md, the package manager config, and scan the full project structure first.
+- Build a mental model of how architecture, frontend, tests, and configuration fit together.
+- Use the documented dev commands and conventions as the source of truth.
+</dependency_checks>
+
+<completeness_contract>
+- Treat the task as incomplete until startup, tests, lint, and typecheck have been addressed.
+- Keep an internal checklist for startup, tests, lint, typecheck,
+  dependencies, imports, env docs, and demo-mode requirements when enabled.
+- If something cannot be resolved, mark it [blocked] and state exactly what remains.
+</completeness_contract>
+
+<instructions>
+- Start the project using the dev command from CLAUDE.md. If it fails,
+  diagnose and fix the root cause.
+- Run the test suite. Fix failures caused by integration issues, broken
+  imports, missing deps, or stale references.
+- Run lint and typecheck. Fix all errors.
+{demo_block}
+- Make a final git commit with the integration fixes.
+</instructions>
+
+<scope_boundaries>
+- You may modify application code, frontend code, tests, and configuration
+  as needed to fix integration issues.
+- Keep fixes targeted. Do not add new product features or redesign the UI.
+</scope_boundaries>
+
+<verification_loop>
+Before finalizing:
+- {startup_goal}
+- Confirm the test suite passes or document legitimate [blocked] failures.
+- Confirm lint passes with zero errors.
+- Confirm typecheck passes with zero errors.
+- Confirm there are no orphaned imports, unresolved references, or missing dependencies.
+</verification_loop>
+
+<terminal_tool_hygiene>
+- Only run shell commands via the terminal tool.
+- If a patch or edit tool exists, use it directly; do not attempt it in bash.
+- After changes, run a lightweight verification step before declaring done.
+</terminal_tool_hygiene>
+
+<avoid>
+- Do not refactor working code without a concrete integration reason.
+- Do not remove tests to make failures disappear.
+- Do not change visual design except where required to fix a genuine bug.
+</avoid>
 
 <extra_instructions>
 {extra}
@@ -1190,12 +1743,22 @@ def build_phase_prompt(
 
     # All phases merged → standard full prompt (identical to pre-multi-backend behavior)
     if phase_set == all_set:
+        if backend == "codex":
+            return build_prompt_codex(answers, conventions, claude_md_template)
         return build_prompt(answers, conventions, claude_md_template)
 
     # Architecture phase (possibly merged with others)
     if "architecture" in phase_set:
         exclude_frontend = "frontend" in all_set and "frontend" not in phase_set
         exclude_tests = "tests" in all_set and "tests" not in phase_set
+        if backend == "codex":
+            return build_architecture_prompt_codex(
+                answers,
+                conventions,
+                claude_md_template,
+                exclude_frontend,
+                exclude_tests,
+            )
         if _is_ideal_backend("architecture", backend):
             return build_architecture_prompt_best(
                 answers,
@@ -1214,6 +1777,8 @@ def build_phase_prompt(
 
     # Standalone frontend phase
     if "frontend" in phase_set:
+        if backend == "codex":
+            return build_frontend_prompt_codex(answers)
         if _is_ideal_backend("frontend", backend):
             return build_frontend_prompt_best(answers)
         return build_frontend_prompt(answers)
@@ -1226,6 +1791,8 @@ def build_phase_prompt(
 
     # Standalone verify phase
     if "verify" in phase_set:
+        if backend == "codex":
+            return build_verify_prompt_codex(answers)
         if _is_ideal_backend("verify", backend):
             return build_verify_prompt_best(answers)
         return build_verify_prompt(answers)
