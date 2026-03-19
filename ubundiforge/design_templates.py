@@ -35,8 +35,7 @@ def design_template_choices_for_stack(stack: str) -> list[tuple[str, str]]:
     """Return ordered design template choices for a stack."""
     template_ids = design_template_ids_for_stack(stack)
     return [
-        (template_id, DESIGN_TEMPLATE_OPTIONS[template_id].label)
-        for template_id in template_ids
+        (template_id, DESIGN_TEMPLATE_OPTIONS[template_id].label) for template_id in template_ids
     ]
 
 

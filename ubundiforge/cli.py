@@ -4,8 +4,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.console import Console
-from rich.panel import Panel
+from rich.text import Text
 
 from ubundiforge import __version__
 from ubundiforge.config import SUPPORTED_BACKENDS, check_backend_installed
@@ -19,6 +18,7 @@ from ubundiforge.design_templates import (
 from ubundiforge.logo import print_logo
 from ubundiforge.prompt_builder import build_phase_prompt
 from ubundiforge.prompts import collect_answers
+from ubundiforge.questionary_theme import prompt_confirm
 from ubundiforge.router import (
     PHASE_LABELS,
     STACK_PHASES,
@@ -41,10 +41,23 @@ from ubundiforge.scaffold_options import (
     ci_action_ids_for_stack,
 )
 from ubundiforge.setup import load_forge_config, needs_setup, run_setup
+from ubundiforge.ui import (
+    bullet,
+    command_text,
+    create_console,
+    grouped_lines,
+    header_panel,
+    make_panel,
+    make_step_panel,
+    muted,
+    path_text,
+    status_line,
+    subtle,
+)
 from ubundiforge.verify import print_report, verify_scaffold
 
 app = typer.Typer(add_completion=False)
-console = Console()
+console = create_console()
 
 
 STACK_ALIASES = {
@@ -69,6 +82,127 @@ STACK_ALIASES = {
     "worker": "python-worker",
     "service": "python-worker",
 }
+
+
+def _render_routing_plan(
+    serial_first: list[tuple[str, str]],
+    parallel_middle: list[tuple[str, str]],
+    serial_last: list[tuple[str, str]],
+    can_parallel: bool,
+) -> None:
+    """Render the selected routing plan."""
+    if not parallel_middle and not serial_last and len(serial_first) == 1:
+        _, backend = serial_first[0]
+        console.print(status_line(f"Using {backend} for all scaffolding", accent="violet"))
+        return
+
+    lines: list[Text] = []
+    step = 1
+    for phase, backend in serial_first:
+        label = PHASE_LABELS.get(phase, phase)
+        lines.append(bullet(f"{step}. {label} -> {backend}", accent="aqua"))
+        step += 1
+    if can_parallel:
+        parts = [
+            f"{PHASE_LABELS.get(phase, phase)} -> {backend}" for phase, backend in parallel_middle
+        ]
+        lines.append(bullet(f"{step}. parallel: {' | '.join(parts)}", accent="amber"))
+        step += 1
+    else:
+        for phase, backend in parallel_middle:
+            label = PHASE_LABELS.get(phase, phase)
+            lines.append(bullet(f"{step}. {label} -> {backend}", accent="aqua"))
+            step += 1
+    for phase, backend in serial_last:
+        label = PHASE_LABELS.get(phase, phase)
+        lines.append(bullet(f"{step}. {label} -> {backend}", accent="plum"))
+        step += 1
+
+    console.print(
+        make_panel(
+            grouped_lines(lines),
+            title="Routing Plan",
+            accent="violet",
+        )
+    )
+
+
+def _render_loaded_context(
+    required_backends: set[str],
+    backend_models: dict[str, str],
+    *,
+    model_override: str | None,
+    conventions: str,
+    claude_md_loaded: bool,
+    design_template_label: str | None,
+) -> None:
+    """Render loaded scaffold context."""
+    lines: list[Text] = []
+    if model_override:
+        lines.append(subtle(f"Model override: {model_override}"))
+    elif backend_models:
+        for backend in sorted(required_backends):
+            configured_model = backend_models.get(backend)
+            if configured_model:
+                lines.append(subtle(f"{backend} model: {configured_model}"))
+
+    lines.append(subtle(f"Conventions: {len(conventions)} chars from ~/.forge/conventions.md"))
+    if claude_md_loaded:
+        lines.append(subtle("CLAUDE.md starter loaded"))
+    if design_template_label:
+        lines.append(subtle(f"Design template: {design_template_label}"))
+
+    console.print(make_panel(grouped_lines(lines), title="Scaffold Context", accent="aqua"))
+
+
+def _render_completion(project_dir: Path, *, git_ok: bool) -> None:
+    """Render the final completion state."""
+    if git_ok:
+        lines = grouped_lines(
+            [
+                subtle("Project created at"),
+                path_text(project_dir),
+            ]
+        )
+        console.print(make_panel(lines, title="Scaffold Complete", accent="aqua"))
+        return
+
+    lines = grouped_lines(
+        [
+            subtle("Project created, but git initialization failed."),
+            path_text(project_dir),
+            muted('Run git init && git add -A && git commit -m "Initial commit" manually.'),
+        ]
+    )
+    console.print(make_panel(lines, title="Scaffold Complete", accent="amber"))
+
+
+def _render_next_steps(answers: dict, project_dir: Path, *, open_editor: bool) -> None:
+    """Render the next-step commands."""
+    lines: list[Text] = [command_text(f"cd {project_dir}")]
+
+    from ubundiforge.stacks import STACK_META
+
+    meta = STACK_META.get(answers["stack"])
+    if meta and meta.env_hints:
+        lines.append(subtle("Copy .env.example to .env.local and fill in your secrets."))
+    if meta and meta.dev_commands:
+        run_cmd = meta.dev_commands.get("run") or meta.dev_commands.get("dev")
+        if run_cmd:
+            lines.append(command_text(run_cmd))
+        test_cmd = meta.dev_commands.get("test")
+        if test_cmd:
+            lines.append(command_text(test_cmd))
+    if not open_editor:
+        lines.append(muted(f"Open your editor manually from {project_dir}."))
+
+    console.print(
+        make_panel(
+            grouped_lines(lines),
+            title="Next Steps",
+            accent="plum",
+        )
+    )
 
 
 @app.callback(invoke_without_command=True)
@@ -188,7 +322,7 @@ def main(
         raise typer.Exit()
 
     print_logo(console)
-    console.print(Panel("[bold]UbundiForge[/bold] -- Ubundi Project Scaffolder", style="cyan"))
+    console.print(header_panel(__version__))
 
     # First-run setup wizard (or manual --setup)
     if setup or (not prompt_only and needs_setup()):
@@ -334,31 +468,8 @@ def main(
     can_parallel = len(parallel_middle) > 1
 
     # Show routing plan
-    if len(merged_groups) == 1:
-        _, backend = merged_groups[0]
-        console.print(f"\n[dim]Using {backend} for all scaffolding[/dim]")
-    else:
-        console.print("\n[dim]Multi-backend routing:[/dim]")
-        step = 1
-        for phase, backend in serial_first:
-            label = PHASE_LABELS.get(phase, phase)
-            console.print(f"[dim]  {step}. {label} -> {backend}[/dim]")
-            step += 1
-        if can_parallel:
-            parts = []
-            for phase, backend in parallel_middle:
-                parts.append(f"{PHASE_LABELS.get(phase, phase)} -> {backend}")
-            console.print(f"[dim]  {step}. [bold]parallel:[/bold] {' | '.join(parts)}[/dim]")
-            step += 1
-        else:
-            for phase, backend in parallel_middle:
-                label = PHASE_LABELS.get(phase, phase)
-                console.print(f"[dim]  {step}. {label} -> {backend}[/dim]")
-                step += 1
-        for phase, backend in serial_last:
-            label = PHASE_LABELS.get(phase, phase)
-            console.print(f"[dim]  {step}. {label} -> {backend}[/dim]")
-            step += 1
+    console.print()
+    _render_routing_plan(serial_first, parallel_middle, serial_last, can_parallel)
 
     # Check that all required backends are installed
     required_backends = {backend for _, backend in phase_backends}
@@ -373,26 +484,13 @@ def main(
 
     # Resolve model per backend: --model overrides everything, else use config
     backend_models: dict[str, str] = forge_config.get("backend_models", {})
-    if model:
-        console.print(f"[dim]Model override: {model}[/dim]")
-    elif backend_models:
-        for b, m in backend_models.items():
-            if b in required_backends:
-                console.print(f"[dim]Model for {b}: {m}[/dim]")
 
     # Load conventions and CLAUDE.md template
     conventions, conv_warnings = load_conventions()
     for warning in conv_warnings:
         console.print(f"[yellow]{warning}[/yellow]")
-    if verbose:
-        n = len(conventions)
-        console.print(f"[dim]Conventions: {n} chars from ~/.forge/conventions.md[/dim]")
-    else:
-        console.print("[dim]Loaded conventions from ~/.forge/conventions.md[/dim]")
 
     claude_md_template = load_claude_md_template()
-    if claude_md_template:
-        console.print("[dim]Loaded CLAUDE.md template[/dim]")
 
     selected_design_template = answers.get("design_template")
     if selected_design_template:
@@ -404,10 +502,15 @@ def main(
             answers["design_template_label"] = DESIGN_TEMPLATE_OPTIONS[
                 selected_design_template
             ].label
-            console.print(
-                "[dim]Loaded design template: "
-                f"{answers['design_template_label']}[/dim]"
-            )
+
+    _render_loaded_context(
+        required_backends,
+        backend_models,
+        model_override=model,
+        conventions=conventions,
+        claude_md_loaded=bool(claude_md_template),
+        design_template_label=answers.get("design_template_label"),
+    )
 
     # Check all user-supplied text for secrets before passing to AI
     fields_to_scan = {
@@ -464,9 +567,28 @@ def main(
             labels = " + ".join(PHASE_LABELS.get(p, p) for p in phases)
             if dry_run:
                 if len(merged_prompts) > 1:
-                    console.print(f"\n[bold]--- {labels} ({backend}) ---[/bold]\n")
+                    console.print()
+                    console.print(
+                        make_panel(
+                            grouped_lines(
+                                [
+                                    Text(labels, style="bold #F7F9FF"),
+                                    Text(f"Backend: {backend}", style="#8893B3"),
+                                ]
+                            ),
+                            title="Prompt Preview",
+                            accent="amber",
+                        )
+                    )
                 else:
-                    console.print("\n[bold]Assembled prompt:[/bold]\n")
+                    console.print()
+                    console.print(
+                        make_panel(
+                            Text("Assembled prompt", style="bold #F7F9FF"),
+                            title="Prompt Preview",
+                            accent="amber",
+                        )
+                    )
                 console.print(prompt)
 
         if export:
@@ -480,14 +602,20 @@ def main(
                     parts.append(prompt)
             all_text = "\n\n".join(parts)
             export_path.write_text(all_text)
-            console.print(f"\n[green]Prompt exported to {export_path}[/green]")
+            console.print()
+            console.print(status_line(f"Prompt exported to {export_path}", accent="aqua"))
 
         raise typer.Exit()
 
     if verbose:
         total_chars = sum(len(prompt) for _, _, prompt in phase_prompts)
         n = len(phase_prompts)
-        console.print(f"[dim]Total prompt length: {total_chars} chars across {n} phase(s)[/dim]")
+        console.print(
+            status_line(
+                f"Total prompt length: {total_chars} chars across {n} phase(s)",
+                accent="violet",
+            )
+        )
 
     # Run — use saved projects_dir if set, otherwise CWD
     base_dir = Path(forge_config.get("projects_dir") or Path.cwd())
@@ -495,14 +623,26 @@ def main(
 
     # Check if directory already exists
     if project_dir.exists() and any(project_dir.iterdir()):
+        console.print()
         console.print(
-            f"\n[yellow bold]{project_dir} already exists and is not empty.[/yellow bold]"
+            make_panel(
+                grouped_lines(
+                    [
+                        Text(
+                            f"{project_dir} already exists and is not empty.",
+                            style="bold #F7F9FF",
+                        ),
+                        subtle("Overwrite it to continue with a clean scaffold."),
+                    ]
+                ),
+                title="Existing Directory",
+                accent="amber",
+            )
         )
-        import questionary
 
-        confirm = questionary.confirm("Overwrite existing directory?", default=False).ask()
+        confirm = prompt_confirm("Overwrite the existing directory", default=False).ask()
         if not confirm:
-            console.print("[dim]Aborted.[/dim]")
+            console.print(status_line("Aborted.", accent="amber"))
             raise typer.Exit(0)
         reset_project_dir(project_dir)
 
@@ -513,12 +653,19 @@ def main(
     # Step 1: Run architecture (serial)
     for phase, backend in serial_first:
         label = PHASE_LABELS.get(phase, phase)
-        console.print(f"\n[dim]Step {step}/{total_phases}: {label} -> {backend}[/dim]")
+        console.print()
+        console.print(
+            make_step_panel(step, total_phases, label, detail=f"backend: {backend}", accent="aqua")
+        )
         phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
         effective_model = model or backend_models.get(backend)
         returncode = run_ai(
-            backend, phase_prompt, project_dir,
-            model=effective_model, verbose=verbose, label=label,
+            backend,
+            phase_prompt,
+            project_dir,
+            model=effective_model,
+            verbose=verbose,
+            label=label,
         )
         if returncode != 0:
             console.print(f"\n[red]{backend} exited with code {returncode} during {label}.[/red]")
@@ -528,21 +675,30 @@ def main(
     # Step 2: Run middle phases (parallel if multiple, serial if single)
     if parallel_middle:
         if can_parallel:
-            labels = " + ".join(
-                f"{PHASE_LABELS.get(p, p)} ({b})" for p, b in parallel_middle
+            labels = " + ".join(f"{PHASE_LABELS.get(p, p)} ({b})" for p, b in parallel_middle)
+            console.print()
+            console.print(
+                make_step_panel(
+                    step,
+                    total_phases,
+                    "Parallel execution window",
+                    detail=labels,
+                    accent="amber",
+                )
             )
-            console.print(f"\n[dim]Step {step}/{total_phases}: Running in parallel: {labels}[/dim]")
 
             parallel_args = []
             for phase, backend in parallel_middle:
                 phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
                 effective_model = model or backend_models.get(backend)
-                parallel_args.append({
-                    "label": PHASE_LABELS.get(phase, phase),
-                    "backend": backend,
-                    "prompt": phase_prompt,
-                    "model": effective_model,
-                })
+                parallel_args.append(
+                    {
+                        "label": PHASE_LABELS.get(phase, phase),
+                        "backend": backend,
+                        "prompt": phase_prompt,
+                        "model": effective_model,
+                    }
+                )
 
             results = run_ai_parallel(parallel_args, project_dir, verbose=verbose)
             for label, returncode in results:
@@ -553,12 +709,21 @@ def main(
         else:
             for phase, backend in parallel_middle:
                 label = PHASE_LABELS.get(phase, phase)
-                console.print(f"\n[dim]Step {step}/{total_phases}: {label} -> {backend}[/dim]")
+                console.print()
+                console.print(
+                    make_step_panel(
+                        step, total_phases, label, detail=f"backend: {backend}", accent="violet"
+                    )
+                )
                 phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
                 effective_model = model or backend_models.get(backend)
                 returncode = run_ai(
-                    backend, phase_prompt, project_dir,
-                    model=effective_model, verbose=verbose, label=label,
+                    backend,
+                    phase_prompt,
+                    project_dir,
+                    model=effective_model,
+                    verbose=verbose,
+                    label=label,
                 )
                 if returncode != 0:
                     console.print(
@@ -570,12 +735,19 @@ def main(
     # Step 3: Run verify (serial)
     for phase, backend in serial_last:
         label = PHASE_LABELS.get(phase, phase)
-        console.print(f"\n[dim]Step {step}/{total_phases}: {label} -> {backend}[/dim]")
+        console.print()
+        console.print(
+            make_step_panel(step, total_phases, label, detail=f"backend: {backend}", accent="plum")
+        )
         phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
         effective_model = model or backend_models.get(backend)
         returncode = run_ai(
-            backend, phase_prompt, project_dir,
-            model=effective_model, verbose=verbose, label=label,
+            backend,
+            phase_prompt,
+            project_dir,
+            model=effective_model,
+            verbose=verbose,
+            label=label,
         )
         if returncode != 0:
             console.print(f"\n[red]{backend} exited with code {returncode} during {label}.[/red]")
@@ -589,43 +761,25 @@ def main(
         report = verify_scaffold(answers["stack"], project_dir, verbose=verbose)
         print_report(report, console)
         if not report.all_passed:
+            console.print()
             console.print(
-                "[yellow]Some verification checks failed. "
-                "The project was still created successfully.[/yellow]"
+                make_panel(
+                    grouped_lines(
+                        [
+                            subtle("Some verification checks failed."),
+                            muted("The project was still created successfully."),
+                        ]
+                    ),
+                    title="Verification",
+                    accent="amber",
+                )
             )
 
-    if git_ok:
-        console.print(
-            f"\n[green bold]Done![/green bold] Project created at [bold]{project_dir}[/bold]"
-        )
-    else:
-        console.print(
-            f"\n[yellow bold]Project created at [bold]{project_dir}[/bold], "
-            f"but git initialization failed.[/yellow bold]"
-            "\n[yellow]Run 'git init && git add -A && git commit -m \"Initial commit\"' "
-            "manually to finish setup.[/yellow]"
-        )
-
-    # Next steps
-    console.print("\n[bold]Next steps:[/bold]")
-    console.print(f"  [dim]cd {project_dir}[/dim]")
-
-    from ubundiforge.stacks import STACK_META
-
-    meta = STACK_META.get(answers["stack"])
-    if meta and meta.env_hints:
-        console.print("  [dim]Copy .env.example to .env.local and fill in your secrets[/dim]")
-    if meta and meta.dev_commands:
-        run_cmd = meta.dev_commands.get("run") or meta.dev_commands.get("dev")
-        if run_cmd:
-            console.print(f"  [dim]{run_cmd}[/dim]")
-        test_cmd = meta.dev_commands.get("test")
-        if test_cmd:
-            console.print(f"  [dim]{test_cmd}[/dim]")
     console.print()
+    _render_completion(project_dir, git_ok=git_ok)
+    console.print()
+    _render_next_steps(answers, project_dir, open_editor=open_editor)
 
     if open_editor:
         preferred = forge_config.get("preferred_editor", "")
         open_in_editor(project_dir, preferred_editor=preferred)
-    else:
-        console.print(f"[dim]Run your editor manually: cd {project_dir}[/dim]")

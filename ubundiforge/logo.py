@@ -4,9 +4,12 @@ from math import ceil
 from pathlib import Path
 
 from rich.console import Console
+from rich.text import Text
 
-DEFAULT_MAX_WIDTH = 36
-DEFAULT_MAX_HEIGHT = 12
+from ubundiforge.ui import ACCENTS
+
+DEFAULT_MAX_WIDTH = 44
+DEFAULT_MAX_HEIGHT = 20
 MIN_RENDER_WIDTH = 18
 CHAR_DENSITY = {
     " ": 0,
@@ -104,6 +107,19 @@ def render_logo(terminal_width: int | None = None) -> str:
     return compact_logo or FALLBACK_LOGO
 
 
+def render_logo_text(terminal_width: int | None = None) -> Text:
+    """Return the logo with a restrained two-tone accent treatment."""
+    lines = render_logo(terminal_width).splitlines()
+    mid = len(lines) // 2
+    text = Text()
+    for index, line in enumerate(lines):
+        if index:
+            text.append("\n")
+        color = ACCENTS["violet"] if index < mid else ACCENTS["aqua"]
+        text.append(line, style=f"bold {color}")
+    return text
+
+
 def print_logo(console: Console) -> None:
-    """Print the Ubundi logo in cyan without overwhelming the terminal."""
-    console.print(f"[bold cyan]{render_logo(console.size.width)}[/bold cyan]")
+    """Print the Ubundi logo with the brand accent palette."""
+    console.print(render_logo_text(console.size.width))

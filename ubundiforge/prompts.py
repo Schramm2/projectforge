@@ -8,6 +8,12 @@ from ubundiforge.design_templates import (
     DESIGN_TEMPLATE_OPTIONS,
     design_template_choices_for_stack,
 )
+from ubundiforge.questionary_theme import (
+    prompt_checkbox,
+    prompt_confirm,
+    prompt_select,
+    prompt_text,
+)
 from ubundiforge.scaffold_options import (
     AUTH_PROVIDER_OPTIONS,
     CI_ACTION_OPTIONS,
@@ -15,6 +21,7 @@ from ubundiforge.scaffold_options import (
     ci_action_ids_for_stack,
 )
 from ubundiforge.stacks import STACK_META
+from ubundiforge.ui import create_console, status_line
 
 STACK_CHOICES = [
     questionary.Choice("Next.js + React (frontend or fullstack)", value="nextjs"),
@@ -46,8 +53,8 @@ def _ask_services(stack: str) -> list[str]:
         return []
 
     choices = [questionary.Choice(s, value=s) for s in meta.services]
-    selected = questionary.checkbox(
-        "Include any of these services? (space to select, enter to confirm):",
+    selected = prompt_checkbox(
+        "Include any services?",
         choices=choices,
     ).ask()
 
@@ -63,8 +70,8 @@ def _ask_auth_provider(stack: str) -> str | None:
     if not choices:
         return None
 
-    include_auth = questionary.confirm(
-        "Include authentication?",
+    include_auth = prompt_confirm(
+        "Add authentication scaffolding",
         default=False,
     ).ask()
     if include_auth is None:
@@ -72,8 +79,8 @@ def _ask_auth_provider(stack: str) -> str | None:
     if not include_auth:
         return None
 
-    provider = questionary.select(
-        "Which auth provider should Forge scaffold?",
+    provider = prompt_select(
+        "Choose the auth provider",
         choices=[
             questionary.Choice(
                 f"{label} — {AUTH_PROVIDER_OPTIONS[value].prompt_description}",
@@ -94,8 +101,8 @@ def _ask_design_template(stack: str) -> str | None:
     if not choices:
         return None
 
-    include_design_template = questionary.confirm(
-        "Apply a design template / brand guide?",
+    include_design_template = prompt_confirm(
+        "Apply a design template or brand guide",
         default=False,
     ).ask()
     if include_design_template is None:
@@ -103,8 +110,8 @@ def _ask_design_template(stack: str) -> str | None:
     if not include_design_template:
         return None
 
-    template_id = questionary.select(
-        "Which design template should Forge use?",
+    template_id = prompt_select(
+        "Choose the design direction",
         choices=[
             questionary.Choice(
                 f"{label} — {DESIGN_TEMPLATE_OPTIONS[value].prompt_description}",
@@ -121,8 +128,8 @@ def _ask_design_template(stack: str) -> str | None:
 
 def _ask_ci_config(stack: str) -> dict:
     """Ask whether to include CI and how detailed the scaffold should be."""
-    include_ci = questionary.confirm(
-        "Include GitHub Actions CI?",
+    include_ci = prompt_confirm(
+        "Add GitHub Actions CI",
         default=False,
     ).ask()
     if include_ci is None:
@@ -134,8 +141,8 @@ def _ask_ci_config(stack: str) -> dict:
             "actions": [],
         }
 
-    mode = questionary.select(
-        "How should Forge scaffold CI?",
+    mode = prompt_select(
+        "Choose the CI starting point",
         choices=[
             questionary.Choice(
                 "Questionnaire — choose the CI actions to include",
@@ -153,8 +160,8 @@ def _ask_ci_config(stack: str) -> dict:
     actions: list[str] = []
     if mode == "questionnaire":
         action_ids = ci_action_ids_for_stack(stack)
-        actions = questionary.checkbox(
-            "Which CI actions should the workflow include?",
+        actions = prompt_checkbox(
+            "Choose the CI actions to include",
             choices=[
                 questionary.Choice(
                     f"{CI_ACTION_OPTIONS[action_id].label} — "
@@ -176,39 +183,43 @@ def _ask_ci_config(stack: str) -> dict:
 
 def collect_answers(docker_available: bool = True) -> dict:
     """Run the interactive prompt flow and return answers as a dict."""
-    name = questionary.text(
-        "Project name:",
+    console = create_console()
+    console.print()
+
+    name = prompt_text(
+        "Name the project",
         validate=_validate_project_name,
     ).ask()
     if name is None:
         raise SystemExit(0)
 
-    stack = questionary.select(
-        "What are we building?",
+    stack = prompt_select(
+        "Choose the primary stack",
         choices=STACK_CHOICES,
     ).ask()
     if stack is None:
         raise SystemExit(0)
 
-    description = questionary.text("Brief description:").ask()
+    description = prompt_text("Brief description").ask()
     if description is None:
         raise SystemExit(0)
 
     meta = STACK_META.get(stack)
     if not docker_available:
         docker = False
-        from rich.console import Console
-
-        Console().print("[dim]Docker not detected — skipping Docker setup.[/dim]")
+        console.print(status_line("Docker not detected — skipping Docker setup.", accent="amber"))
     else:
         docker_default = meta.docker_default if meta else True
-        docker = questionary.confirm("Include Docker setup?", default=docker_default).ask()
+        docker = prompt_confirm(
+            "Include Docker setup",
+            default=docker_default,
+        ).ask()
         if docker is None:
             raise SystemExit(0)
 
     design_template = _ask_design_template(stack)
 
-    customize = questionary.confirm(
+    customize = prompt_confirm(
         "Customize further? (auth, services, CI, extras)",
         default=False,
     ).ask()
@@ -225,16 +236,16 @@ def collect_answers(docker_available: bool = True) -> dict:
         services = _ask_services(stack)
         ci = _ask_ci_config(stack)
 
-        extra = questionary.text(
-            "Any extra instructions? (optional, press Enter to skip):",
+        extra = prompt_text(
+            "Add any extra instructions",
             default="",
         ).ask()
         if extra is None:
             raise SystemExit(0)
         extra = extra.strip()
 
-    demo_mode = questionary.confirm(
-        "Enable demo mode? (project runs without real API keys/secrets)",
+    demo_mode = prompt_confirm(
+        "Enable demo mode? (runs without real API keys)",
         default=True,
     ).ask()
     if demo_mode is None:

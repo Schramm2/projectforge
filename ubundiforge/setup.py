@@ -8,10 +8,20 @@ from pathlib import Path
 
 import questionary
 from rich.console import Console
-from rich.table import Table
 
 from ubundiforge.config import SUPPORTED_BACKENDS, check_backend_installed
 from ubundiforge.conventions import CONVENTIONS_PATH, DEFAULT_CONVENTIONS, FORGE_DIR
+from ubundiforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
+from ubundiforge.ui import (
+    badge,
+    grouped_lines,
+    make_panel,
+    make_step_panel,
+    make_table,
+    muted,
+    status_line,
+    subtle,
+)
 
 CONFIG_PATH = FORGE_DIR / "config.json"
 
@@ -102,48 +112,77 @@ def _routing_summary(available: list[str], console: Console) -> None:
     has_codex = "codex" in available
 
     if has_claude and has_gemini and has_codex:
-        console.print(
-            "[green]All three backends detected — optimal routing enabled.[/green]\n"
-            "[dim]  Architecture & backend code -> claude[/dim]\n"
-            "[dim]  Frontend & UI              -> gemini[/dim]\n"
-            "[dim]  Tests & automation         -> codex[/dim]\n"
+        body = grouped_lines(
+            [
+                subtle("All three backends detected. Specialist routing is available."),
+                subtle("Architecture & backend code -> claude"),
+                subtle("Frontend & UI -> gemini"),
+                subtle("Tests & automation -> codex"),
+                muted("Use --use to override routing for any run."),
+            ]
         )
+        console.print(make_panel(body, title="Routing", accent="aqua"))
     elif has_claude and has_gemini:
-        console.print(
-            "[dim]claude + gemini detected.[/dim]\n"
-            "[dim]  Architecture, backend & tests -> claude[/dim]\n"
-            "[dim]  Frontend & UI                 -> gemini[/dim]\n"
+        body = grouped_lines(
+            [
+                subtle("claude + gemini detected."),
+                subtle("Architecture, backend & tests -> claude"),
+                subtle("Frontend & UI -> gemini"),
+                muted("Use --use to override routing for any run."),
+            ]
         )
+        console.print(make_panel(body, title="Routing", accent="aqua"))
     elif has_claude and has_codex:
-        console.print(
-            "[dim]claude + codex detected.[/dim]\n"
-            "[dim]  Architecture & backend -> claude[/dim]\n"
-            "[dim]  Tests & automation     -> codex[/dim]\n"
+        body = grouped_lines(
+            [
+                subtle("claude + codex detected."),
+                subtle("Architecture & backend -> claude"),
+                subtle("Tests & automation -> codex"),
+                muted("Use --use to override routing for any run."),
+            ]
         )
+        console.print(make_panel(body, title="Routing", accent="aqua"))
     elif has_claude:
-        console.print(
-            "[dim]Only claude detected — it will handle all scaffolding.[/dim]\n"
-            "[dim]Install gemini and/or codex to enable specialist routing.[/dim]\n"
+        body = grouped_lines(
+            [
+                subtle("Only claude detected. It will handle all scaffolding."),
+                muted("Install gemini and/or codex to enable specialist routing."),
+                muted("Use --use to override routing for any run."),
+            ]
         )
+        console.print(make_panel(body, title="Routing", accent="amber"))
     else:
         backend = available[0] if available else "?"
-        console.print(f"[dim]Only {backend} detected — it will handle all scaffolding.[/dim]\n")
-
-    console.print("[dim]Use --use to override routing for any run.[/dim]\n")
+        body = grouped_lines(
+            [
+                subtle(f"Only {backend} detected. It will handle all scaffolding."),
+                muted("Use --use to override routing for any run."),
+            ]
+        )
+        console.print(make_panel(body, title="Routing", accent="amber"))
 
 
 def run_setup(console: Console) -> dict:
     """Run the interactive setup wizard. Returns the saved config dict."""
     console.print()
-    console.print("[bold cyan]Welcome to UbundiForge Setup[/bold cyan]")
     console.print(
-        "[dim]Let's make sure everything is configured before your first scaffold.[/dim]\n"
+        make_panel(
+            grouped_lines(
+                [
+                    "Welcome to UbundiForge Setup",
+                    subtle("Let's configure the tools and defaults behind each scaffold."),
+                ]
+            ),
+            title="Setup",
+            accent="violet",
+        )
     )
 
     # --- Step 1: Detect AI CLI tools ---
-    console.print("[bold]Step 1:[/bold] Checking for AI coding assistants...\n")
+    console.print()
+    console.print(make_step_panel(1, 8, "Checking AI coding assistants", accent="aqua"))
 
-    table = Table(show_header=True, header_style="bold")
+    table = make_table(title="AI Assistants", accent="aqua")
     table.add_column("Tool")
     table.add_column("Strength")
     table.add_column("Status")
@@ -160,33 +199,47 @@ def run_setup(console: Console) -> dict:
         strength = strengths.get(backend, "")
         if installed:
             available.append(backend)
-            table.add_row(backend, strength, "[green]Installed[/green]")
+            table.add_row(backend, strength, badge("Installed", "success"))
         else:
-            table.add_row(backend, strength, "[dim]Not found[/dim]")
+            table.add_row(backend, strength, muted("Not found"))
 
     console.print(table)
     console.print()
 
     if not available:
         console.print(
-            "[red bold]No AI CLI tools found.[/red bold]\n"
-            "[red]Forge needs at least one of: claude, gemini, or codex.[/red]\n"
-            "[dim]Install one and run [bold]forge --setup[/bold] again.[/dim]"
+            make_panel(
+                grouped_lines(
+                    [
+                        "No AI CLI tools found.",
+                        subtle("Forge needs at least one of: claude, gemini, or codex."),
+                        muted("Install one and run forge --setup again."),
+                    ]
+                ),
+                title="Setup",
+                accent="amber",
+            )
         )
         raise SystemExit(1)
 
     # --- Step 2: Routing summary ---
-    console.print("[bold]Step 2:[/bold] Backend routing.\n")
+    console.print(make_step_panel(2, 8, "Backend routing", accent="violet"))
     _routing_summary(available, console)
 
     # --- Step 3: Model selection per backend ---
-    console.print("[bold]Step 3:[/bold] Model preferences.\n")
+    console.print(make_step_panel(3, 8, "Model preferences", accent="plum"))
 
     existing_models = load_forge_config().get("backend_models", {})
     backend_models: dict[str, str] = {}
 
     if len(available) > 0:
-        console.print("[dim]Choose a model for each backend, or keep the default.[/dim]\n")
+        console.print(
+            status_line(
+                "Choose a model for each backend, or keep the default.",
+                accent="plum",
+            )
+        )
+        console.print()
 
         for backend in available:
             models = BACKEND_MODELS.get(backend, [])
@@ -206,8 +259,8 @@ def run_setup(console: Console) -> dict:
             # Find preselect: existing config, else the default model
             preselect = existing or next((m["id"] for m in models if m.get("default")), None)
 
-            model_val = questionary.select(
-                f"Model for {backend}:",
+            model_val = prompt_select(
+                f"Choose the model for {backend}",
                 choices=choices,
                 default=preselect,
             ).ask()
@@ -215,8 +268,8 @@ def run_setup(console: Console) -> dict:
                 raise SystemExit(0)
 
             if model_val == "_custom":
-                model_val = questionary.text(
-                    f"Enter custom model ID for {backend}:",
+                model_val = prompt_text(
+                    f"Enter a custom model ID for {backend}",
                     default=existing,
                 ).ask()
                 if model_val is None:
@@ -229,20 +282,20 @@ def run_setup(console: Console) -> dict:
                 backend_models[backend] = model_val
 
         if backend_models:
-            model_table = Table(show_header=True, header_style="bold")
+            model_table = make_table(title="Saved Models", accent="plum")
             model_table.add_column("Backend")
             model_table.add_column("Model")
             for b, m in backend_models.items():
                 model_table.add_row(b, m)
             console.print(model_table)
         else:
-            console.print("[dim]Using default models for all backends.[/dim]")
+            console.print(status_line("Using default models for all backends.", accent="plum"))
         console.print()
 
     # --- Step 4: Pick preferred editor ---
-    console.print("[bold]Step 4:[/bold] Detecting editors...\n")
+    console.print(make_step_panel(4, 8, "Detecting editors", accent="amber"))
 
-    editor_table = Table(show_header=True, header_style="bold")
+    editor_table = make_table(title="Editors", accent="amber")
     editor_table.add_column("Editor")
     editor_table.add_column("Status")
 
@@ -252,12 +305,12 @@ def run_setup(console: Console) -> dict:
         cli_ok, app_ok = _check_editor_installed(cmd, app_bundle)
         if cli_ok:
             available_editors.append((cmd, label))
-            editor_table.add_row(label, "[green]Installed[/green]")
+            editor_table.add_row(label, badge("Installed", "success"))
         elif app_ok:
             available_editors.append((cmd, label))
-            editor_table.add_row(label, "[green]Installed[/green]")
+            editor_table.add_row(label, badge("Installed", "success"))
         else:
-            editor_table.add_row(label, "[dim]Not found[/dim]")
+            editor_table.add_row(label, muted("Not found"))
 
     console.print(editor_table)
     console.print()
@@ -265,17 +318,24 @@ def run_setup(console: Console) -> dict:
     if not available_editors:
         preferred_editor = ""
         console.print(
-            "[dim]No editors with CLI access found. "
-            "You can open projects manually after scaffolding.[/dim]\n"
+            status_line(
+                "No editors with CLI access found. Open projects manually.",
+                accent="amber",
+            )
         )
     elif len(available_editors) == 1:
         preferred_editor = available_editors[0][0]
-        console.print(f"[dim]Only {available_editors[0][1]} found — using it as default.[/dim]\n")
+        console.print(
+            status_line(
+                f"Only {available_editors[0][1]} found — using it as default.",
+                accent="amber",
+            )
+        )
     else:
         choices = [questionary.Choice(label, value=cmd) for cmd, label in available_editors]
         choices.append(questionary.Choice("None — I'll open projects manually", value=""))
-        preferred_editor = questionary.select(
-            "Which editor should Forge open projects in?",
+        preferred_editor = prompt_select(
+            "Choose the editor Forge should open by default",
             choices=choices,
         ).ask()
         if preferred_editor is None:
@@ -283,16 +343,16 @@ def run_setup(console: Console) -> dict:
         console.print()
 
     # --- Step 5: Git check ---
-    console.print("[bold]Step 5:[/bold] Checking git...\n")
+    console.print(make_step_panel(5, 8, "Checking git", accent="aqua"))
 
-    git_table = Table(show_header=True, header_style="bold")
+    git_table = make_table(title="Git", accent="aqua")
     git_table.add_column("Check")
     git_table.add_column("Status")
 
     git_installed = shutil.which("git") is not None
     git_table.add_row(
         "git",
-        "[green]Installed[/green]" if git_installed else "[red]Not found[/red]",
+        badge("Installed", "success") if git_installed else badge("Not found", "error"),
     )
 
     if git_installed:
@@ -300,11 +360,11 @@ def run_setup(console: Console) -> dict:
         git_email = _get_git_config("user.email")
         git_table.add_row(
             "user.name",
-            f"[green]{git_name}[/green]" if git_name else "[yellow]Not set[/yellow]",
+            git_name if git_name else badge("Not set", "warning"),
         )
         git_table.add_row(
             "user.email",
-            f"[green]{git_email}[/green]" if git_email else "[yellow]Not set[/yellow]",
+            git_email if git_email else badge("Not set", "warning"),
         )
 
     console.print(git_table)
@@ -312,42 +372,77 @@ def run_setup(console: Console) -> dict:
 
     if not git_installed:
         console.print(
-            "[red]Git is not installed. Forge uses git init on every scaffold.[/red]\n"
-            "[dim]Install git and run [bold]forge --setup[/bold] again.[/dim]\n"
+            make_panel(
+                grouped_lines(
+                    [
+                        "Git is not installed. Forge uses git init on every scaffold.",
+                        subtle("Install git and run forge --setup again."),
+                    ]
+                ),
+                title="Git",
+                accent="amber",
+            )
         )
     elif not git_name or not git_email:
         console.print(
-            "[yellow]Git user.name or user.email is not configured.[/yellow]\n"
-            "[dim]Forge runs git init + commit on scaffolded projects. "
-            "Set them with:[/dim]\n"
-            '[dim]  git config --global user.name "Your Name"[/dim]\n'
-            '[dim]  git config --global user.email "you@example.com"[/dim]\n'
+            make_panel(
+                grouped_lines(
+                    [
+                        "Git user.name or user.email is not configured.",
+                        subtle("Forge runs git init + commit on scaffolded projects."),
+                        subtle('git config --global user.name "Your Name"'),
+                        subtle('git config --global user.email "you@example.com"'),
+                    ]
+                ),
+                title="Git",
+                accent="amber",
+            )
         )
 
     # --- Step 6: Docker check ---
-    console.print("[bold]Step 6:[/bold] Checking Docker...\n")
+    console.print(make_step_panel(6, 8, "Checking Docker", accent="violet"))
 
     docker_installed = shutil.which("docker") is not None
     if docker_installed:
-        console.print("[green]Docker is installed.[/green]\n")
+        console.print(status_line("Docker is installed.", accent="aqua"))
     else:
         console.print(
-            "[dim]Docker not found. Forge will still offer the Docker option,\n"
-            "but scaffolded Dockerfiles won't be testable until Docker is installed.[/dim]\n"
+            make_panel(
+                grouped_lines(
+                    [
+                        "Docker not found.",
+                        subtle("Forge can still scaffold Docker support."),
+                        muted(
+                            "You will not be able to validate Dockerfiles until Docker is "
+                            "installed."
+                        ),
+                    ]
+                ),
+                title="Docker",
+                accent="violet",
+            )
         )
 
     # --- Step 7: Default project directory ---
-    console.print("[bold]Step 7:[/bold] Default project directory.\n")
+    console.print(make_step_panel(7, 8, "Default project directory", accent="plum"))
 
     existing_dir = load_forge_config().get("projects_dir", "")
     default_dir = existing_dir or ""
 
     console.print(
-        "[dim]Where should Forge create new projects?\n"
-        "Leave empty to use the current directory each time.[/dim]\n"
+        make_panel(
+            grouped_lines(
+                [
+                    "Where should Forge create new projects?",
+                    subtle("Leave empty to use the current directory each time."),
+                ]
+            ),
+            title="Projects",
+            accent="plum",
+        )
     )
-    projects_dir = questionary.text(
-        "Default project directory:",
+    projects_dir = prompt_text(
+        "Set the default project directory",
         default=default_dir,
     ).ask()
     if projects_dir is None:
@@ -357,35 +452,54 @@ def run_setup(console: Console) -> dict:
     if projects_dir:
         expanded = Path(projects_dir).expanduser().resolve()
         if not expanded.exists():
-            create = questionary.confirm(
-                f"{expanded} doesn't exist. Create it?",
+            create = prompt_confirm(
+                f"Create {expanded}",
                 default=True,
             ).ask()
             if create is None:
                 raise SystemExit(0)
             if create:
                 expanded.mkdir(parents=True, exist_ok=True)
-                console.print(f"[green]Created {expanded}[/green]\n")
+                console.print(status_line(f"Created {expanded}", accent="aqua"))
         else:
-            console.print(f"[dim]Using {expanded}[/dim]\n")
+            console.print(status_line(f"Using {expanded}", accent="plum"))
         projects_dir = str(expanded)
     else:
-        console.print("[dim]Will use current directory.[/dim]\n")
+        console.print(status_line("Will use the current directory.", accent="plum"))
 
     # --- Step 8: Conventions file ---
-    console.print("[bold]Step 8:[/bold] Conventions file.\n")
+    console.print(make_step_panel(8, 8, "Conventions file", accent="aqua"))
 
     if CONVENTIONS_PATH.exists():
-        console.print(f"[dim]Found existing conventions at {CONVENTIONS_PATH}[/dim]\n")
+        console.print(status_line(f"Found conventions at {CONVENTIONS_PATH}", accent="aqua"))
     else:
         console.print(
-            "[dim]Forge uses a conventions file to inject your team's coding standards\n"
-            "into every scaffold. A default one will be created for you.[/dim]\n"
+            make_panel(
+                grouped_lines(
+                    [
+                        "Forge uses a conventions file to inject your team's standards into every "
+                        "scaffold.",
+                        subtle("A default one will be created for you."),
+                    ]
+                ),
+                title="Conventions",
+                accent="aqua",
+            )
         )
         FORGE_DIR.mkdir(parents=True, exist_ok=True)
         CONVENTIONS_PATH.write_text(DEFAULT_CONVENTIONS)
-        console.print(f"[green]Created default conventions at {CONVENTIONS_PATH}[/green]")
-        console.print("[dim]Edit this file anytime to customize your project standards.[/dim]\n")
+        console.print(
+            status_line(
+                f"Created default conventions at {CONVENTIONS_PATH}",
+                accent="aqua",
+            )
+        )
+        console.print(
+            status_line(
+                "Edit this file anytime to customize your project standards.",
+                accent="aqua",
+            )
+        )
 
     # --- Save config ---
     config = {
@@ -397,8 +511,18 @@ def run_setup(console: Console) -> dict:
     }
     save_forge_config(config)
 
-    console.print("[green bold]Setup complete.[/green bold]")
-    console.print(f"[dim]Config saved to {CONFIG_PATH}[/dim]")
-    console.print("[dim]Run [bold]forge --setup[/bold] anytime to reconfigure.[/dim]\n")
+    console.print(
+        make_panel(
+            grouped_lines(
+                [
+                    subtle("Setup complete."),
+                    subtle(f"Config saved to {CONFIG_PATH}"),
+                    muted("Run forge --setup anytime to reconfigure."),
+                ]
+            ),
+            title="Setup Complete",
+            accent="aqua",
+        )
+    )
 
     return config

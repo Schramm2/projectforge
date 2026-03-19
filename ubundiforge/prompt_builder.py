@@ -1217,13 +1217,11 @@ def build_architecture_prompt_codex(
     exclusion_lines = []
     if exclude_frontend:
         exclusion_lines.append(
-            "- Do NOT create frontend UI components or pages — "
-            "a separate phase will handle those."
+            "- Do NOT create frontend UI components or pages — a separate phase will handle those."
         )
     if exclude_tests:
         exclusion_lines.append(
-            "- Do NOT create test files or CI configuration — "
-            "a separate phase will handle those."
+            "- Do NOT create test files or CI configuration — a separate phase will handle those."
         )
     exclusion_block = ""
     if exclusion_lines:
@@ -1445,9 +1443,7 @@ def build_verify_prompt_codex(answers: dict) -> str:
 - Databases must fall back to mock or seed data when connections are missing.
 - External APIs must return mock responses when keys are missing.
 - Verify .env.example documents required and optional variables clearly."""
-        startup_goal = (
-            "Start the project and confirm it renders visible content in demo mode."
-        )
+        startup_goal = "Start the project and confirm it renders visible content in demo mode."
     else:
         demo_block = "- Verify .env.example documents all required variables."
         startup_goal = "Start the project and confirm the normal development flow works."

@@ -9,9 +9,9 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 from rich.console import Console
-from rich.table import Table
 
 from ubundiforge.stacks import STACK_META
+from ubundiforge.ui import badge, make_table, muted
 
 
 @dataclass
@@ -206,18 +206,18 @@ def verify_scaffold(
 
 def print_report(report: VerifyReport, console: Console) -> None:
     """Render the verification report as a Rich table."""
-    table = Table(title="Scaffold Verification", show_lines=False)
+    table = make_table(title="Scaffold Verification", accent="plum")
     table.add_column("Check", style="bold")
     table.add_column("Status")
-    table.add_column("Detail", style="dim")
+    table.add_column("Detail", style="#8893B3")
 
     for check in report.checks:
         if check.skipped:
-            status = "[dim]skipped[/dim]"
+            status = muted("skipped")
         elif check.passed:
-            status = "[green]pass[/green]"
+            status = badge("pass", "success")
         else:
-            status = "[red]fail[/red]"
+            status = badge("fail", "error")
         table.add_row(check.name, status, check.detail or "")
 
     console.print()

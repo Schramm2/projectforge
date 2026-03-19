@@ -11,13 +11,22 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from rich.console import Console
 from rich.live import Live
 from rich.spinner import Spinner
-from rich.table import Table
 from rich.text import Text
 
-console = Console()
+from ubundiforge.ui import (
+    badge,
+    create_console,
+    grouped_lines,
+    make_panel,
+    make_table,
+    muted,
+    status_line,
+    subtle,
+)
+
+console = create_console()
 
 
 def _build_cmd(backend: str, prompt: str, model: str | None = None) -> list[str]:
@@ -79,12 +88,22 @@ def run_ai(
 
     if verbose:
         display_cmd = [c if c != prompt else "<prompt>" for c in cmd]
-        console.print(f"[dim]Command: {' '.join(display_cmd)}[/dim]")
-        console.print(f"[dim]Working directory: {project_dir}[/dim]")
+        console.print(
+            make_panel(
+                grouped_lines(
+                    [
+                        subtle(f"Command: {' '.join(display_cmd)}"),
+                        subtle(f"Working directory: {project_dir}"),
+                    ]
+                ),
+                title="Execution",
+                accent="violet",
+            )
+        )
 
     start = time.monotonic()
 
-    spinner = Spinner("dots", text=Text(f"Starting {display_label}...", style="dim"))
+    spinner = Spinner("dots", text=Text(f"Starting {display_label}...", style="#C6CEE6"))
 
     def _stream_stdout(pipe: io.BufferedReader, live: Live) -> None:
         """Read stdout line-by-line, print above the spinner via Rich."""
@@ -105,9 +124,7 @@ def run_ai(
         )
 
         with Live(spinner, console=console, refresh_per_second=10) as live:
-            reader = threading.Thread(
-                target=_stream_stdout, args=(proc.stdout, live), daemon=True
-            )
+            reader = threading.Thread(target=_stream_stdout, args=(proc.stdout, live), daemon=True)
             reader.start()
 
             while proc.poll() is None:
@@ -117,30 +134,41 @@ def run_ai(
                     proc.wait()
                     reader.join(timeout=5)
                     console.print(
-                        f"\n[yellow]{display_label} timed out after {elapsed:.0f}s. "
-                        f"The phase may have stalled.[/yellow]"
+                        make_panel(
+                            grouped_lines(
+                                [
+                                    Text.assemble(
+                                        badge("timeout", "warning"),
+                                        Text("  "),
+                                        subtle(f"{display_label} timed out after {elapsed:.0f}s."),
+                                    ),
+                                    muted("The phase may have stalled."),
+                                ]
+                            ),
+                            title="Execution",
+                            accent="amber",
+                        )
                     )
                     return 1
-                spinner.update(text=Text(
-                    f"{display_label} working... ({elapsed:.0f}s)", style="dim"
-                ))
+                spinner.update(
+                    text=Text(f"{display_label} working... ({elapsed:.0f}s)", style="#C6CEE6")
+                )
                 time.sleep(0.2)
 
             reader.join(timeout=5)
 
     except FileNotFoundError:
-        console.print(f"[red]{backend} command not found.[/red]")
+        console.print(status_line(f"{backend} command not found.", accent="amber"))
         return 1
 
     elapsed = time.monotonic() - start
 
     if verbose:
         console.print(
-            f"[dim]{display_label} completed in {elapsed:.1f}s"
-            f" (exit {proc.returncode})[/dim]"
+            status_line(f"{display_label} completed in {elapsed:.1f}s (exit {proc.returncode})")
         )
     else:
-        console.print(f"[dim]{display_label} finished in {elapsed:.0f}s[/dim]")
+        console.print(status_line(f"{display_label} finished in {elapsed:.0f}s"))
 
     return proc.returncode
 
@@ -148,6 +176,7 @@ def run_ai(
 @dataclass
 class _ParallelPhase:
     """Tracks a phase running in the background."""
+
     label: str
     backend: str
     start: float = 0.0
@@ -177,24 +206,32 @@ def run_ai_parallel(
     readers: dict[str, threading.Thread] = {}
     lock = threading.Lock()
 
-    def _build_status_table() -> Table:
+    def _build_status_table():
         """Build a Rich table showing all parallel phase statuses."""
-        table = Table(show_header=False, show_edge=False, pad_edge=False, box=None)
-        table.add_column(width=3)
-        table.add_column()
+        table = make_table(
+            title="Parallel Phases",
+            accent="amber",
+            show_edge=False,
+            pad_edge=False,
+            box_style=None,
+        )
+        table.add_column("Status", width=10)
+        table.add_column("Phase")
+        table.add_column("Backend")
+        table.add_column("State")
         for t in trackers.values():
             elapsed = time.monotonic() - t.start if t.start else 0
             if t.returncode is not None:
                 if t.returncode == 0:
-                    icon = "[green]ok[/green]"
-                    status = f"{t.label} finished in {elapsed:.0f}s"
+                    icon = badge("done", "success")
+                    status = f"finished in {elapsed:.0f}s"
                 else:
-                    icon = "[red]!![/red]"
-                    status = f"{t.label} failed (exit {t.returncode})"
+                    icon = badge("failed", "error")
+                    status = f"exit {t.returncode}"
             else:
-                icon = "[cyan]...[/cyan]"
-                status = f"{t.label} ({t.backend}) working... ({elapsed:.0f}s)"
-            table.add_row(icon, f"[dim]{status}[/dim]")
+                icon = badge("live", "info")
+                status = f"working... {elapsed:.0f}s"
+            table.add_row(icon, t.label, t.backend, subtle(status))
         return table
 
     def _reader_fn(label: str, pipe: io.BufferedReader) -> None:
@@ -262,9 +299,7 @@ def run_ai_parallel(
 
     # Initialize trackers
     for phase in phases:
-        trackers[phase["label"]] = _ParallelPhase(
-            label=phase["label"], backend=phase["backend"]
-        )
+        trackers[phase["label"]] = _ParallelPhase(label=phase["label"], backend=phase["backend"])
 
     results: list[tuple[str, int]] = []
 
@@ -287,7 +322,14 @@ def run_ai_parallel(
         label = phase["label"]
         t = trackers[label]
         if t.lines:
-            console.print(f"\n[bold]--- {label} output ---[/bold]")
+            console.print()
+            console.print(
+                make_panel(
+                    Text(label, style="bold #F7F9FF"),
+                    title="Phase Output",
+                    accent="plum",
+                )
+            )
             for line in t.lines:
                 console.print(line)
 
@@ -310,10 +352,10 @@ def ensure_git_init(project_dir: Path) -> bool:
     git_dir = project_dir / ".git"
 
     if not git_dir.exists():
-        console.print("[dim]Git not initialized by AI — setting up...[/dim]")
+        console.print(status_line("Git not initialized by AI — setting up...", accent="violet"))
         result = subprocess.run(["git", "init"], cwd=project_dir, capture_output=True, text=True)
         if result.returncode != 0:
-            console.print(f"[yellow]git init failed: {result.stderr.strip()}[/yellow]")
+            console.print(status_line(f"git init failed: {result.stderr.strip()}", accent="amber"))
             return False
 
     # Check whether there is at least one commit
@@ -325,10 +367,10 @@ def ensure_git_init(project_dir: Path) -> bool:
     if has_commit.returncode == 0:
         return True
 
-    console.print("[dim]No commits found — creating initial commit...[/dim]")
+    console.print(status_line("No commits found — creating initial commit...", accent="violet"))
     result = subprocess.run(["git", "add", "-A"], cwd=project_dir, capture_output=True, text=True)
     if result.returncode != 0:
-        console.print(f"[yellow]git add failed: {result.stderr.strip()}[/yellow]")
+        console.print(status_line(f"git add failed: {result.stderr.strip()}", accent="amber"))
         return False
 
     result = subprocess.run(
@@ -338,10 +380,10 @@ def ensure_git_init(project_dir: Path) -> bool:
         text=True,
     )
     if result.returncode != 0:
-        console.print(f"[yellow]git commit failed: {result.stderr.strip()}[/yellow]")
+        console.print(status_line(f"git commit failed: {result.stderr.strip()}", accent="amber"))
         return False
 
-    console.print("[dim]Git initialized with initial commit[/dim]")
+    console.print(status_line("Git initialized with initial commit", accent="aqua"))
     return True
 
 
@@ -385,10 +427,10 @@ def open_in_editor(project_dir: Path, preferred_editor: str = "") -> None:
     for editor in candidates:
         if shutil.which(editor):
             subprocess.Popen([editor, str(project_dir)])
-            console.print(f"[dim]Opened {project_dir} in {editor}[/dim]")
+            console.print(status_line(f"Opened {project_dir} in {editor}"))
             return
         if _try_open_via_app(editor, project_dir):
-            console.print(f"[dim]Opened {project_dir} in {editor}[/dim]")
+            console.print(status_line(f"Opened {project_dir} in {editor}"))
             return
 
-    console.print("[yellow]No editor found. Open the project manually.[/yellow]")
+    console.print(status_line("No editor found. Open the project manually.", accent="amber"))
