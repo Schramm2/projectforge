@@ -8,6 +8,7 @@ from ubundiforge.design_templates import (
     DESIGN_TEMPLATE_OPTIONS,
     design_template_choices_for_stack,
 )
+from ubundiforge.media_assets import list_collections
 from ubundiforge.questionary_theme import (
     prompt_checkbox,
     prompt_confirm,
@@ -219,6 +220,37 @@ def collect_answers(docker_available: bool = True) -> dict:
 
     design_template = _ask_design_template(stack)
 
+    # Media assets from media/<collection>/
+    media_collection: str | None = None
+    collections = list_collections()
+    if collections:
+        if len(collections) == 1:
+            c = collections[0]
+            use_it = prompt_confirm(
+                f"Use {c.name} media assets? ({c.file_count} files)",
+                default=True,
+            ).ask()
+            if use_it is None:
+                raise SystemExit(0)
+            if use_it:
+                media_collection = c.name
+        else:
+            choices = [
+                questionary.Choice(
+                    f"{c.name} ({c.file_count} files)",
+                    value=c.name,
+                )
+                for c in collections
+            ]
+            choices.append(questionary.Choice("None", value=""))
+            media_collection = prompt_select(
+                "Which media collection?",
+                choices=choices,
+            ).ask()
+            if media_collection is None:
+                raise SystemExit(0)
+            media_collection = media_collection or None
+
     customize = prompt_confirm(
         "Customize further? (auth, services, CI, extras)",
         default=False,
@@ -257,6 +289,7 @@ def collect_answers(docker_available: bool = True) -> dict:
         "description": description.strip(),
         "docker": docker,
         "design_template": design_template,
+        "media_collection": media_collection,
         "auth_provider": auth_provider,
         "services": services,
         "ci": ci,

@@ -16,6 +16,14 @@ from ubundiforge.design_templates import (
     load_design_template,
 )
 from ubundiforge.logo import print_logo
+from ubundiforge.media_assets import (
+    MEDIA_DIR,
+    build_asset_manifest,
+    copy_assets,
+    list_collections,
+    scan_assets,
+    target_asset_dir,
+)
 from ubundiforge.prompt_builder import build_phase_prompt
 from ubundiforge.prompts import collect_answers
 from ubundiforge.questionary_theme import prompt_confirm
@@ -135,6 +143,8 @@ def _render_loaded_context(
     conventions: str,
     claude_md_loaded: bool,
     design_template_label: str | None,
+    media_collection: str | None = None,
+    media_asset_count: int = 0,
 ) -> None:
     """Render loaded scaffold context."""
     lines: list[Text] = []
@@ -151,6 +161,8 @@ def _render_loaded_context(
         lines.append(subtle("CLAUDE.md starter loaded"))
     if design_template_label:
         lines.append(subtle(f"Design template: {design_template_label}"))
+    if media_collection and media_asset_count:
+        lines.append(subtle(f"Media: {media_asset_count} files from {media_collection}/"))
 
     console.print(make_panel(grouped_lines(lines), title="Scaffold Context", accent="aqua"))
 
@@ -293,6 +305,17 @@ def main(
             help="Demo mode: project runs without real API keys.",
         ),
     ] = True,
+    media: Annotated[
+        str | None,
+        typer.Option(
+            "--media",
+            help="Media collection name from the media/ folder to import.",
+        ),
+    ] = None,
+    no_media: Annotated[
+        bool,
+        typer.Option("--no-media", help="Skip media asset import."),
+    ] = False,
     setup: Annotated[
         bool,
         typer.Option("--setup", help="Run the setup wizard."),
@@ -419,12 +442,23 @@ def main(
             elif ci_mode == "questionnaire":
                 action_ids = ci_action_ids_for_stack(resolved_stack)
 
+        # Resolve --media / --no-media: explicit name, or auto-pick sole collection
+        media_collection: str | None = None
+        if not no_media:
+            if media:
+                media_collection = media
+            else:
+                collections = list_collections()
+                if len(collections) == 1:
+                    media_collection = collections[0].name
+
         answers: dict = {
             "name": name.strip(),
             "stack": resolved_stack,
             "description": description.strip(),
             "docker": docker_val,
             "design_template": design_template,
+            "media_collection": media_collection,
             "auth_provider": auth_provider,
             "services": svc_list,
             "ci": {
@@ -503,6 +537,20 @@ def main(
                 selected_design_template
             ].label
 
+    # Scan media assets if a collection was selected
+    media_asset_count = 0
+    media_source_dir: Path | None = None
+    selected_collection = answers.get("media_collection")
+    if selected_collection:
+        collection_dir = MEDIA_DIR / selected_collection
+        media_files = scan_assets(collection_dir)
+        if media_files:
+            stack = answers["stack"]
+            manifest = build_asset_manifest(media_files, target_asset_dir(stack))
+            answers["media_assets_manifest"] = manifest
+            media_asset_count = len(media_files)
+            media_source_dir = collection_dir
+
     _render_loaded_context(
         required_backends,
         backend_models,
@@ -510,6 +558,8 @@ def main(
         conventions=conventions,
         claude_md_loaded=bool(claude_md_template),
         design_template_label=answers.get("design_template_label"),
+        media_collection=selected_collection,
+        media_asset_count=media_asset_count,
     )
 
     # Check all user-supplied text for secrets before passing to AI
@@ -645,6 +695,19 @@ def main(
             console.print(status_line("Aborted.", accent="amber"))
             raise typer.Exit(0)
         reset_project_dir(project_dir)
+
+    # --- Copy media assets before AI runs (so the AI can see them) ---
+    if answers.get("media_assets_manifest") and media_source_dir:
+        copy_result = copy_assets(media_source_dir, project_dir, answers["stack"])
+        if copy_result.copied:
+            console.print(
+                status_line(
+                    f"Copied {copy_result.copied} media assets to {copy_result.target_dir}",
+                    accent="aqua",
+                )
+            )
+        for warning in copy_result.warnings:
+            console.print(f"[yellow]{warning}[/yellow]")
 
     # --- Execute phases: serial first, parallel middle, serial last ---
     total_phases = len(phase_backends)

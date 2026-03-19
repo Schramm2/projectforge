@@ -35,3 +35,6 @@ htmlcov/
 
 # Generated scaffold outputs
 projects/
+
+# User media collections (images, fonts, etc.)
+media/

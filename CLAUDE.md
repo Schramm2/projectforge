@@ -19,16 +19,20 @@ ubundiforge/           Core package
   runner.py            Subprocess execution of AI CLIs
   stacks.py            Stack metadata and cross-recipe defaults
   conventions.py       Loads user conventions from ~/.forge/conventions.md
+  media_assets.py      Scan, manifest, and copy media/ collections into scaffolds
   safety.py            Secret detection on user-supplied text
   scaffold_options.py  Auth provider and CI action definitions
   setup.py             First-run setup wizard
   config.py            Backend availability checks
+  ui.py                Shared Rich UI primitives and Ubundi palette
+  questionary_theme.py Themed questionary prompt wrappers
   logo.py              ASCII art banner
 tests/                 pytest suite mirroring ubundiforge/ modules
 docs/                  Specs, roadmap, reference docs
 research/              Discovery research and archived notes
 scripts/               install.sh and utility scripts
 assets/                ASCII art and static assets
+media/                 User media collections (media/<brand>/logo.svg etc.)
 ```
 
 ## How it works

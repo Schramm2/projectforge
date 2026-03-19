@@ -56,6 +56,23 @@ def _build_design_template_block(answers: dict) -> str:
     )
 
 
+def _build_media_assets_block(answers: dict) -> str:
+    """Return the media assets manifest block if assets were scanned."""
+    manifest = (answers.get("media_assets_manifest") or "").strip()
+    if not manifest:
+        return ""
+
+    return (
+        "\n<media_assets>\n"
+        "The following media assets have been pre-loaded into the project's "
+        "static assets directory. Reference them using their paths exactly as "
+        "listed. Do not create placeholder images when real assets are "
+        "available below.\n\n"
+        f"{manifest}\n"
+        "</media_assets>"
+    )
+
+
 def _demo_mode_section(answers: dict) -> str:
     """Return the demo mode instruction block if enabled, else empty string."""
     if answers.get("demo_mode"):
@@ -192,6 +209,7 @@ def build_prompt(
     )
     ci_section = _build_ci_section(ci)
     design_template_block = _build_design_template_block(answers)
+    media_assets_block = _build_media_assets_block(answers)
 
     docker_block = ""
     if answers["docker"]:
@@ -247,7 +265,7 @@ from experience that these patterns reduce bugs and speed up onboarding.
 
 {conventions}
 </conventions>
-{design_template_block}
+{design_template_block}{media_assets_block}
 
 <stack_guidance>
 {stack_section}
@@ -334,6 +352,7 @@ def build_architecture_prompt(
     )
     ci_section = "" if exclude_tests else _build_ci_section(ci)
     design_template_block = "" if exclude_frontend else _build_design_template_block(answers)
+    media_assets_block = "" if exclude_frontend else _build_media_assets_block(answers)
 
     docker_block = ""
     if answers["docker"]:
@@ -406,7 +425,7 @@ from experience that these patterns reduce bugs and speed up onboarding.
 
 {conventions}
 </conventions>
-{design_template_block}
+{design_template_block}{media_assets_block}
 
 <stack_guidance>
 {stack_section}
@@ -469,6 +488,7 @@ def build_frontend_prompt(answers: dict) -> str:
     stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
     extra = answers.get("extra", "").strip() or "None"
     design_template_block = _build_design_template_block(answers)
+    media_assets_block = _build_media_assets_block(answers)
 
     return f"""\
 You are an expert frontend engineer and visual designer who creates \
@@ -484,7 +504,7 @@ create the starter frontend UI that best demonstrates the scaffold.
 <stack>{stack_label}</stack>
 <description>{answers["description"]}</description>
 </project>
-{design_template_block}
+{design_template_block}{media_assets_block}
 
 <instructions>
 1. Read the existing project structure first. Check CLAUDE.md, package.json \
@@ -652,6 +672,7 @@ def build_architecture_prompt_best(
     )
     ci_section = "" if exclude_tests else _build_ci_section(ci)
     design_template_block = "" if exclude_frontend else _build_design_template_block(answers)
+    media_assets_block = "" if exclude_frontend else _build_media_assets_block(answers)
 
     docker_block = ""
     if answers["docker"]:
@@ -724,7 +745,7 @@ from experience that these patterns reduce bugs and speed up onboarding.
 
 {conventions}
 </conventions>
-{design_template_block}
+{design_template_block}{media_assets_block}
 
 <stack_guidance>
 {stack_section}
@@ -788,6 +809,7 @@ def build_frontend_prompt_best(answers: dict) -> str:
     stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
     extra = answers.get("extra", "").strip() or "None"
     design_template_block = _build_design_template_block(answers)
+    media_assets_block = _build_media_assets_block(answers)
 
     return f"""\
 <role>
@@ -806,7 +828,7 @@ Project name: {answers["name"]}
 Stack: {stack_label}
 Description: {answers["description"]}
 </context>
-{design_template_block}
+{design_template_block}{media_assets_block}
 
 <task>
 Before writing any code, follow these steps:
@@ -1025,6 +1047,7 @@ def build_prompt_codex(
     )
     ci_section = _build_ci_section(ci)
     design_template_block = _build_design_template_block(answers)
+    media_assets_block = _build_media_assets_block(answers)
 
     docker_block = ""
     if answers["docker"]:
@@ -1074,7 +1097,7 @@ your defaults.
 
 {conventions}
 </conventions>
-{design_template_block}
+{design_template_block}{media_assets_block}
 
 <stack_guidance>
 {stack_section}
@@ -1193,6 +1216,7 @@ def build_architecture_prompt_codex(
     )
     ci_section = "" if exclude_tests else _build_ci_section(ci)
     design_template_block = "" if exclude_frontend else _build_design_template_block(answers)
+    media_assets_block = "" if exclude_frontend else _build_media_assets_block(answers)
 
     docker_block = ""
     if answers["docker"]:
@@ -1257,7 +1281,7 @@ your defaults.
 
 {conventions}
 </conventions>
-{design_template_block}
+{design_template_block}{media_assets_block}
 
 <stack_guidance>
 {stack_section}
@@ -1340,6 +1364,7 @@ def build_frontend_prompt_codex(answers: dict) -> str:
     stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
     extra = answers.get("extra", "").strip() or "None"
     design_template_block = _build_design_template_block(answers)
+    media_assets_block = _build_media_assets_block(answers)
 
     return f"""\
 You are an expert frontend engineer working inside an existing scaffold. Build \
@@ -1351,7 +1376,7 @@ starter UI.
 <stack>{stack_label}</stack>
 <description>{answers["description"]}</description>
 </project>
-{design_template_block}
+{design_template_block}{media_assets_block}
 
 <output_contract>
 - Create or update frontend files only.

@@ -467,8 +467,8 @@ def run_setup(console: Console) -> dict:
     else:
         console.print(status_line("Will use the current directory.", accent="plum"))
 
-    # --- Step 8: Conventions file ---
-    console.print(make_step_panel(8, 8, "Conventions file", accent="aqua"))
+    # --- Step 8: Conventions & media ---
+    console.print(make_step_panel(8, 8, "Conventions & media", accent="aqua"))
 
     if CONVENTIONS_PATH.exists():
         console.print(status_line(f"Found conventions at {CONVENTIONS_PATH}", accent="aqua"))
@@ -497,6 +497,32 @@ def run_setup(console: Console) -> dict:
         console.print(
             status_line(
                 "Edit this file anytime to customize your project standards.",
+                accent="aqua",
+            )
+        )
+
+    # Check media collections in the repo's media/ folder
+    from ubundiforge.media_assets import MEDIA_DIR, list_collections
+
+    MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    collections = list_collections()
+    if collections:
+        names = ", ".join(f"{c.name} ({c.file_count})" for c in collections)
+        console.print(status_line(f"Media collections: {names}", accent="aqua"))
+    else:
+        console.print(
+            make_panel(
+                grouped_lines(
+                    [
+                        f"Media folder: {MEDIA_DIR}",
+                        subtle(
+                            "Create a named subfolder and drop images, fonts, or icons inside it."
+                        ),
+                        subtle("Example: media/my-brand/logo.svg"),
+                        muted("Forge will offer to import the collection during each scaffold."),
+                    ]
+                ),
+                title="Media Assets",
                 accent="aqua",
             )
         )
