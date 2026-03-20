@@ -1,13 +1,19 @@
 """UbundiForge CLI — entry point."""
 
+import re
 from pathlib import Path
 from typing import Annotated
 
+import questionary
 import typer
 from rich.text import Text
 
 from ubundiforge import __version__
-from ubundiforge.config import SUPPORTED_BACKENDS, check_backend_installed
+from ubundiforge.config import (
+    SUPPORTED_BACKENDS,
+    BackendStatus,
+    get_backend_statuses,
+)
 from ubundiforge.conventions import load_claude_md_template, load_conventions
 from ubundiforge.design_templates import (
     DESIGN_TEMPLATE_OPTIONS,
@@ -26,7 +32,7 @@ from ubundiforge.media_assets import (
 )
 from ubundiforge.prompt_builder import build_phase_prompt
 from ubundiforge.prompts import collect_answers
-from ubundiforge.questionary_theme import prompt_confirm
+from ubundiforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
 from ubundiforge.router import (
     PHASE_LABELS,
     STACK_PHASES,
@@ -68,6 +74,12 @@ from ubundiforge.verify import print_report, verify_scaffold
 
 app = typer.Typer()
 console = create_console()
+
+_PROJECT_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+_BACKEND_LOGIN_COMMANDS = {
+    "claude": "claude auth login",
+    "codex": "codex login",
+}
 
 
 STACK_ALIASES = {
@@ -219,6 +231,212 @@ def _render_next_steps(answers: dict, project_dir: Path, *, open_editor: bool) -
     )
 
 
+def _backend_help_line(backend: str, status: BackendStatus) -> Text:
+    """Return a user-facing readiness line for a backend."""
+    if status.ready is False:
+        login_command = status.login_command or _BACKEND_LOGIN_COMMANDS.get(backend, backend)
+        return subtle(f"{backend} needs login. Run {login_command}.")
+    if not status.installed:
+        return subtle(f"{backend} is not installed or not on PATH.")
+    return subtle(f"{backend} is installed but readiness could not be verified.")
+
+
+def _render_backend_readiness_notice(
+    backend_statuses: dict[str, BackendStatus],
+    *,
+    required_backends: set[str],
+) -> None:
+    """Render a panel when required backends are unavailable for routing."""
+    lines: list[Text] = []
+    for backend in sorted(required_backends):
+        status = backend_statuses.get(backend, BackendStatus(False, False))
+        lines.append(_backend_help_line(backend, status))
+    lines.append(muted("Run forge --setup after fixing login or install issues."))
+    console.print(make_panel(grouped_lines(lines), title="Backend Readiness", accent="amber"))
+
+
+def _render_phase_failure(backend: str, label: str, returncode: int) -> None:
+    """Render helpful follow-up guidance when a scaffold phase fails."""
+    lines: list[Text] = [
+        subtle(f"{label} failed with {backend} (exit {returncode})."),
+        subtle("Re-run with --verbose for full subprocess output."),
+        subtle("Use --dry-run to inspect the assembled prompt before trying again."),
+        muted("You can also force a different backend with --use if another one is ready."),
+    ]
+    console.print(make_panel(grouped_lines(lines), title="Execution", accent="amber"))
+
+
+def _render_verification_guidance(project_dir: Path) -> None:
+    """Render concrete next steps after verification failures."""
+    console.print()
+    console.print(
+        make_panel(
+            grouped_lines(
+                [
+                    subtle("Some verification checks failed."),
+                    subtle("The scaffold was still created successfully."),
+                    subtle(
+                        "Inspect the failing checks above, then rerun the relevant "
+                        "commands in:"
+                    ),
+                    path_text(project_dir),
+                    command_text(f"cd {project_dir}"),
+                ]
+            ),
+            title="Verification",
+            accent="amber",
+        )
+    )
+
+
+def _validate_project_name_for_collision(name: str) -> bool | str:
+    """Validate a replacement project name when resolving collisions."""
+    if not name.strip():
+        return "Project name cannot be empty."
+    if not _PROJECT_NAME_RE.match(name):
+        return (
+            "Must start with a letter/number and contain only letters, numbers, "
+            "dots, hyphens, or underscores."
+        )
+    return True
+
+
+def _resolve_project_dir(base_dir: Path, answers: dict) -> Path:
+    """Resolve the final scaffold directory, offering safer collision options."""
+    while True:
+        project_dir = base_dir / answers["name"]
+        if not project_dir.exists() or not any(project_dir.iterdir()):
+            return project_dir
+
+        console.print()
+        console.print(
+            make_panel(
+                grouped_lines(
+                    [
+                        Text(
+                            f"{project_dir} already exists and is not empty.",
+                            style="bold #F7F9FF",
+                        ),
+                        subtle("Choose another name, overwrite it, or cancel."),
+                    ]
+                ),
+                title="Existing Directory",
+                accent="amber",
+            )
+        )
+
+        action = prompt_select(
+            "How would you like to proceed?",
+            choices=[
+                questionary.Choice("Choose another project name", value="rename"),
+                questionary.Choice("Overwrite the existing directory", value="overwrite"),
+                questionary.Choice("Cancel", value="cancel"),
+            ],
+            default="rename",
+        ).ask()
+        if action is None or action == "cancel":
+            console.print(status_line("Aborted.", accent="amber"))
+            raise typer.Exit(0)
+
+        if action == "rename":
+            new_name = prompt_text(
+                "Choose another project name",
+                default=f"{answers['name']}-2",
+                validate=_validate_project_name_for_collision,
+            ).ask()
+            if new_name is None:
+                raise typer.Exit(0)
+            answers["name"] = new_name.strip()
+            continue
+
+        confirm = prompt_confirm("Overwrite the existing directory", default=False).ask()
+        if confirm is None:
+            raise typer.Exit(0)
+        if confirm:
+            reset_project_dir(project_dir)
+            return project_dir
+
+
+def _has_explicit_scaffold_request(**kwargs: object) -> bool:
+    """Return whether the user has already signaled project-scaffold intent."""
+    return any(
+        [
+            bool(kwargs.get("use")),
+            bool(kwargs.get("model")),
+            bool(kwargs.get("name")),
+            bool(kwargs.get("stack")),
+            bool(kwargs.get("description")),
+            bool(kwargs.get("design_template")),
+            kwargs.get("docker") is not None,
+            bool(kwargs.get("extra")),
+            bool(kwargs.get("services")),
+            bool(kwargs.get("auth_provider")),
+            kwargs.get("ci") is not None,
+            bool(kwargs.get("ci_template")),
+            bool(kwargs.get("ci_actions")),
+            bool(kwargs.get("media")),
+            bool(kwargs.get("no_media")),
+        ]
+    )
+
+
+def _prompt_post_setup_next_step() -> str:
+    """Ask a first-run user what they want to do after setup completes."""
+    from ubundiforge.config import get_usable_backends
+
+    has_usable = bool(get_usable_backends())
+
+    console.print()
+    if has_usable:
+        console.print(
+            make_panel(
+                grouped_lines(
+                    [
+                        subtle("Forge is configured and ready."),
+                        subtle(
+                            "You can create a project now, revisit your setup, "
+                            "or exit and come back later."
+                        ),
+                        muted("Useful commands: forge, forge --dry-run, forge --setup"),
+                    ]
+                ),
+                title="You're Ready",
+                accent="plum",
+            )
+        )
+    else:
+        console.print(
+            make_panel(
+                grouped_lines(
+                    [
+                        subtle("Forge is configured, but no backends are ready yet."),
+                        subtle("Log into an AI CLI before creating a project."),
+                        muted("Useful commands: forge --setup, forge --dry-run"),
+                    ]
+                ),
+                title="Almost Ready",
+                accent="amber",
+            )
+        )
+
+    choices = []
+    if has_usable:
+        choices.append(questionary.Choice("Create a project now", value="create"))
+    choices.extend([
+        questionary.Choice("Review setup again", value="setup"),
+        questionary.Choice("Exit for now", value="exit"),
+    ])
+
+    action = prompt_select(
+        "What would you like to do next?",
+        choices=choices,
+        default="create" if has_usable else "exit",
+    ).ask()
+    if action is None:
+        raise typer.Exit()
+    return action
+
+
 @app.callback(invoke_without_command=True)
 def main(
     use: Annotated[
@@ -341,6 +559,23 @@ def main(
 ) -> None:
     """UbundiForge — Ubundi Project Scaffolder. Scaffold projects with AI + your conventions."""
     prompt_only = dry_run or bool(export)
+    explicit_scaffold_request = _has_explicit_scaffold_request(
+        use=use,
+        model=model,
+        name=name,
+        stack=stack,
+        description=description,
+        design_template=design_template,
+        docker=docker,
+        extra=extra,
+        services=services,
+        auth_provider=auth_provider,
+        ci=ci,
+        ci_template=ci_template,
+        ci_actions=ci_actions,
+        media=media,
+        no_media=no_media,
+    )
 
     if version:
         console.print(f"ubundiforge {__version__}")
@@ -350,12 +585,25 @@ def main(
     console.print(header_panel(__version__))
 
     # First-run setup wizard (or manual --setup)
-    if setup or (not prompt_only and needs_setup()):
-        run_setup(console)
+    auto_setup = not setup and not prompt_only and needs_setup()
+    if setup or auto_setup:
+        while True:
+            run_setup(console)
+            if not auto_setup or explicit_scaffold_request:
+                break
+
+            action = _prompt_post_setup_next_step()
+            if action == "create":
+                break
+            if action == "setup":
+                continue
+            raise typer.Exit()
+
         if setup:
             raise typer.Exit()
 
     forge_config = load_forge_config()
+    backend_statuses = get_backend_statuses() if not prompt_only else {}
 
     if use and use not in SUPPORTED_BACKENDS:
         backends = ", ".join(SUPPORTED_BACKENDS)
@@ -477,11 +725,17 @@ def main(
         )
 
     # --- Multi-backend phase routing ---
+    available_backends = (
+        {backend for backend, status in backend_statuses.items() if status.usable}
+        if backend_statuses
+        else None
+    )
     phase_backends = pick_phase_backends(
         answers["stack"],
         override=use,
         description=answers.get("description", ""),
         prefer_installed_backends=not prompt_only,
+        available_backends=available_backends,
     )
     merged_groups = merge_adjacent_phases(phase_backends)
     all_phases = STACK_PHASES.get(answers["stack"], ["architecture", "tests"])
@@ -510,12 +764,27 @@ def main(
     # Check that all required backends are installed
     required_backends = {backend for _, backend in phase_backends}
     if not prompt_only:
+        if not available_backends:
+            _render_backend_readiness_notice(
+                backend_statuses,
+                required_backends={
+                    backend
+                    for backend, status in backend_statuses.items()
+                    if status.installed
+                },
+            )
+            raise typer.Exit(1)
+
         for backend in required_backends:
-            if not check_backend_installed(backend):
+            status = backend_statuses.get(backend, BackendStatus(False, False))
+            if not status.installed:
                 console.print(
                     f"\n[red bold]{backend}[/red bold] [red]is not installed or not on PATH.[/red]"
                     "\n[dim]Install at least one AI CLI (claude, gemini, or codex).[/dim]"
                 )
+                raise typer.Exit(1)
+            if status.ready is False:
+                _render_backend_readiness_notice(backend_statuses, required_backends={backend})
                 raise typer.Exit(1)
 
     # Resolve model per backend: --model overrides everything, else use config
@@ -586,6 +855,14 @@ def main(
                 "\n[red]Remove credentials before passing them to an AI CLI.[/red]"
             )
             raise typer.Exit(1)
+
+    # Resolve the target project directory before prompts are assembled so any
+    # rename choice becomes part of the prompt contract.
+    # Skip directory resolution in prompt-only mode to avoid side effects.
+    base_dir = Path(forge_config.get("projects_dir") or Path.cwd())
+    project_dir = base_dir / answers["name"]
+    if not prompt_only:
+        project_dir = _resolve_project_dir(base_dir, answers)
 
     # Build prompts for each individual phase
     phase_prompts: list[tuple[str, str, str]] = []  # (phase, backend, prompt)
@@ -677,35 +954,6 @@ def main(
             )
         )
 
-    # Run — use saved projects_dir if set, otherwise CWD
-    base_dir = Path(forge_config.get("projects_dir") or Path.cwd())
-    project_dir = base_dir / answers["name"]
-
-    # Check if directory already exists
-    if project_dir.exists() and any(project_dir.iterdir()):
-        console.print()
-        console.print(
-            make_panel(
-                grouped_lines(
-                    [
-                        Text(
-                            f"{project_dir} already exists and is not empty.",
-                            style="bold #F7F9FF",
-                        ),
-                        subtle("Overwrite it to continue with a clean scaffold."),
-                    ]
-                ),
-                title="Existing Directory",
-                accent="amber",
-            )
-        )
-
-        confirm = prompt_confirm("Overwrite the existing directory", default=False).ask()
-        if not confirm:
-            console.print(status_line("Aborted.", accent="amber"))
-            raise typer.Exit(0)
-        reset_project_dir(project_dir)
-
     # --- Copy media assets before AI runs (so the AI can see them) ---
     if answers.get("media_assets_manifest") and media_source_dir:
         copy_result = copy_assets(media_source_dir, project_dir, answers["stack"])
@@ -741,7 +989,7 @@ def main(
             label=label,
         )
         if returncode != 0:
-            console.print(f"\n[red]{backend} exited with code {returncode} during {label}.[/red]")
+            _render_phase_failure(backend, label, returncode)
             raise typer.Exit(returncode)
         step += 1
 
@@ -776,7 +1024,7 @@ def main(
             results = run_ai_parallel(parallel_args, project_dir, verbose=verbose)
             for label, returncode in results:
                 if returncode != 0:
-                    console.print(f"\n[red]{label} failed (exit {returncode}).[/red]")
+                    _render_phase_failure("parallel backend", label, returncode)
                     raise typer.Exit(returncode)
             step += len(parallel_middle)
         else:
@@ -799,9 +1047,7 @@ def main(
                     label=label,
                 )
                 if returncode != 0:
-                    console.print(
-                        f"\n[red]{backend} exited with code {returncode} during {label}.[/red]"
-                    )
+                    _render_phase_failure(backend, label, returncode)
                     raise typer.Exit(returncode)
                 step += 1
 
@@ -823,7 +1069,7 @@ def main(
             label=label,
         )
         if returncode != 0:
-            console.print(f"\n[red]{backend} exited with code {returncode} during {label}.[/red]")
+            _render_phase_failure(backend, label, returncode)
             raise typer.Exit(returncode)
         step += 1
 
@@ -843,19 +1089,7 @@ def main(
         report = verify_scaffold(answers["stack"], project_dir, verbose=verbose)
         print_report(report, console)
         if not report.all_passed:
-            console.print()
-            console.print(
-                make_panel(
-                    grouped_lines(
-                        [
-                            subtle("Some verification checks failed."),
-                            muted("The project was still created successfully."),
-                        ]
-                    ),
-                    title="Verification",
-                    accent="amber",
-                )
-            )
+            _render_verification_guidance(project_dir)
 
     run_post_scaffold_hook(project_dir, answers)
     append_scaffold_log(answers, phase_backends, project_dir)

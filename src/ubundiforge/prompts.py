@@ -22,7 +22,7 @@ from ubundiforge.scaffold_options import (
     ci_action_ids_for_stack,
 )
 from ubundiforge.stacks import STACK_META
-from ubundiforge.ui import create_console, status_line
+from ubundiforge.ui import create_console, grouped_lines, make_panel, muted, status_line, subtle
 
 STACK_CHOICES = [
     questionary.Choice("Next.js + React (frontend or fullstack)", value="nextjs"),
@@ -47,13 +47,66 @@ def _validate_project_name(name: str) -> bool | str:
     return True
 
 
-def _ask_services(stack: str) -> list[str]:
+def _stack_label(stack: str) -> str:
+    """Return the display label for a stack identifier."""
+    for choice in STACK_CHOICES:
+        if choice.value == stack:
+            return str(choice.title)
+    return stack
+
+
+def _has_customizations(answers: dict) -> bool:
+    """Return whether the current answer set includes any advanced options."""
+    ci = answers.get("ci", {})
+    return bool(
+        answers.get("auth_provider")
+        or answers.get("services")
+        or ci.get("include")
+        or answers.get("extra")
+    )
+
+
+def _normalize_answers_for_stack(answers: dict) -> None:
+    """Drop selections that no longer apply after a stack change."""
+    stack = answers.get("stack", "")
+
+    if not design_template_choices_for_stack(stack):
+        answers["design_template"] = None
+
+    if not auth_provider_choices_for_stack(stack):
+        answers["auth_provider"] = None
+
+    meta = STACK_META.get(stack)
+    allowed_services = set(meta.services if meta else [])
+    answers["services"] = [
+        service for service in answers.get("services", []) if service in allowed_services
+    ]
+
+    ci = answers.get("ci", {}) or {}
+    if not ci.get("include"):
+        answers["ci"] = {"include": False, "mode": None, "actions": []}
+        return
+
+    filtered_actions = [
+        action
+        for action in ci.get("actions", [])
+        if action in set(ci_action_ids_for_stack(stack))
+    ]
+    answers["ci"] = {
+        "include": True,
+        "mode": ci.get("mode") or "blank-template",
+        "actions": filtered_actions,
+    }
+
+
+def _ask_services(stack: str, current: list[str] | None = None) -> list[str]:
     """Ask the user which services to include, based on the stack's typical services."""
     meta = STACK_META.get(stack)
     if not meta or not meta.services:
         return []
 
-    choices = [questionary.Choice(s, value=s) for s in meta.services]
+    current = current or []
+    choices = [questionary.Choice(s, value=s, checked=s in current) for s in meta.services]
     selected = prompt_checkbox(
         "Include any services?",
         choices=choices,
@@ -65,7 +118,7 @@ def _ask_services(stack: str) -> list[str]:
     return selected
 
 
-def _ask_auth_provider(stack: str) -> str | None:
+def _ask_auth_provider(stack: str, current: str | None = None) -> str | None:
     """Ask whether to include auth, then which provider to use."""
     choices = auth_provider_choices_for_stack(stack)
     if not choices:
@@ -73,7 +126,7 @@ def _ask_auth_provider(stack: str) -> str | None:
 
     include_auth = prompt_confirm(
         "Add authentication scaffolding",
-        default=False,
+        default=current is not None,
     ).ask()
     if include_auth is None:
         raise SystemExit(0)
@@ -89,6 +142,7 @@ def _ask_auth_provider(stack: str) -> str | None:
             )
             for value, label in choices
         ],
+        default=current,
     ).ask()
     if provider is None:
         raise SystemExit(0)
@@ -96,7 +150,7 @@ def _ask_auth_provider(stack: str) -> str | None:
     return provider
 
 
-def _ask_design_template(stack: str) -> str | None:
+def _ask_design_template(stack: str, current: str | None = None) -> str | None:
     """Ask whether to apply a design template, then which one to use."""
     choices = design_template_choices_for_stack(stack)
     if not choices:
@@ -104,7 +158,7 @@ def _ask_design_template(stack: str) -> str | None:
 
     include_design_template = prompt_confirm(
         "Apply a design template or brand guide",
-        default=False,
+        default=current is not None,
     ).ask()
     if include_design_template is None:
         raise SystemExit(0)
@@ -120,6 +174,7 @@ def _ask_design_template(stack: str) -> str | None:
             )
             for value, label in choices
         ],
+        default=current,
     ).ask()
     if template_id is None:
         raise SystemExit(0)
@@ -127,11 +182,12 @@ def _ask_design_template(stack: str) -> str | None:
     return template_id
 
 
-def _ask_ci_config(stack: str) -> dict:
+def _ask_ci_config(stack: str, current: dict | None = None) -> dict:
     """Ask whether to include CI and how detailed the scaffold should be."""
+    current = current or {"include": False, "mode": None, "actions": []}
     include_ci = prompt_confirm(
         "Add GitHub Actions CI",
-        default=False,
+        default=bool(current.get("include")),
     ).ask()
     if include_ci is None:
         raise SystemExit(0)
@@ -154,6 +210,7 @@ def _ask_ci_config(stack: str) -> dict:
                 value="blank-template",
             ),
         ],
+        default=current.get("mode") or "questionnaire",
     ).ask()
     if mode is None:
         raise SystemExit(0)
@@ -168,6 +225,7 @@ def _ask_ci_config(stack: str) -> dict:
                     f"{CI_ACTION_OPTIONS[action_id].label} — "
                     f"{CI_ACTION_OPTIONS[action_id].prompt_description}",
                     value=action_id,
+                    checked=action_id in current.get("actions", []),
                 )
                 for action_id in action_ids
             ],
@@ -182,117 +240,239 @@ def _ask_ci_config(stack: str) -> dict:
     }
 
 
-def collect_answers(docker_available: bool = True) -> dict:
-    """Run the interactive prompt flow and return answers as a dict."""
+def _ask_project_basics(answers: dict, *, docker_available: bool) -> None:
+    """Collect or edit the core project details."""
     console = create_console()
-    console.print()
 
     name = prompt_text(
         "Name the project",
+        default=answers.get("name", ""),
         validate=_validate_project_name,
     ).ask()
     if name is None:
         raise SystemExit(0)
+    answers["name"] = name.strip()
 
     stack = prompt_select(
         "Choose the primary stack",
         choices=STACK_CHOICES,
+        default=answers.get("stack"),
     ).ask()
     if stack is None:
         raise SystemExit(0)
+    answers["stack"] = stack
+    _normalize_answers_for_stack(answers)
 
-    description = prompt_text("Brief description").ask()
+    description = prompt_text(
+        "Brief description",
+        default=answers.get("description", ""),
+    ).ask()
     if description is None:
         raise SystemExit(0)
+    answers["description"] = description.strip()
 
     meta = STACK_META.get(stack)
     if not docker_available:
-        docker = False
+        answers["docker"] = False
         console.print(status_line("Docker not detected — skipping Docker setup.", accent="amber"))
-    else:
+        return
+
+    docker_default = answers.get("docker")
+    if docker_default is None:
         docker_default = meta.docker_default if meta else True
-        docker = prompt_confirm(
-            "Include Docker setup",
-            default=docker_default,
-        ).ask()
-        if docker is None:
-            raise SystemExit(0)
+    docker = prompt_confirm(
+        "Include Docker setup",
+        default=bool(docker_default),
+    ).ask()
+    if docker is None:
+        raise SystemExit(0)
+    answers["docker"] = docker
 
-    design_template = _ask_design_template(stack)
 
-    # Media assets from media/<collection>/
+def _ask_design_and_media(answers: dict) -> None:
+    """Collect or edit design template and media choices."""
+    stack = answers["stack"]
+    answers["design_template"] = _ask_design_template(stack, answers.get("design_template"))
+
     media_collection: str | None = None
     collections = list_collections()
+    current_media = answers.get("media_collection")
     if collections:
         if len(collections) == 1:
-            c = collections[0]
+            collection = collections[0]
             use_it = prompt_confirm(
-                f"Use {c.name} media assets? ({c.file_count} files)",
-                default=True,
+                f"Use {collection.name} media assets? ({collection.file_count} files)",
+                default=current_media == collection.name or current_media is None,
             ).ask()
             if use_it is None:
                 raise SystemExit(0)
             if use_it:
-                media_collection = c.name
+                media_collection = collection.name
         else:
             choices = [
                 questionary.Choice(
-                    f"{c.name} ({c.file_count} files)",
-                    value=c.name,
+                    f"{collection.name} ({collection.file_count} files)",
+                    value=collection.name,
                 )
-                for c in collections
+                for collection in collections
             ]
             choices.append(questionary.Choice("None", value=""))
             media_collection = prompt_select(
                 "Which media collection?",
                 choices=choices,
+                default=current_media or "",
             ).ask()
             if media_collection is None:
                 raise SystemExit(0)
             media_collection = media_collection or None
 
+    answers["media_collection"] = media_collection
+
+
+def _ask_customizations(answers: dict) -> None:
+    """Collect or edit advanced integration options."""
     customize = prompt_confirm(
         "Customize further? (auth, services, CI, extras)",
-        default=False,
+        default=_has_customizations(answers),
     ).ask()
     if customize is None:
         raise SystemExit(0)
 
-    auth_provider = None
-    services = []
-    ci = {"include": False, "mode": None, "actions": []}
-    extra = ""
+    if not customize:
+        answers["auth_provider"] = None
+        answers["services"] = []
+        answers["ci"] = {"include": False, "mode": None, "actions": []}
+        answers["extra"] = ""
+        return
 
-    if customize:
-        auth_provider = _ask_auth_provider(stack)
-        services = _ask_services(stack)
-        ci = _ask_ci_config(stack)
+    answers["auth_provider"] = _ask_auth_provider(answers["stack"], answers.get("auth_provider"))
+    answers["services"] = _ask_services(answers["stack"], answers.get("services"))
+    answers["ci"] = _ask_ci_config(answers["stack"], answers.get("ci"))
 
-        extra = prompt_text(
-            "Add any extra instructions",
-            default="",
-        ).ask()
-        if extra is None:
-            raise SystemExit(0)
-        extra = extra.strip()
+    extra = prompt_text(
+        "Add any extra instructions",
+        default=answers.get("extra", ""),
+    ).ask()
+    if extra is None:
+        raise SystemExit(0)
+    answers["extra"] = extra.strip()
 
+
+def _ask_demo_mode(answers: dict) -> None:
+    """Collect or edit demo mode preference."""
     demo_mode = prompt_confirm(
         "Enable demo mode? (runs without real API keys)",
-        default=True,
+        default=bool(answers.get("demo_mode", True)),
     ).ask()
     if demo_mode is None:
         raise SystemExit(0)
+    answers["demo_mode"] = demo_mode
 
-    return {
-        "name": name.strip(),
-        "stack": stack,
-        "description": description.strip(),
-        "docker": docker,
-        "design_template": design_template,
-        "media_collection": media_collection,
-        "auth_provider": auth_provider,
-        "services": services,
-        "ci": ci,
-        "extra": extra,
-        "demo_mode": demo_mode,
+
+def _ci_summary(ci: dict) -> str:
+    """Return a compact summary of the selected CI configuration."""
+    if not ci.get("include"):
+        return "No"
+    mode = ci.get("mode") or "blank-template"
+    actions = ci.get("actions", [])
+    if mode == "questionnaire" and actions:
+        return f"Questionnaire ({', '.join(actions)})"
+    if mode == "questionnaire":
+        return "Questionnaire"
+    return "Blank template"
+
+
+def _review_answers(answers: dict) -> str:
+    """Show a review panel and ask what to do next."""
+    console = create_console()
+    design_id = answers.get("design_template")
+    design_label = (
+        DESIGN_TEMPLATE_OPTIONS[design_id].label if design_id in DESIGN_TEMPLATE_OPTIONS else "None"
+    )
+    auth_provider = answers.get("auth_provider")
+    auth_label = AUTH_PROVIDER_OPTIONS[auth_provider].label if auth_provider else "None"
+    services = ", ".join(answers.get("services", [])) or "None"
+    extra = answers.get("extra", "")
+    extra_summary = extra if not extra else (extra[:97] + "..." if len(extra) > 100 else extra)
+
+    console.print()
+    console.print(
+        make_panel(
+            grouped_lines(
+                [
+                    subtle(f"Name: {answers.get('name')}"),
+                    subtle(f"Stack: {_stack_label(answers.get('stack', ''))}"),
+                    subtle(f"Description: {answers.get('description')}"),
+                    subtle(f"Docker: {'Yes' if answers.get('docker') else 'No'}"),
+                    subtle(f"Design template: {design_label}"),
+                    subtle(f"Media collection: {answers.get('media_collection') or 'None'}"),
+                    subtle(f"Auth: {auth_label}"),
+                    subtle(f"Services: {services}"),
+                    subtle(f"CI: {_ci_summary(answers.get('ci', {}))}"),
+                    subtle(f"Demo mode: {'Yes' if answers.get('demo_mode') else 'No'}"),
+                    muted(f"Extra instructions: {extra_summary or 'None'}"),
+                ]
+            ),
+            title="Review Choices",
+            accent="amber",
+        )
+    )
+
+    action = prompt_select(
+        "What would you like to do?",
+        choices=[
+            questionary.Choice("Scaffold project", value="scaffold"),
+            questionary.Choice("Edit basics", value="basics"),
+            questionary.Choice("Edit design and media", value="appearance"),
+            questionary.Choice("Edit auth, services, CI, and extras", value="integrations"),
+            questionary.Choice("Edit demo mode", value="demo"),
+            questionary.Choice("Cancel", value="cancel"),
+        ],
+        default="scaffold",
+    ).ask()
+    if action is None:
+        raise SystemExit(0)
+    return action
+
+
+def collect_answers(docker_available: bool = True) -> dict:
+    """Run the interactive prompt flow and return answers as a dict."""
+    console = create_console()
+    console.print()
+
+    answers: dict = {
+        "name": "",
+        "stack": "nextjs",
+        "description": "",
+        "docker": None,
+        "design_template": None,
+        "media_collection": None,
+        "auth_provider": None,
+        "services": [],
+        "ci": {"include": False, "mode": None, "actions": []},
+        "extra": "",
+        "demo_mode": True,
     }
+
+    _ask_project_basics(answers, docker_available=docker_available)
+    _ask_design_and_media(answers)
+    _ask_customizations(answers)
+    _ask_demo_mode(answers)
+
+    while True:
+        action = _review_answers(answers)
+        if action == "scaffold":
+            return answers
+        if action == "basics":
+            _ask_project_basics(answers, docker_available=docker_available)
+            continue
+        if action == "appearance":
+            _ask_design_and_media(answers)
+            continue
+        if action == "integrations":
+            _ask_customizations(answers)
+            continue
+        if action == "demo":
+            _ask_demo_mode(answers)
+            continue
+        raise SystemExit(0)

@@ -1,10 +1,12 @@
 """Tests for CLI execution paths."""
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
 from ubundiforge.cli import app
+from ubundiforge.config import BackendStatus
 
 runner = CliRunner()
 
@@ -13,7 +15,13 @@ def _patch_prompt_only_dependencies(monkeypatch, *, setup_called: list[bool]) ->
     monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
     monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: True)
     monkeypatch.setattr("ubundiforge.cli.load_forge_config", lambda: {})
-    monkeypatch.setattr("ubundiforge.cli.check_backend_installed", lambda backend: False)
+    monkeypatch.setattr(
+        "ubundiforge.cli.get_backend_statuses",
+        lambda: {
+            backend: BackendStatus(installed=False, ready=False)
+            for backend in ("claude", "gemini", "codex")
+        },
+    )
     monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: False)
     monkeypatch.setattr("ubundiforge.cli.load_conventions", lambda: ("Use strict typing.", []))
     monkeypatch.setattr("ubundiforge.cli.load_claude_md_template", lambda: None)
@@ -163,7 +171,13 @@ def test_mock_backends_cover_full_cli_flow_without_installed_ai_clis(monkeypatch
     )
     monkeypatch.setattr("ubundiforge.cli.load_conventions", lambda: ("Use strict typing.", []))
     monkeypatch.setattr("ubundiforge.cli.load_claude_md_template", lambda: None)
-    monkeypatch.setattr("ubundiforge.cli.check_backend_installed", lambda backend: True)
+    monkeypatch.setattr(
+        "ubundiforge.cli.get_backend_statuses",
+        lambda: {
+            backend: BackendStatus(installed=True, ready=True)
+            for backend in ("claude", "gemini", "codex")
+        },
+    )
     monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
 
     phase_calls: list[str] = []
@@ -233,3 +247,149 @@ def test_mock_backends_cover_full_cli_flow_without_installed_ai_clis(monkeypatch
     assert (project_dir / "tests-automation.txt").exists()
     assert (project_dir / "verify-fix.txt").exists()
     assert "Project created at" in result.stdout
+
+
+def test_first_run_setup_prompts_before_interactive_scaffold(monkeypatch):
+    monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: True)
+
+    setup_calls = {"count": 0}
+    answer_calls = {"count": 0}
+
+    def _fake_run_setup(console) -> dict:
+        setup_calls["count"] += 1
+        return {}
+
+    monkeypatch.setattr("ubundiforge.cli.run_setup", _fake_run_setup)
+    monkeypatch.setattr(
+        "ubundiforge.cli.prompt_select",
+        lambda *args, **kwargs: SimpleNamespace(ask=lambda: "exit"),
+    )
+
+    def _unexpected_collect_answers(*args, **kwargs):
+        answer_calls["count"] += 1
+        raise AssertionError("collect_answers should not run when the user exits after setup")
+
+    monkeypatch.setattr("ubundiforge.cli.collect_answers", _unexpected_collect_answers)
+
+    result = runner.invoke(app, [])
+
+    assert result.exit_code == 0
+    assert setup_calls["count"] == 1
+    assert answer_calls["count"] == 0
+    assert "Forge is configured and ready." in result.stdout
+
+
+def test_first_run_setup_can_be_repeated_before_scaffolding(monkeypatch):
+    monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: True)
+
+    setup_calls = {"count": 0}
+    actions = iter(["setup", "exit"])
+
+    def _fake_run_setup(console) -> dict:
+        setup_calls["count"] += 1
+        return {}
+
+    monkeypatch.setattr("ubundiforge.cli.run_setup", _fake_run_setup)
+    monkeypatch.setattr(
+        "ubundiforge.cli.prompt_select",
+        lambda *args, **kwargs: SimpleNamespace(ask=lambda: next(actions)),
+    )
+    monkeypatch.setattr(
+        "ubundiforge.cli.collect_answers",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("collect_answers should not run when the user exits")
+        ),
+    )
+
+    result = runner.invoke(app, [])
+
+    assert result.exit_code == 0
+    assert setup_calls["count"] == 2
+
+
+def test_first_run_with_explicit_scaffold_flags_skips_post_setup_prompt(monkeypatch, tmp_path):
+    monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: True)
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_forge_config",
+        lambda: {"projects_dir": str(tmp_path)},
+    )
+    monkeypatch.setattr("ubundiforge.cli.load_conventions", lambda: ("Use strict typing.", []))
+    monkeypatch.setattr("ubundiforge.cli.load_claude_md_template", lambda: None)
+    monkeypatch.setattr(
+        "ubundiforge.cli.get_backend_statuses",
+        lambda: {
+            backend: BackendStatus(installed=True, ready=True)
+            for backend in ("claude", "gemini", "codex")
+        },
+    )
+    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
+
+    setup_calls = {"count": 0}
+    prompt_calls = {"count": 0}
+
+    def _fake_run_setup(console) -> dict:
+        setup_calls["count"] += 1
+        return {}
+
+    monkeypatch.setattr("ubundiforge.cli.run_setup", _fake_run_setup)
+
+    def _unexpected_post_setup_prompt(*args, **kwargs):
+        prompt_calls["count"] += 1
+        raise AssertionError("post-setup prompt should be skipped for explicit scaffold runs")
+
+    monkeypatch.setattr("ubundiforge.cli.prompt_select", _unexpected_post_setup_prompt)
+    monkeypatch.setattr("ubundiforge.cli.run_ai", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(
+        "ubundiforge.cli.run_ai_parallel",
+        lambda phases, project_dir, verbose=False: [],
+    )
+    monkeypatch.setattr("ubundiforge.cli.ensure_git_init", lambda project_dir: True)
+
+    result = runner.invoke(
+        app,
+        [
+            "--name",
+            "guided-first-run",
+            "--stack",
+            "fastapi",
+            "--description",
+            "A first-run explicit scaffold",
+            "--no-docker",
+            "--no-open",
+            "--no-verify",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert setup_calls["count"] == 1
+    assert prompt_calls["count"] == 0
+    assert "Project created at" in result.stdout
+
+
+def test_resolve_project_dir_allows_rename(monkeypatch, tmp_path):
+    from ubundiforge.cli import _resolve_project_dir
+
+    target = tmp_path / "existing"
+    target.mkdir()
+    (target / "keep.txt").write_text("keep")
+
+    answers = {"name": "existing"}
+    actions = iter(["rename"])
+
+    monkeypatch.setattr(
+        "ubundiforge.cli.prompt_select",
+        lambda *args, **kwargs: SimpleNamespace(ask=lambda: next(actions)),
+    )
+    monkeypatch.setattr(
+        "ubundiforge.cli.prompt_text",
+        lambda *args, **kwargs: SimpleNamespace(ask=lambda: "renamed-project"),
+    )
+
+    project_dir = _resolve_project_dir(tmp_path, answers)
+
+    assert answers["name"] == "renamed-project"
+    assert project_dir == tmp_path / "renamed-project"
+    assert (target / "keep.txt").exists()

@@ -77,6 +77,7 @@ def pick_phase_backends(
     override: str | None = None,
     description: str = "",
     prefer_installed_backends: bool = True,
+    available_backends: set[str] | None = None,
 ) -> list[tuple[str, str]]:
     """Pick the best backend for each scaffold phase.
 
@@ -84,9 +85,11 @@ def pick_phase_backends(
         stack: The stack identifier.
         override: Force a single backend for all phases (--use flag).
         description: Project description, used for keyword-based routing.
-        prefer_installed_backends: When True, route based on locally installed
+        prefer_installed_backends: When True, route based on locally available
             AI CLIs. When False, route using the ideal backend plan regardless
             of local tool availability.
+        available_backends: Optional explicit set of backends that are safe to
+            route to. When provided, this takes precedence over install checks.
 
     Returns:
         List of (phase, backend) tuples in execution order.
@@ -96,7 +99,9 @@ def pick_phase_backends(
     if override:
         return [(phase, override) for phase in phases]
 
-    if prefer_installed_backends:
+    if available_backends is not None:
+        available = set(available_backends)
+    elif prefer_installed_backends:
         available = {b for b in FALLBACK_ORDER if check_backend_installed(b)}
     else:
         available = set(FALLBACK_ORDER)

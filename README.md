@@ -4,16 +4,16 @@ UbundiForge is a Python CLI that scaffolds new projects with AI coding tools whi
 
 ## What It Does
 
-- First-run setup wizard that detects installed AI CLIs and editors
-- Prompts for project name, stack, description, Docker preference, optional auth/CI choices, and extra instructions
+- First-run setup wizard that detects installed AI CLIs, backend readiness, editors, git, and Docker
+- Post-setup handoff that lets new users create a project now, review setup again, or exit cleanly
+- Interactive scaffold flow with a review-and-edit step before generation starts
 - Supports selectable design templates / brand guides for frontend-capable scaffolds
 - Routes to your preferred AI backend (configurable during setup)
-- Falls back to the next available backend if the primary isn't installed
+- Falls back to the next available backend if the primary isn't ready
+- Multi-phase parallel execution with live progress display
 - Injects shared conventions from `~/.forge/conventions.md`
 - Scans user input for leaked secrets before passing to AI
 - Optionally includes a `CLAUDE.md` template in generated projects
-- Scaffolds `agent_docs/` starter docs to match the `CLAUDE.md` progressive-disclosure flow
-- Creates the target project directory and runs the selected AI CLI inside it
 - Writes a `.forge/scaffold.json` manifest into every generated project for provenance
 - Logs every scaffold to `~/.forge/scaffold.log` for history
 - Runs post-scaffold hooks from `~/.forge/hooks/post-scaffold.sh`
@@ -21,37 +21,29 @@ UbundiForge is a Python CLI that scaffolds new projects with AI coding tools whi
 
 ## Supported Stacks
 
-- Next.js + React
-- FastAPI
-- FastAPI + AI/LLM
-- Next.js + FastAPI monorepo
-- Python CLI Tool
-- TypeScript npm Package
-- Python Worker / Scheduled Service
+| Stack | Identifier | Aliases |
+|-------|-----------|---------|
+| Next.js + React | `nextjs` | `next`, `react` |
+| FastAPI | `fastapi` | `api` |
+| FastAPI + AI/LLM | `fastapi-ai` | `ai`, `llm` |
+| Next.js + FastAPI Monorepo | `both` | `fullstack`, `monorepo` |
+| Python CLI Tool | `python-cli` | `cli`, `typer` |
+| TypeScript npm Package | `ts-package` | `npm-package`, `library` |
+| Python Worker | `python-worker` | `worker`, `service` |
 
-## Backend Routing
-
-By default, UbundiForge uses the backend you chose during setup (or `claude` if unconfigured).
-
-If the primary backend isn't installed, UbundiForge automatically falls back to the next available one (claude -> gemini -> codex).
-
-You can override the routing with `--use`.
+See [docs/stacks.md](docs/stacks.md) for detailed structure, libraries, and dev commands for each stack.
 
 ## Requirements
 
 - Python 3.12+
 - At least one installed AI CLI:
-  - `claude`
-  - `gemini`
-  - `codex`
+  - `claude` ([Claude Code](https://docs.anthropic.com/en/docs/claude-code))
+  - `gemini` ([Gemini CLI](https://github.com/google-gemini/gemini-cli))
+  - `codex` ([Codex](https://github.com/openai/codex))
 
 ## Installation
 
-### Homebrew
-
-Homebrew already ships other formulae with `forge` in the name, so the Homebrew package for this project should be published as `ubundiforge` while still installing the `forge` command.
-
-Once the tap is live:
+### Homebrew (macOS)
 
 ```bash
 brew tap matthewubundi/tap
@@ -59,50 +51,59 @@ brew install ubundiforge
 forge --version
 ```
 
-The formula in this repo is generated from `uv.lock`:
-
-```bash
-python3 scripts/generate_homebrew_formula.py
-```
-
 ### pipx
-
-For isolated global installs outside Homebrew:
 
 ```bash
 pipx install ubundiforge
 forge --version
 ```
 
-To test the packaged CLI from a local checkout before publishing:
-
-```bash
-pipx install .
-forge --version
-```
-
 ### From source
 
-For contributors working in the repo:
-
 ```bash
+git clone https://github.com/matthewubundi/UbundiForge.git
+cd UbundiForge
 uv sync --dev
 ./forge --version
 ```
 
-On first run, Forge launches a setup wizard that checks for installed AI CLIs and editors, then saves your preferences to `~/.forge/config.json`.
+On first run, Forge launches a setup wizard that checks backend readiness, editor preference, git setup, Docker availability, and project-directory defaults, then saves your preferences to `~/.forge/config.json`.
 
-## Usage
+After setup, Forge does not immediately force you into a scaffold. It shows a short handoff screen so you can:
 
-### First-run setup
+- create a project now
+- review setup again
+- exit and come back later
 
-The setup wizard runs automatically on first use. To re-run it:
+### Testing a pristine first-run wizard
+
+If you want to test Forge as if you were a brand new user on a machine that
+already has Forge or AI CLIs installed, prefer temporarily moving `~/.forge`
+out of the way instead of changing `HOME`.
 
 ```bash
-forge --setup
+mv ~/.forge ~/.forge.backup-$(date +%Y%m%d-%H%M%S)
+forge
 ```
 
-This detects installed tools, lets you pick a default AI backend and editor, and creates a conventions file if one doesn't exist.
+After testing, restore your original Forge config:
+
+```bash
+rm -rf ~/.forge
+mv ~/.forge.backup-YYYYMMDD-HHMMSS ~/.forge
+```
+
+Why this is recommended:
+
+- It forces Forge to show the true first-run setup wizard.
+- It preserves your normal Claude, Gemini, and Codex login state.
+- It avoids false failures where the AI CLI is installed but appears logged out.
+
+Using `HOME="$(mktemp -d)" forge` can also produce a clean Forge config, but it
+may hide authentication files used by `claude`, `gemini`, or `codex`, which can
+cause scaffolding to fail even though the CLIs are installed.
+
+## Quick Start
 
 ### Interactive mode
 
@@ -110,221 +111,138 @@ This detects installed tools, lets you pick a default AI backend and editor, and
 forge
 ```
 
-### Non-interactive mode
+Forge will walk you through the scaffold interactively, then show a review screen before anything is generated so you can edit basics, design/media, integrations, or demo mode without restarting the whole flow.
 
-Skip the questions entirely by providing all required flags:
+### Non-interactive mode
 
 ```bash
 forge --name pulse --stack fastapi --description "health check API" --docker
 forge --name storefront --stack nextjs --description "e-commerce site" --no-docker
 forge --name platform --stack both --description "fullstack SaaS app"
-forge --name studio --stack nextjs --description "client portal" --auth-provider clerk --ci --ci-template questionnaire --ci-actions lint,typecheck,unit-tests
-forge --name ubundi-site --stack nextjs --description "brand site" --design-template ubundi-brand-guide
 ```
 
-Stack accepts aliases: `next`, `react`, `api`, `ai`, `fullstack`, `monorepo`, `cli`, `worker`, `library`.
+### Dry run
 
-### Backend and model selection
-
-Force a specific backend:
-
-```bash
-forge --use claude
-forge --use gemini
-forge --use codex
-```
-
-Pass a model to the AI CLI:
-
-```bash
-forge --model opus
-forge --use gemini --model flash
-```
-
-### Prompt inspection and export
-
-Preview the generated prompt without executing:
+Preview the assembled prompt without executing:
 
 ```bash
 forge --dry-run
 ```
 
-Export the prompt to a file:
+### Backend override
 
 ```bash
-forge --export prompt.md
+forge --use claude
+forge --use gemini --model flash
 ```
 
-### Design templates
+See [docs/getting-started.md](docs/getting-started.md) for a full walkthrough.
 
-Forge can inject a reusable design template / brand guide into scaffold prompts for `nextjs` and `both` stacks.
+## Configuration
 
-- Built-in template: `ubundi-brand-guide`
-- CLI flag: `--design-template ubundi-brand-guide`
-- Interactive mode: choose `Apply a design template / brand guide?`
-- Override the built-in template locally for your own machine or repo:
-  - `~/.forge/design-templates/ubundi-brand-guide.md`
-  - `.forge/design-templates/ubundi-brand-guide.md`
+All user config lives under `~/.forge/`:
 
-The intended workflow is to encode the brand guide as prompt-ready tokens and rules in that markdown file, so every new scaffold inherits the same palette, typography, components, and layout language by default.
+| File | Purpose |
+|------|---------|
+| `config.json` | Backend, editor, and project directory preferences |
+| `conventions.md` | Team coding standards injected into every scaffold prompt |
+| `hooks/post-scaffold.sh` | Custom script run after every scaffold |
+| `scaffold.log` | Append-only JSON-lines scaffold history |
 
-### Post-scaffold options
-
-Open the project in your editor after scaffolding (uses the editor chosen during setup):
+Re-run setup at any time:
 
 ```bash
-forge --open
+forge --setup
 ```
 
-### Shell completions
+See [docs/configuration.md](docs/configuration.md) for the full reference.
 
-Enable tab completion for all `forge` flags:
+## CLI Flags
 
-```bash
-# Generate and install the completion script (zsh)
-_FORGE_COMPLETE=source_zsh forge > ~/.zfunc/_forge
+| Flag | Description |
+|------|-------------|
+| `--name`, `-n` | Project name |
+| `--stack`, `-s` | Stack identifier or alias |
+| `--description`, `-d` | Project description |
+| `--use` | Override AI backend (`claude`, `gemini`, `codex`) |
+| `--model`, `-m` | Model to pass to the AI CLI |
+| `--docker` / `--no-docker` | Include Docker setup |
+| `--auth-provider` | Auth provider for frontend stacks (`clerk`, `supabase-auth`, `authjs`, `better-auth`) |
+| `--ci` / `--no-ci` | Include GitHub Actions CI workflow |
+| `--design-template` | Brand/design guide for frontend stacks |
+| `--media` | Media collection to import into the project |
+| `--demo` / `--no-demo` | Demo mode (projects run without real API keys) |
+| `--dry-run` | Print assembled prompt without executing |
+| `--export` | Export prompt to a file |
+| `--verbose` | Show full subprocess output and timing |
+| `--open` / `--no-open` | Open project in editor after scaffolding |
+| `--verify` / `--no-verify` | Run post-scaffold verification checks |
+| `--setup` | Re-run the setup wizard |
+| `--version`, `-v` | Show version |
 
-# Rebuild the completion cache
-rm -f ~/.zcompdump*
-exec zsh
-```
+## Documentation
 
-After setup, `forge --<tab>` shows all available flags with descriptions.
-
-### Scaffold manifest
-
-Every scaffolded project gets a `.forge/scaffold.json` file recording how it was built:
-
-```json
-{
-  "forge_version": "0.1.0",
-  "name": "my-app",
-  "stack": "nextjs",
-  "backends": ["claude"],
-  "routing": [{"phase": "architecture", "backend": "claude"}, ...],
-  "design_template": "ubundi-brand-guide",
-  "conventions_hash": "sha256:a1b2c3d4...",
-  "timestamp": "2026-03-20T08:30:00+00:00"
-}
-```
-
-This gives every generated project traceable provenance — stack, backends, model, conventions hash, and timestamp.
-
-### Scaffold log
-
-Forge appends a JSON-lines entry to `~/.forge/scaffold.log` after every scaffold. Each line records the project name, stack, backends used, directory, and timestamp.
-
-```bash
-# View your scaffold history
-cat ~/.forge/scaffold.log | python -m json.tool --json-lines
-```
-
-### Post-scaffold hooks
-
-Create `~/.forge/hooks/post-scaffold.sh` to run custom commands after every scaffold:
-
-```bash
-mkdir -p ~/.forge/hooks
-cat > ~/.forge/hooks/post-scaffold.sh << 'EOF'
-#!/bin/bash
-# Example: set up git remote, copy secrets, configure pre-commit
-echo "Post-scaffold hook running for $FORGE_PROJECT_NAME ($FORGE_STACK)"
-EOF
-chmod +x ~/.forge/hooks/post-scaffold.sh
-```
-
-The hook runs with the project directory as its working directory and receives these environment variables:
-
-| Variable | Description |
-|---|---|
-| `FORGE_PROJECT_DIR` | Absolute path to the new project |
-| `FORGE_PROJECT_NAME` | Project name |
-| `FORGE_STACK` | Stack type (e.g. `nextjs`, `fastapi`) |
-| `FORGE_DEMO_MODE` | `1` if demo mode, `0` otherwise |
-
-### Debugging
-
-Show detailed execution info (command, timing, file sizes):
-
-```bash
-forge --verbose
-```
-
-Show the installed version:
-
-```bash
-forge --version
-```
+- [Getting Started](docs/getting-started.md) -- Installation, first run, first scaffold
+- [Admin Playbook](docs/admin-playbook.md) -- Maintaining conventions, adding stacks, and shipping Homebrew releases
+- [Configuration](docs/configuration.md) -- Config files, conventions, hooks, media assets
+- [Stacks](docs/stacks.md) -- Detailed reference for every supported stack
+- [Troubleshooting](docs/troubleshooting.md) -- Common issues and fixes
+- [Homebrew Release Notes](docs/homebrew.md) -- Formula generation and release flow
+- [Changelog](CHANGELOG.md) -- Version history
 
 ## How It Works
 
-1. On first run, the setup wizard detects AI CLIs and editors, saves preferences.
-2. UbundiForge collects answers through an interactive terminal flow (or CLI flags).
-3. It loads your shared conventions and optional `CLAUDE.md` template.
-4. It scans user-provided text for secrets before proceeding.
-5. It builds a single scaffold prompt tailored to the chosen stack.
-6. It picks the best AI backend (with automatic fallback if needed).
-7. It launches the selected AI CLI in a new project directory with a clean live loader.
-8. After scaffolding, it writes a `.forge/scaffold.json` manifest into the project.
-9. It ensures git is initialized and opens the project in your editor.
-10. It runs your post-scaffold hook (if configured) and logs the scaffold to history.
+1. On first run, the setup wizard detects installed backends, checks whether they are ready to use, and saves your defaults.
+2. Forge gives new users a clean handoff: create a project now, review setup again, or exit.
+3. UbundiForge collects answers through an interactive terminal flow or CLI flags.
+4. In interactive mode, Forge shows a review screen so you can edit selections before generation starts.
+5. It loads your shared conventions and optional `CLAUDE.md` template.
+6. It scans user-provided text for secrets before proceeding.
+7. It picks the best ready AI backend plan for each scaffold phase.
+8. It launches the selected AI CLI in a new project directory with a live progress display.
+9. After scaffolding, it writes a `.forge/scaffold.json` manifest into the project.
+10. It ensures git is initialized, runs verification, runs your post-scaffold hook, and opens the project in your editor if configured.
 
 ## Project Structure
 
 ```text
-forge/
-├── src/
-│   └── ubundiforge/
-│       ├── cli.py               # Typer app, single command entry point
-│       ├── config.py            # Backend availability checks
-│       ├── conventions.py       # Loads conventions from ~/.forge/
-│       ├── homebrew.py          # Formula generation helpers
-│       ├── prompt_builder.py    # Assembles prompt from answers + conventions
-│       ├── prompts.py           # Interactive question flow
-│       ├── router.py            # AI backend routing + fallback
-│       ├── runner.py            # Subprocess execution of AI CLIs
-│       ├── scaffold_log.py      # Scaffold history log and per-project manifest
-│       ├── safety.py            # Secret detection
-│       ├── scaffold_options.py  # Auth provider and CI action definitions
-│       ├── setup.py             # First-run setup wizard
-│       ├── stacks.py            # Stack metadata and cross-recipe defaults
-│       └── assets/              # Bundled package assets
-├── Formula/                     # Generated Homebrew formula source
-├── tests/                       # pytest suite
-├── docs/                        # Specs, roadmap, diagrams
-├── research/                    # Discovery research and archives
-├── scripts/                     # Utility scripts
+UbundiForge/
+├── src/ubundiforge/        Core package
+│   ├── cli.py              Typer app, single command entry point
+│   ├── config.py           Backend availability checks
+│   ├── conventions.py      Loads conventions from ~/.forge/
+│   ├── homebrew.py         Formula generation helpers
+│   ├── prompt_builder.py   Assembles prompt from answers + conventions
+│   ├── prompts.py          Interactive question flow
+│   ├── router.py           AI backend routing + fallback
+│   ├── runner.py           Subprocess execution of AI CLIs
+│   ├── scaffold_log.py     Scaffold history and per-project manifest
+│   ├── safety.py           Secret detection
+│   ├── scaffold_options.py Auth provider and CI action definitions
+│   ├── setup.py            First-run setup wizard
+│   ├── stacks.py           Stack metadata and cross-recipe defaults
+│   ├── assets/             Bundled ASCII art
+│   └── templates/          CLAUDE.md and design templates
+├── Formula/                Homebrew formula
+├── tests/                  pytest suite
+├── docs/                   User guides and reference docs
+├── scripts/                Utility scripts
+├── CHANGELOG.md
+├── LICENSE
 ├── pyproject.toml
-├── forge                        # Repo-local developer launcher
+├── forge                   Repo-local developer launcher
 └── README.md
 ```
 
 ## Development
 
-Set up the development environment:
-
 ```bash
-uv sync --dev
+uv sync --dev                            # Install in dev mode
+uv run pytest                            # Run tests
+uv run ruff check src/ubundiforge tests  # Lint
+uv run ruff format src/ubundiforge       # Format
 ```
 
-Run tests:
+## License
 
-```bash
-uv run pytest
-```
-
-Run Ruff:
-
-```bash
-uv run ruff check src/ubundiforge tests
-```
-
-## Notes
-
-- UbundiForge expects external AI CLIs to already be installed and available on `PATH`.
-- Config and preferences are stored at `~/.forge/config.json`.
-- Conventions are loaded from `~/.forge/conventions.md`. If that file does not exist, the setup wizard creates it with defaults.
-- The bundled `CLAUDE.md` template is loaded from `src/ubundiforge/templates/claude-md-template.md`.
-- Scaffold history is appended to `~/.forge/scaffold.log`.
-- Post-scaffold hooks go in `~/.forge/hooks/post-scaffold.sh`.
-- Homebrew release notes live in `docs/homebrew.md`.
+MIT -- see [LICENSE](LICENSE).

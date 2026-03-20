@@ -9,7 +9,11 @@ from pathlib import Path
 import questionary
 from rich.console import Console
 
-from ubundiforge.config import SUPPORTED_BACKENDS, check_backend_installed
+from ubundiforge.config import (
+    SUPPORTED_BACKENDS,
+    BackendStatus,
+    get_backend_statuses,
+)
 from ubundiforge.conventions import CONVENTIONS_PATH, DEFAULT_CONVENTIONS, FORGE_DIR
 from ubundiforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
 from ubundiforge.ui import (
@@ -58,6 +62,11 @@ SUPPORTED_EDITORS = [
     ("zed", "Zed", "Zed.app"),
 ]
 
+_BACKEND_LOGIN_HINTS = {
+    "claude": "claude auth login",
+    "codex": "codex login",
+}
+
 
 def _check_editor_installed(cli_cmd: str, app_bundle: str) -> tuple[bool, bool]:
     """Check if an editor is available via CLI and/or as a macOS .app bundle.
@@ -85,6 +94,30 @@ def _get_git_config(key: str) -> str:
         return result.stdout.strip()
     except FileNotFoundError:
         return ""
+
+
+def _set_git_config(key: str, value: str) -> bool:
+    """Write a git config value, returning whether it succeeded."""
+    try:
+        result = subprocess.run(
+            ["git", "config", "--global", key, value],
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return False
+    return result.returncode == 0
+
+
+def _backend_readiness_cell(status: BackendStatus):
+    """Return a badge or muted text for a backend readiness value."""
+    if not status.installed:
+        return muted("Not found")
+    if status.ready is True:
+        return badge("Ready", "success")
+    if status.ready is False:
+        return badge("Needs login", "warning")
+    return badge("Not verified", "warning")
 
 
 def needs_setup() -> bool:
@@ -119,6 +152,17 @@ def save_forge_config(config: dict) -> None:
 
 def _routing_summary(available: list[str], console: Console) -> None:
     """Print a summary of how multi-backend routing will work."""
+    if not available:
+        body = grouped_lines(
+            [
+                subtle("No ready backends detected yet."),
+                muted("Finish logging into an installed backend to enable scaffolding."),
+                muted("Use --use after login if you want to force a specific backend."),
+            ]
+        )
+        console.print(make_panel(body, title="Routing", accent="amber"))
+        return
+
     has_claude = "claude" in available
     has_gemini = "gemini" in available
     has_codex = "codex" in available
@@ -198,6 +242,7 @@ def run_setup(console: Console) -> dict:
     table.add_column("Tool")
     table.add_column("Strength")
     table.add_column("Status")
+    table.add_column("Readiness")
 
     strengths = {
         "claude": "Architecture & backend",
@@ -205,20 +250,27 @@ def run_setup(console: Console) -> dict:
         "codex": "Tests & automation",
     }
 
+    backend_statuses = get_backend_statuses()
     available: list[str] = []
     for backend in SUPPORTED_BACKENDS:
-        installed = check_backend_installed(backend)
+        status = backend_statuses[backend]
         strength = strengths.get(backend, "")
-        if installed:
+        if status.usable:
             available.append(backend)
-            table.add_row(backend, strength, badge("Installed", "success"))
+        if status.installed:
+            table.add_row(
+                backend,
+                strength,
+                badge("Installed", "success"),
+                _backend_readiness_cell(status),
+            )
         else:
-            table.add_row(backend, strength, muted("Not found"))
+            table.add_row(backend, strength, muted("Not found"), muted("Not found"))
 
     console.print(table)
     console.print()
 
-    if not available:
+    if not any(status.installed for status in backend_statuses.values()):
         console.print(
             make_panel(
                 grouped_lines(
@@ -233,6 +285,22 @@ def run_setup(console: Console) -> dict:
             )
         )
         raise SystemExit(1)
+
+    not_ready_backends = [
+        backend
+        for backend, status in backend_statuses.items()
+        if status.installed and status.ready is False
+    ]
+    if not_ready_backends:
+        lines = [
+            subtle(
+                f"{backend} is installed but not ready for scaffolding. "
+                f"Run {_BACKEND_LOGIN_HINTS.get(backend, backend)}."
+            )
+            for backend in not_ready_backends
+        ]
+        lines.append(muted("Automatic routing will skip these backends until they are ready."))
+        console.print(make_panel(grouped_lines(lines), title="Backend Login", accent="amber"))
 
     # --- Step 2: Routing summary ---
     console.print(make_step_panel(2, 8, "Backend routing", accent="violet"))
@@ -410,6 +478,35 @@ def run_setup(console: Console) -> dict:
                 accent="amber",
             )
         )
+        configure_git = prompt_confirm("Configure git identity now", default=True).ask()
+        if configure_git is None:
+            raise SystemExit(0)
+        if configure_git:
+            entered_name = prompt_text("Git user.name", default=git_name).ask()
+            if entered_name is None:
+                raise SystemExit(0)
+
+            entered_email = prompt_text("Git user.email", default=git_email).ask()
+            if entered_email is None:
+                raise SystemExit(0)
+
+            entered_name = entered_name.strip()
+            entered_email = entered_email.strip()
+
+            name_ok = bool(entered_name) and _set_git_config("user.name", entered_name)
+            email_ok = bool(entered_email) and _set_git_config("user.email", entered_email)
+            if name_ok and email_ok:
+                git_name = entered_name
+                git_email = entered_email
+                console.print(status_line("Saved git identity for new scaffolds.", accent="aqua"))
+            else:
+                console.print(
+                    status_line(
+                        "Could not save git identity automatically. You can rerun "
+                        "forge --setup later.",
+                        accent="amber",
+                    )
+                )
 
     # --- Step 6: Docker check ---
     console.print(make_step_panel(6, 8, "Checking Docker", accent="violet"))
@@ -446,7 +543,10 @@ def run_setup(console: Console) -> dict:
             grouped_lines(
                 [
                     "Where should Forge create new projects?",
-                    subtle("Leave empty to use the current directory each time."),
+                    subtle(
+                        "Leave empty to create each new project inside the directory "
+                        "where you run forge."
+                    ),
                 ]
             ),
             title="Projects",
@@ -477,7 +577,12 @@ def run_setup(console: Console) -> dict:
             console.print(status_line(f"Using {expanded}", accent="plum"))
         projects_dir = str(expanded)
     else:
-        console.print(status_line("Will use the current directory.", accent="plum"))
+        console.print(
+            status_line(
+                "New projects will be created inside the current directory you run forge from.",
+                accent="plum",
+            )
+        )
 
     # --- Step 8: Conventions & media ---
     console.print(make_step_panel(8, 8, "Conventions & media", accent="aqua"))

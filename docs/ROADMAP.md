@@ -21,6 +21,10 @@ Items marked with [DONE] have been implemented.
 
 - **Named convention profiles**: `forge --conventions fintech-client` loads `~/.forge/conventions/fintech-client.md` instead of the default. Different clients, different standards.
 - **Convention composition**: Stack multiple convention files — a base `ubundi.md` plus a client-specific overlay.
+- **Existing repo convention audit**: Add a `forge check` mode for running Forge against an existing repository instead of scaffolding a new one. Detect the stack from files like `package.json`, `pyproject.toml`, Docker/CI config, and `.forge/scaffold.json` when present; compare the repo against Ubundi conventions; then produce a pass/warn/fail scorecard with suggested fixes. The interactive `forge` flow could offer this as "Scaffold new repo" vs "Check existing repo" so teams can run the same conventions engine on legacy codebases too.
+  - First pass should be deterministic and local: required files (`README.md`, `CLAUDE.md`, `.env.example`), lint/typecheck/test commands, CI presence, Docker health checks, strict typing, and expected directory/layout rules per detected stack.
+  - Second pass can be AI-assisted: feed the detected stack, repo snapshot, and loaded convention profile into the selected backend so Forge can flag softer Ubundi conventions like architecture boundaries, naming patterns, frontend/API interaction patterns, and missing docs.
+  - Follow-on commands could be `forge check --fix` for safe baseline repairs and `forge check --export report.md` for sharing audits in PRs or internal reviews.
 - [DONE] **Project-local conventions**: Checks `.forge/conventions.md` in the current directory first, falls back to `~/.forge/conventions.md`.
 - [DONE] **Convention validation**: Warns if the conventions file is empty or suspiciously short.
 
