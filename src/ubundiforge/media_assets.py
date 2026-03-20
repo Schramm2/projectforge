@@ -6,7 +6,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-MEDIA_DIR = Path(__file__).resolve().parent.parent / "media"
+MEDIA_DIR = Path(__file__).resolve().parent.parent.parent / "media"
 
 MEDIA_EXTENSIONS = frozenset(
     {

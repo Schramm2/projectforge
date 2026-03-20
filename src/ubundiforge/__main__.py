@@ -2,5 +2,11 @@
 
 from ubundiforge.cli import app
 
+
+def main() -> None:
+    """Run the Forge CLI."""
+    app(prog_name="forge")
+
+
 if __name__ == "__main__":
-    raise SystemExit(app(prog_name="forge"))
+    main()

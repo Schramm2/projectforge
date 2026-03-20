@@ -9,26 +9,42 @@ description = "A CLI wrapper that scaffolds new projects using AI coding tools w
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
+keywords = ["ai", "cli", "scaffolding", "developer-tools", "ubundi"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Code Generators",
+]
 dependencies = [
     "typer>=0.15.0",
     "rich>=13.0.0",
     "questionary>=2.1.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/matthewubundi/forge"
+Repository = "https://github.com/matthewubundi/forge"
+Issues = "https://github.com/matthewubundi/forge/issues"
+
 [project.scripts]
-forge = "forge_entry:main"
+forge = "ubundiforge.__main__:main"
+
+[project.entry-points."pipx.run"]
+ubundiforge = "ubundiforge.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["ubundiforge"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"assets/ascii-art.txt" = "assets/ascii-art.txt"
-"ubundiforge/forge_entry.py" = "forge_entry.py"
+packages = ["src/ubundiforge"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "ubundiforge/",
-    "assets/ascii-art.txt",
+    "/src/ubundiforge",
+    "/README.md",
+    "/LICENSE",
 ]
 
 [tool.ruff]
@@ -43,3 +59,6 @@ dev = [
     "pytest>=9.0.2",
     "ruff>=0.15.6",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

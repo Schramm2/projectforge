@@ -2,23 +2,13 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-INSTALLER="$ROOT_DIR/scripts/install.sh"
-VENV_DIR="${VENV_DIR:-$ROOT_DIR/.venv}"
-FORGE_BIN="$VENV_DIR/bin/forge"
-STAMP_FILE="$VENV_DIR/.forge-install-stamp"
 
-needs_install=false
-
-if [ ! -x "$FORGE_BIN" ] || [ ! -f "$STAMP_FILE" ]; then
-  needs_install=true
-elif [ "$ROOT_DIR/pyproject.toml" -nt "$STAMP_FILE" ]; then
-  needs_install=true
-elif [ "$INSTALLER" -nt "$STAMP_FILE" ]; then
-  needs_install=true
+if ! command -v uv >/dev/null 2>&1; then
+  echo "uv is required for the repo-local developer launcher." >&2
+  echo "Install uv or use a packaged Forge install instead." >&2
+  exit 1
 fi
 
-if [ "$needs_install" = true ]; then
-  "$INSTALLER" >&2
-fi
+export PYTHONPATH="$ROOT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
 
-exec "$FORGE_BIN" "$@"
+exec uv run python -m ubundiforge "$@"

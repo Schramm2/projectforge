@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from ubundiforge.media_assets import (
+    MEDIA_DIR,
     MEDIA_EXTENSIONS,
     AssetInfo,
     build_asset_manifest,
@@ -16,6 +17,12 @@ from ubundiforge.media_assets import (
 def _create_file(path: Path, content: bytes = b"x") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(content)
+
+
+def test_media_dir_points_to_repo_root_media_directory() -> None:
+    repo_root = Path(__file__).resolve().parent.parent
+
+    assert MEDIA_DIR == repo_root / "media"
 
 
 def test_scan_assets_finds_media_files(tmp_path: Path) -> None:

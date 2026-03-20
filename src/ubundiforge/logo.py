@@ -22,7 +22,7 @@ CHAR_DENSITY = {
     "#": 6,
     "%": 7,
 }
-LOGO_PATHS = (Path(__file__).resolve().parent.parent / "assets" / "ascii-art.txt",)
+LOGO_PATHS = (Path(__file__).resolve().parent / "assets" / "ascii-art.txt",)
 FALLBACK_LOGO = """\
  #%%%%%%%         %%%%%%%%
 +%%%  -%%+        %%%  =%%%
@@ -38,7 +38,7 @@ FALLBACK_LOGO = """\
 
 
 def _load_logo_art() -> str | None:
-    """Load the source ASCII art if it exists in the local project."""
+    """Load the bundled ASCII art if it exists in the installed package."""
     for path in LOGO_PATHS:
         if path.exists():
             return path.read_text()

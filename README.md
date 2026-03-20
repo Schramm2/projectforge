@@ -40,7 +40,6 @@ You can override the routing with `--use`.
 ## Requirements
 
 - Python 3.12+
-- [`uv`](https://github.com/astral-sh/uv) for environment setup
 - At least one installed AI CLI:
   - `claude`
   - `gemini`
@@ -48,10 +47,47 @@ You can override the routing with `--use`.
 
 ## Installation
 
+### Homebrew
+
+Homebrew already ships other formulae with `forge` in the name, so the Homebrew package for this project should be published as `ubundiforge` while still installing the `forge` command.
+
+Once the tap is live:
+
 ```bash
-uv sync
-source .venv/bin/activate
+brew tap matthewubundi/tap
+brew install ubundiforge
 forge --version
+```
+
+The formula in this repo is generated from `uv.lock`:
+
+```bash
+python3 scripts/generate_homebrew_formula.py
+```
+
+### pipx
+
+For isolated global installs outside Homebrew:
+
+```bash
+pipx install ubundiforge
+forge --version
+```
+
+To test the packaged CLI from a local checkout before publishing:
+
+```bash
+pipx install .
+forge --version
+```
+
+### From source
+
+For contributors working in the repo:
+
+```bash
+uv sync --dev
+./forge --version
 ```
 
 On first run, Forge launches a setup wizard that checks for installed AI CLIs and editors, then saves your preferences to `~/.forge/config.json`.
@@ -228,7 +264,7 @@ forge --version
 4. It scans user-provided text for secrets before proceeding.
 5. It builds a single scaffold prompt tailored to the chosen stack.
 6. It picks the best AI backend (with automatic fallback if needed).
-7. It launches the selected AI CLI in a new project directory with a progress spinner.
+7. It launches the selected AI CLI in a new project directory with a clean live loader.
 8. After scaffolding, it writes a `.forge/scaffold.json` manifest into the project.
 9. It ensures git is initialized and opens the project in your editor.
 10. It runs your post-scaffold hook (if configured) and logs the scaffold to history.
@@ -237,36 +273,38 @@ forge --version
 
 ```text
 forge/
-├── ubundiforge/
-│   ├── cli.py               # Typer app, single command entry point
-│   ├── config.py             # Backend availability checks
-│   ├── conventions.py        # Loads conventions from ~/.forge/
-│   ├── forge_entry.py        # Bootstrap entry point (bypasses uv .pth bug)
-│   ├── prompt_builder.py     # Assembles prompt from answers + conventions
-│   ├── prompts.py            # Interactive question flow
-│   ├── router.py             # AI backend routing + fallback
-│   ├── runner.py             # Subprocess execution of AI CLIs
-│   ├── scaffold_log.py       # Scaffold history log and per-project manifest
-│   ├── safety.py             # Secret detection
-│   ├── scaffold_options.py   # Auth provider and CI action definitions
-│   ├── setup.py              # First-run setup wizard
-│   ├── stacks.py             # Stack metadata and cross-recipe defaults
-│   └── logo.py               # ASCII art banner
-├── tests/                    # pytest suite
-├── docs/                     # Specs, roadmap, diagrams
-├── research/                 # Discovery research and archives
-├── scripts/                  # Utility scripts
-├── assets/                   # ASCII art and static assets
+├── src/
+│   └── ubundiforge/
+│       ├── cli.py               # Typer app, single command entry point
+│       ├── config.py            # Backend availability checks
+│       ├── conventions.py       # Loads conventions from ~/.forge/
+│       ├── homebrew.py          # Formula generation helpers
+│       ├── prompt_builder.py    # Assembles prompt from answers + conventions
+│       ├── prompts.py           # Interactive question flow
+│       ├── router.py            # AI backend routing + fallback
+│       ├── runner.py            # Subprocess execution of AI CLIs
+│       ├── scaffold_log.py      # Scaffold history log and per-project manifest
+│       ├── safety.py            # Secret detection
+│       ├── scaffold_options.py  # Auth provider and CI action definitions
+│       ├── setup.py             # First-run setup wizard
+│       ├── stacks.py            # Stack metadata and cross-recipe defaults
+│       └── assets/              # Bundled package assets
+├── Formula/                     # Generated Homebrew formula source
+├── tests/                       # pytest suite
+├── docs/                        # Specs, roadmap, diagrams
+├── research/                    # Discovery research and archives
+├── scripts/                     # Utility scripts
 ├── pyproject.toml
+├── forge                        # Repo-local developer launcher
 └── README.md
 ```
 
 ## Development
 
-Code changes are picked up immediately (editable install). If you change dependencies or delete `.venv`:
+Set up the development environment:
 
 ```bash
-uv sync
+uv sync --dev
 ```
 
 Run tests:
@@ -278,7 +316,7 @@ uv run pytest
 Run Ruff:
 
 ```bash
-uv run ruff check ubundiforge/ tests/
+uv run ruff check src/ubundiforge tests
 ```
 
 ## Notes
@@ -286,6 +324,7 @@ uv run ruff check ubundiforge/ tests/
 - UbundiForge expects external AI CLIs to already be installed and available on `PATH`.
 - Config and preferences are stored at `~/.forge/config.json`.
 - Conventions are loaded from `~/.forge/conventions.md`. If that file does not exist, the setup wizard creates it with defaults.
-- The bundled `CLAUDE.md` template is loaded from `ubundiforge/templates/claude-md-template.md`.
+- The bundled `CLAUDE.md` template is loaded from `src/ubundiforge/templates/claude-md-template.md`.
 - Scaffold history is appended to `~/.forge/scaffold.log`.
 - Post-scaffold hooks go in `~/.forge/hooks/post-scaffold.sh`.
+- Homebrew release notes live in `docs/homebrew.md`.
