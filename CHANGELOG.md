@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-03-20
+
+### Added
+
+- Backend readiness checks during setup so Forge can distinguish installed tools from backends that are actually ready to scaffold.
+- A post-setup handoff screen on first run so new users can create a project now, review setup again, or exit cleanly.
+- A review-and-edit screen before interactive scaffolding so users can revise their selections without restarting the whole flow.
+- Focused tests for backend readiness, first-run handoff, review/edit behavior, and safer project-directory handling.
+
+### Changed
+
+- Interactive scaffolding now supports editing basics, design/media, integrations, and demo mode before generation starts.
+- Existing target directories now offer safer choices: rename the project, overwrite the directory, or cancel.
+- Setup now offers inline git identity configuration when `user.name` or `user.email` is missing.
+- Setup and getting-started docs now reflect backend readiness, first-run handoff, and the review/edit scaffold flow.
+- Routing now skips backends that are known to be installed but not authenticated instead of failing later during execution.
+
 ## [0.1.0] - 2026-03-20
 
 ### Added
@@ -33,4 +50,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pipx support for isolated global installs.
 - MIT license.
 
+[0.2.0]: https://github.com/matthewubundi/UbundiForge/releases/tag/v0.2.0
 [0.1.0]: https://github.com/matthewubundi/UbundiForge/releases/tag/v0.1.0

@@ -49,6 +49,45 @@ uv run ruff check ubundiforge/   # Lint
 uv run ruff format ubundiforge/  # Format
 ```
 
+## Release Workflow
+
+Before testing a true new-user install flow from Homebrew, publish the changes
+as a new release first. Otherwise the brew install path will still serve the
+previous version.
+
+Release checklist:
+
+1. Bump the version in both:
+   - `pyproject.toml`
+   - `src/ubundiforge/__init__.py`
+2. Add a new entry to `CHANGELOG.md`.
+3. Refresh `uv.lock` if runtime dependencies changed.
+4. Verify locally:
+   - `uv run pytest`
+   - `uv run ruff check src/ubundiforge tests`
+   - `./forge --dry-run --name release-smoke --stack fastapi --description "release smoke test"`
+5. Commit and tag the release:
+   - `git add .`
+   - `git commit -m "release: vX.Y.Z"`
+   - `git tag vX.Y.Z`
+   - `git push origin main --tags`
+6. Compute the GitHub release tarball checksum:
+   - `curl -Ls https://github.com/matthewubundi/UbundiForge/archive/refs/tags/vX.Y.Z.tar.gz | shasum -a 256`
+7. Regenerate `Formula/ubundiforge.rb`:
+   - `python3 scripts/generate_homebrew_formula.py --source-url https://github.com/matthewubundi/UbundiForge/archive/refs/tags/vX.Y.Z.tar.gz --source-sha256 <sha256>`
+8. Commit the updated formula in this repo.
+9. Sync `Formula/ubundiforge.rb` into the Homebrew tap repo.
+10. Validate the tap:
+   - `brew install --build-from-source matthewubundi/tap/ubundiforge`
+   - `brew test matthewubundi/tap/ubundiforge`
+11. Push the tap update.
+
+Only after that should you run a real new-user brew smoke test:
+
+- `brew install ubundiforge`
+- `forge --version`
+- `forge`
+
 ## Key flags
 
 - `--use claude|gemini|codex` — override AI routing
