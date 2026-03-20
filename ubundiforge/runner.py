@@ -1,7 +1,9 @@
 """Executes the AI CLI subprocess with the assembled prompt."""
 
 import io
+import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -12,13 +14,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from rich.live import Live
-from rich.spinner import Spinner
 from rich.text import Text
 
 from ubundiforge.ui import (
     badge,
     create_console,
     grouped_lines,
+    make_loader_panel,
     make_panel,
     make_table,
     muted,
@@ -27,6 +29,20 @@ from ubundiforge.ui import (
 )
 
 console = create_console()
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+_SPINNER_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
+_PULSE_STYLES = {
+    "aqua": ("#4D6A84", "#75DCE6", "#C6CEE6", "#75DCE6"),
+    "amber": ("#77603A", "#F3BB58", "#F7D99C", "#F3BB58"),
+    "violet": ("#5F4A87", "#A16EFA", "#D3BCFF", "#A16EFA"),
+    "plum": ("#7B4A79", "#D768D2", "#F0B6ED", "#D768D2"),
+}
+_BACKEND_ACCENTS = {
+    "claude": "violet",
+    "gemini": "amber",
+    "codex": "aqua",
+}
 
 
 def _build_cmd(backend: str, prompt: str, model: str | None = None) -> list[str]:
@@ -52,6 +68,153 @@ def _build_cmd(backend: str, prompt: str, model: str | None = None) -> list[str]
 
 
 _PHASE_TIMEOUT = 1800  # 30 minutes per phase
+
+
+def _phase_accent(backend: str) -> str:
+    """Return the accent color that best matches a backend."""
+    return _BACKEND_ACCENTS.get(backend, "violet")
+
+
+def _initial_phase_summary(label: str, backend: str) -> str:
+    """Return the first human-friendly summary shown before output arrives."""
+    lowered = label.lower()
+    if "architecture" in lowered:
+        return "Designing the project foundation"
+    if "frontend" in lowered:
+        return "Shaping the interface and app structure"
+    if "tests" in lowered:
+        return "Setting up tests and developer workflows"
+    if "verify" in lowered:
+        return "Checking the scaffold and smoothing rough edges"
+    return f"Working through the scaffold with {backend}"
+
+
+def _sanitize_progress_line(line: str) -> str:
+    """Normalize backend output into compact text suitable for a loader."""
+    clean = _ANSI_RE.sub("", line).strip()
+    clean = re.sub(r"\s+", " ", clean)
+    return clean[:120]
+
+
+def _is_noisy_progress_line(line: str) -> bool:
+    """Filter out raw lines that are too noisy to show directly in the loader."""
+    if not line:
+        return True
+    noisy_prefixes = (
+        "$",
+        ">",
+        "```",
+        "diff --git",
+        "@@",
+        "+++",
+        "---",
+        "{",
+        "[{",
+    )
+    if line.startswith(noisy_prefixes):
+        return True
+    if line.count("/") > 6:
+        return True
+    return False
+
+
+def _summarize_output_line(line: str) -> str | None:
+    """Translate backend output into a clean user-facing progress summary."""
+    lowered = line.lower()
+
+    keyword_groups = (
+        (
+            ("inspect", "review", "analy", "read ", "scan", "explor", "understand"),
+            "Reviewing the scaffold brief",
+        ),
+        (("plan", "approach", "strategy", "outline"), "Planning the next set of changes"),
+        (("lint", "eslint", "ruff", "prettier"), "Running lint checks"),
+        (("typecheck", "tsc", "mypy", "pyright"), "Running type checks"),
+        (("test", "pytest", "vitest", "jest", "playwright", "cypress"), "Running tests and checks"),
+        (
+            (
+                "install",
+                "dependencies",
+                "dependency",
+                "npm ",
+                "pnpm ",
+                "bun ",
+                "pip ",
+                "uv sync",
+                "poetry ",
+            ),
+            "Installing project dependencies",
+        ),
+        (
+            (
+                "create",
+                "created",
+                "patch",
+                "write",
+                "writing",
+                "update",
+                "updating",
+                "edited",
+                "edit ",
+                "apply_patch",
+                "scaffold",
+            ),
+            "Writing and refining project files",
+        ),
+        (("schema", "migration", "database", "sql"), "Preparing the data layer"),
+        (("build", "compile", "bundle", "transpil"), "Building the project"),
+        (
+            (
+                "localhost",
+                "listening",
+                "dev server",
+                "starting server",
+                "ready on",
+                "running dev",
+                "vite",
+            ),
+            "Starting the app locally",
+        ),
+        (("git init", "git add", "git commit", ".git"), "Finalizing the repository"),
+        (
+            ("error", "failed", "traceback", "exception", "cannot", "unable to", "fixing"),
+            "Working through an issue in the scaffold",
+        ),
+        (("done", "complete", "completed", "finished", "success"), "Wrapping up this phase"),
+    )
+
+    for tokens, summary in keyword_groups:
+        if any(token in lowered for token in tokens):
+            return summary
+    return None
+
+
+def _progress_summary_for_line(line: str, current: str) -> str:
+    """Pick the best loader summary for a new backend output line."""
+    summary = _summarize_output_line(line)
+    if summary:
+        return summary
+    if not _is_noisy_progress_line(line):
+        return line
+    return current
+
+
+def _spinner_frame(elapsed: float) -> str:
+    """Return the current spinner frame."""
+    return _SPINNER_FRAMES[int(elapsed * 10) % len(_SPINNER_FRAMES)]
+
+
+def _spinner_style(accent: str, elapsed: float) -> str:
+    """Return a pulsing spinner color to mimic a subtle fade animation."""
+    palette = _PULSE_STYLES.get(accent, _PULSE_STYLES["violet"])
+    return palette[int(elapsed * 6) % len(palette)]
+
+
+def _format_activity(text: str, limit: int = 54) -> str:
+    """Clamp activity text so loader surfaces stay compact."""
+    if len(text) <= limit:
+        return text
+    return f"{text[: limit - 1].rstrip()}…"
 
 
 def run_ai(
@@ -102,16 +265,26 @@ def run_ai(
         )
 
     start = time.monotonic()
-
-    spinner = Spinner("dots", text=Text(f"Starting {display_label}...", style="#C6CEE6"))
+    accent = _phase_accent(backend)
+    summary = _initial_phase_summary(display_label, backend)
+    last_line = ""
+    lock = threading.Lock()
 
     def _stream_stdout(pipe: io.BufferedReader, live: Live) -> None:
-        """Read stdout line-by-line, print above the spinner via Rich."""
+        """Read stdout line-by-line and update the polished loader state."""
+        nonlocal summary, last_line
         try:
             for raw_line in iter(pipe.readline, b""):
                 line = raw_line.decode("utf-8", errors="replace").rstrip("\n")
                 if line:
-                    live.console.print(line)
+                    clean = _sanitize_progress_line(line)
+                    if not clean:
+                        continue
+                    with lock:
+                        last_line = clean
+                        summary = _progress_summary_for_line(clean, summary)
+                    if verbose:
+                        live.console.print(line)
         except ValueError:
             pass  # pipe closed
 
@@ -123,7 +296,7 @@ def run_ai(
             stderr=subprocess.STDOUT,
         )
 
-        with Live(spinner, console=console, refresh_per_second=10) as live:
+        with Live(console=console, refresh_per_second=12) as live:
             reader = threading.Thread(target=_stream_stdout, args=(proc.stdout, live), daemon=True)
             reader.start()
 
@@ -150,8 +323,19 @@ def run_ai(
                         )
                     )
                     return 1
-                spinner.update(
-                    text=Text(f"{display_label} working... ({elapsed:.0f}s)", style="#C6CEE6")
+                with lock:
+                    current_summary = summary
+                    current_detail = last_line if last_line != current_summary else None
+                live.update(
+                    make_loader_panel(
+                        display_label,
+                        current_summary,
+                        elapsed=elapsed,
+                        spinner_frame=_spinner_frame(elapsed),
+                        spinner_style=_spinner_style(accent, elapsed),
+                        accent=accent,
+                        detail=current_detail,
+                    )
                 )
                 time.sleep(0.2)
 
@@ -163,25 +347,39 @@ def run_ai(
 
     elapsed = time.monotonic() - start
 
+    if proc.returncode != 0 and not verbose:
+        failure_lines: list[Text] = [
+            Text.assemble(
+                badge("failed", "error"),
+                Text("  "),
+                subtle(f"{display_label} exited with code {proc.returncode}."),
+            )
+        ]
+        if last_line:
+            failure_lines.append(muted(_format_activity(last_line, limit=110)))
+        console.print(make_panel(grouped_lines(failure_lines), title="Execution", accent="plum"))
+
     if verbose:
         console.print(
             status_line(f"{display_label} completed in {elapsed:.1f}s (exit {proc.returncode})")
         )
     else:
-        console.print(status_line(f"{display_label} finished in {elapsed:.0f}s"))
+        console.print(status_line(f"{display_label} finished in {elapsed:.0f}s", accent=accent))
 
     return proc.returncode
 
 
 @dataclass
-class _ParallelPhase:
-    """Tracks a phase running in the background."""
+class _PhaseProgress:
+    """Tracks live progress and final state for a running phase."""
 
     label: str
     backend: str
+    summary: str
     start: float = 0.0
     returncode: int | None = None
     lines: list[str] = field(default_factory=list)
+    last_line: str = ""
 
 
 def run_ai_parallel(
@@ -201,7 +399,7 @@ def run_ai_parallel(
     """
     project_dir.mkdir(parents=True, exist_ok=True)
 
-    trackers: dict[str, _ParallelPhase] = {}
+    trackers: dict[str, _PhaseProgress] = {}
     procs: dict[str, subprocess.Popen] = {}
     readers: dict[str, threading.Thread] = {}
     lock = threading.Lock()
@@ -218,6 +416,7 @@ def run_ai_parallel(
         table.add_column("Status", width=10)
         table.add_column("Phase")
         table.add_column("Backend")
+        table.add_column("Activity")
         table.add_column("State")
         for t in trackers.values():
             elapsed = time.monotonic() - t.start if t.start else 0
@@ -231,7 +430,13 @@ def run_ai_parallel(
             else:
                 icon = badge("live", "info")
                 status = f"working... {elapsed:.0f}s"
-            table.add_row(icon, t.label, t.backend, subtle(status))
+            table.add_row(
+                icon,
+                t.label,
+                t.backend,
+                subtle(_format_activity(t.summary)),
+                subtle(status),
+            )
         return table
 
     def _reader_fn(label: str, pipe: io.BufferedReader) -> None:
@@ -239,8 +444,15 @@ def run_ai_parallel(
             for raw_line in iter(pipe.readline, b""):
                 line = raw_line.decode("utf-8", errors="replace").rstrip("\n")
                 if line:
+                    clean = _sanitize_progress_line(line)
+                    if not clean:
+                        continue
                     with lock:
-                        trackers[label].lines.append(line)
+                        trackers[label].lines.append(clean)
+                        trackers[label].last_line = clean
+                        trackers[label].summary = _progress_summary_for_line(
+                            clean, trackers[label].summary
+                        )
         except ValueError:
             pass
 
@@ -299,7 +511,11 @@ def run_ai_parallel(
 
     # Initialize trackers
     for phase in phases:
-        trackers[phase["label"]] = _ParallelPhase(label=phase["label"], backend=phase["backend"])
+        trackers[phase["label"]] = _PhaseProgress(
+            label=phase["label"],
+            backend=phase["backend"],
+            summary=_initial_phase_summary(phase["label"], phase["backend"]),
+        )
 
     results: list[tuple[str, int]] = []
 
@@ -317,21 +533,21 @@ def run_ai_parallel(
             label, rc = future.result()
             results.append((label, rc))
 
-    # Print buffered output from each phase
-    for phase in phases:
-        label = phase["label"]
-        t = trackers[label]
-        if t.lines:
-            console.print()
-            console.print(
-                make_panel(
-                    Text(label, style="bold #F7F9FF"),
-                    title="Phase Output",
-                    accent="plum",
+    if verbose:
+        for phase in phases:
+            label = phase["label"]
+            t = trackers[label]
+            if t.lines:
+                console.print()
+                console.print(
+                    make_panel(
+                        Text(label, style="bold #F7F9FF"),
+                        title="Phase Output",
+                        accent="plum",
+                    )
                 )
-            )
-            for line in t.lines:
-                console.print(line)
+                for line in t.lines:
+                    console.print(line)
 
     return results
 
@@ -434,3 +650,64 @@ def open_in_editor(project_dir: Path, preferred_editor: str = "") -> None:
             return
 
     console.print(status_line("No editor found. Open the project manually.", accent="amber"))
+
+
+HOOKS_DIR = Path.home() / ".forge" / "hooks"
+POST_SCAFFOLD_HOOK = HOOKS_DIR / "post-scaffold.sh"
+
+
+def run_post_scaffold_hook(
+    project_dir: Path,
+    answers: dict,
+) -> bool:
+    """Run ~/.forge/hooks/post-scaffold.sh if it exists.
+
+    The hook receives the project directory as cwd and key scaffold
+    metadata as environment variables.
+
+    Returns:
+        True if the hook ran successfully or no hook exists. False on failure.
+    """
+    if not POST_SCAFFOLD_HOOK.exists():
+        return True
+
+    env = {
+        **os.environ,
+        "FORGE_PROJECT_DIR": str(project_dir),
+        "FORGE_PROJECT_NAME": answers.get("name", ""),
+        "FORGE_STACK": answers.get("stack", ""),
+        "FORGE_DEMO_MODE": "1" if answers.get("demo_mode") else "0",
+    }
+
+    console.print(status_line("Running post-scaffold hook...", accent="violet"))
+
+    try:
+        result = subprocess.run(
+            ["bash", str(POST_SCAFFOLD_HOOK)],
+            cwd=project_dir,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired:
+        console.print(status_line("Post-scaffold hook timed out (60s limit).", accent="amber"))
+        return False
+
+    if result.stdout.strip():
+        for line in result.stdout.strip().splitlines():
+            console.print(f"  {line}")
+
+    if result.returncode != 0:
+        console.print(
+            status_line(
+                f"Post-scaffold hook exited with code {result.returncode}.",
+                accent="amber",
+            )
+        )
+        if result.stderr.strip():
+            console.print(f"  {result.stderr.strip()}")
+        return False
+
+    console.print(status_line("Post-scaffold hook completed.", accent="aqua"))
+    return True

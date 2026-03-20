@@ -19,7 +19,8 @@ flowchart TD
         PickEditor[Pick default editor]
         CheckGit[Check git + Docker + projects dir]
         Conventions[Creates conventions file<br/>~/.forge/conventions.md]
-        DetectAI --> PickAI --> DetectEditor --> PickEditor --> CheckGit --> Conventions
+        Media[Creates media/ folder<br/>for asset collections]
+        DetectAI --> PickAI --> DetectEditor --> PickEditor --> CheckGit --> Conventions --> Media
     end
 
     Setup --> Describe
@@ -36,13 +37,14 @@ flowchart TD
     subgraph Options["2 — Choose options"]
         Docker[Docker setup?]
         Design[Design template?<br/>brand guide for frontend stacks]
+        MediaQ[Media assets?<br/>pick a collection from media/]
         Demo[Demo mode?<br/>runs without real API keys]
         Customize{Want to customize?}
         Auth[Authentication<br/>Clerk / NextAuth / Supabase]
         Svc[Services<br/>PostgreSQL, OpenAI, AWS...]
         CI[CI/CD pipeline?]
         Extra[Any special instructions?]
-        Docker --> Design --> Demo --> Customize
+        Docker --> Design --> MediaQ --> Demo --> Customize
         Customize -- Yes --> Auth --> Svc --> CI --> Extra
         Customize -- No --> Skip[ ]
     end
@@ -61,10 +63,11 @@ flowchart TD
 
     subgraph Generate["4 — Forge builds your project"]
         direction TB
-        Conv[Loads your team's<br/>coding conventions]
+        Conv[Loads conventions,<br/>design template,<br/>media manifest]
+        CopyMedia[Copies media assets<br/>into project static dir]
         Prompt[Assembles phase-specific<br/>AI brief with specialist prompts]
         AI["Runs phases: arch serial,<br/>frontend+tests parallel,<br/>verify serial"]
-        Conv --> Prompt --> AI
+        Conv --> CopyMedia --> Prompt --> AI
     end
 
     Generate --> Verify
@@ -131,6 +134,11 @@ flowchart LR
         TplLoad[Load template<br/>local → global → bundled]
     end
 
+    subgraph MediaMod["media_assets.py"]
+        MediaScan[Scan media/ collections<br/>build asset manifest]
+        MediaCopy[Copy assets into<br/>project static dir]
+    end
+
     subgraph Safety["safety.py"]
         Scan[Regex secret<br/>detection]
     end
@@ -147,7 +155,7 @@ flowchart LR
     end
 
     subgraph Builder["prompt_builder.py"]
-        PhasePrompt[Phase-specific prompts<br/>with specialist variants<br/>+ demo mode block<br/>+ design template block]
+        PhasePrompt[Phase-specific prompts<br/>with specialist variants<br/>+ demo mode block<br/>+ design template block<br/>+ media assets manifest]
     end
 
     subgraph Runner["runner.py"]
@@ -169,6 +177,7 @@ flowchart LR
 
     Entry --> Conv
     Entry --> DesignTpl
+    Entry --> MediaMod
     Entry --> Safety
     Entry --> Router
 
@@ -176,10 +185,12 @@ flowchart LR
     Router --> Merge
     Conv --> Builder
     DesignTpl --> Builder
+    MediaMod --> Builder
     Stacks --> Builder
     ScaffoldOpts --> Builder
     Safety -->|pass| Builder
 
+    MediaCopy -->|before AI| Runner
     Builder -->|per phase| Runner
     Exec --> GitInit
     GitInit --> VerifyMod
@@ -200,6 +211,7 @@ flowchart TD
         CIConfig[CI configuration<br/>mode + selected actions]
         AuthMeta[Auth provider metadata<br/>libraries + env hints]
         DesignTplInput[Design template<br/>brand guide, tokens,<br/>typography, components]
+        MediaInput[Media assets manifest<br/>file paths + sizes from<br/>selected collection]
         ClaudeMD[CLAUDE.md template<br/>optional]
         DemoFlag[Demo mode flag<br/>zero-config env fallbacks]
         PhaseCtx[Phase context<br/>which phases, position<br/>in pipeline, prior work]
@@ -220,6 +232,7 @@ flowchart TD
         CrossSection[CROSS-PROJECT STANDARDS<br/>tooling, naming, testing,<br/>docker best practices]
         ConvSection[CONVENTIONS<br/>full conventions.md content]
         DesignTplSection[DESIGN TEMPLATE<br/>brand tokens, typography,<br/>component patterns]
+        MediaSection[MEDIA ASSETS<br/>pre-loaded file manifest<br/>with target paths]
         Instructions[INSTRUCTIONS<br/>phase-specific tasks]
         ExtraSection[EXTRA INSTRUCTIONS<br/>user's freeform input]
         TemplateSection[CLAUDE.MD TEMPLATE<br/>if provided]
@@ -233,6 +246,7 @@ flowchart TD
     CrossDefaults --> CrossSection
     ConvFile --> ConvSection
     DesignTplInput --> DesignTplSection
+    MediaInput --> MediaSection
     PhaseCtx --> Instructions
     Answers --> ExtraSection
     ClaudeMD --> TemplateSection
@@ -246,6 +260,7 @@ flowchart TD
     CrossSection --> Prompt
     ConvSection --> Prompt
     DesignTplSection --> Prompt
+    MediaSection --> Prompt
     Instructions --> Prompt
     ExtraSection --> Prompt
     TemplateSection --> Prompt

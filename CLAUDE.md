@@ -20,6 +20,7 @@ ubundiforge/           Core package
   stacks.py            Stack metadata and cross-recipe defaults
   conventions.py       Loads user conventions from ~/.forge/conventions.md
   media_assets.py      Scan, manifest, and copy media/ collections into scaffolds
+  scaffold_log.py     Append-only scaffold history + per-project manifest
   safety.py            Secret detection on user-supplied text
   scaffold_options.py  Auth provider and CI action definitions
   setup.py             First-run setup wizard

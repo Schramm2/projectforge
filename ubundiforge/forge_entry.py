@@ -22,4 +22,4 @@ def main() -> None:
 
     from ubundiforge.cli import app
 
-    raise SystemExit(app())
+    raise SystemExit(app(prog_name="forge"))

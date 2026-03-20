@@ -39,8 +39,10 @@ from ubundiforge.runner import (
     reset_project_dir,
     run_ai,
     run_ai_parallel,
+    run_post_scaffold_hook,
 )
 from ubundiforge.safety import check_for_secrets
+from ubundiforge.scaffold_log import append_scaffold_log, write_scaffold_manifest
 from ubundiforge.scaffold_options import (
     AUTH_PROVIDER_OPTIONS,
     CI_TEMPLATE_MODES,
@@ -64,7 +66,7 @@ from ubundiforge.ui import (
 )
 from ubundiforge.verify import print_report, verify_scaffold
 
-app = typer.Typer(add_completion=False)
+app = typer.Typer()
 console = create_console()
 
 
@@ -817,7 +819,16 @@ def main(
             raise typer.Exit(returncode)
         step += 1
 
-    # Post-scaffold: git init, verify, and open editor
+    # Post-scaffold: manifest, log, git init, verify, hooks, and open editor
+    write_scaffold_manifest(
+        answers,
+        phase_backends,
+        project_dir,
+        conventions,
+        model_override=model,
+        backend_models=backend_models,
+    )
+
     git_ok = ensure_git_init(project_dir)
 
     if verify:
@@ -837,6 +848,9 @@ def main(
                     accent="amber",
                 )
             )
+
+    run_post_scaffold_hook(project_dir, answers)
+    append_scaffold_log(answers, phase_backends, project_dir)
 
     console.print()
     _render_completion(project_dir, git_ok=git_ok)

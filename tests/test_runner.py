@@ -1,8 +1,15 @@
 """Tests for the runner module."""
 
+import stat
 from pathlib import Path
 
-from ubundiforge.runner import _build_cmd, reset_project_dir
+from ubundiforge.runner import (
+    _build_cmd,
+    _initial_phase_summary,
+    _progress_summary_for_line,
+    reset_project_dir,
+    run_post_scaffold_hook,
+)
 
 
 def test_claude_cmd_basic():
@@ -59,6 +66,57 @@ def test_unknown_backend_returns_empty():
     assert cmd == []
 
 
+def test_initial_phase_summary_matches_known_phase_labels():
+    assert (
+        _initial_phase_summary("Architecture & Core", "claude")
+        == "Designing the project foundation"
+    )
+    assert (
+        _initial_phase_summary("Frontend & UI", "gemini")
+        == "Shaping the interface and app structure"
+    )
+    assert (
+        _initial_phase_summary("Tests & Automation", "codex")
+        == "Setting up tests and developer workflows"
+    )
+    assert (
+        _initial_phase_summary("Verify & Fix", "claude")
+        == "Checking the scaffold and smoothing rough edges"
+    )
+
+
+def test_progress_summary_for_line_maps_common_backend_output_to_clean_loader_copy():
+    current = "Designing the project foundation"
+
+    assert (
+        _progress_summary_for_line("Inspecting the existing files first", current)
+        == "Reviewing the scaffold brief"
+    )
+    assert (
+        _progress_summary_for_line("Running pnpm install", current)
+        == "Installing project dependencies"
+    )
+    assert (
+        _progress_summary_for_line("Applying patch to app/page.tsx", current)
+        == "Writing and refining project files"
+    )
+    assert _progress_summary_for_line("Running pytest -q", current) == "Running tests and checks"
+    assert (
+        _progress_summary_for_line("Starting dev server on localhost:3000", current)
+        == "Starting the app locally"
+    )
+
+
+def test_progress_summary_for_line_uses_clean_fallback_for_non_noisy_updates():
+    current = "Setting up tests and developer workflows"
+
+    assert (
+        _progress_summary_for_line("Refining the empty state for the dashboard shell", current)
+        == "Refining the empty state for the dashboard shell"
+    )
+    assert _progress_summary_for_line("$ cat src/app/page.tsx", current) == current
+
+
 def test_reset_project_dir_clears_existing_contents(tmp_path):
     project_dir = tmp_path / "demo"
     project_dir.mkdir()
@@ -80,3 +138,55 @@ def test_reset_project_dir_creates_missing_directory(tmp_path):
 
     assert project_dir.exists()
     assert isinstance(project_dir, Path)
+
+
+def test_post_scaffold_hook_returns_true_when_no_hook(tmp_path, monkeypatch):
+    monkeypatch.setattr("ubundiforge.runner.POST_SCAFFOLD_HOOK", tmp_path / "nope.sh")
+    assert run_post_scaffold_hook(tmp_path, {"name": "demo"}) is True
+
+
+def test_post_scaffold_hook_runs_script(tmp_path, monkeypatch):
+    hook_path = tmp_path / "hook.sh"
+    marker = tmp_path / "marker.txt"
+    hook_path.write_text(f'#!/bin/bash\necho "$FORGE_PROJECT_NAME" > {marker}\n')
+    hook_path.chmod(hook_path.stat().st_mode | stat.S_IEXEC)
+
+    monkeypatch.setattr("ubundiforge.runner.POST_SCAFFOLD_HOOK", hook_path)
+
+    project_dir = tmp_path / "my-project"
+    project_dir.mkdir()
+
+    result = run_post_scaffold_hook(project_dir, {"name": "my-project", "stack": "nextjs"})
+    assert result is True
+    assert marker.read_text().strip() == "my-project"
+
+
+def test_post_scaffold_hook_returns_false_on_failure(tmp_path, monkeypatch):
+    hook_path = tmp_path / "hook.sh"
+    hook_path.write_text("#!/bin/bash\nexit 1\n")
+    hook_path.chmod(hook_path.stat().st_mode | stat.S_IEXEC)
+
+    monkeypatch.setattr("ubundiforge.runner.POST_SCAFFOLD_HOOK", hook_path)
+
+    project_dir = tmp_path / "fail-project"
+    project_dir.mkdir()
+
+    result = run_post_scaffold_hook(project_dir, {"name": "fail-project"})
+    assert result is False
+
+
+def test_post_scaffold_hook_passes_env_vars(tmp_path, monkeypatch):
+    hook_path = tmp_path / "hook.sh"
+    env_dump = tmp_path / "env.txt"
+    hook_path.write_text(f'#!/bin/bash\necho "$FORGE_STACK:$FORGE_DEMO_MODE" > {env_dump}\n')
+    hook_path.chmod(hook_path.stat().st_mode | stat.S_IEXEC)
+
+    monkeypatch.setattr("ubundiforge.runner.POST_SCAFFOLD_HOOK", hook_path)
+
+    project_dir = tmp_path / "env-project"
+    project_dir.mkdir()
+
+    run_post_scaffold_hook(
+        project_dir, {"name": "env-project", "stack": "fastapi", "demo_mode": True}
+    )
+    assert env_dump.read_text().strip() == "fastapi:1"

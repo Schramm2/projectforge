@@ -60,7 +60,7 @@ Items marked with [DONE] have been implemented.
 - [DONE] **Auto-git-init**: Verifies git was initialized after scaffold; if not, runs `git init` and makes an initial commit.
 - [DONE] **Health check**: The verify phase starts the dev server and probes `/health` or `/ready` endpoints to confirm the project boots.
 - [DONE] **Post-scaffold verification**: `--verify/--no-verify` runs lint, typecheck, build, and test commands after scaffolding with a Rich table summary of results.
-- **Post-scaffold hooks**: User-defined scripts in `~/.forge/hooks/post-scaffold.sh` that run after every scaffold (e.g. configure git remote, set up pre-commit hooks, copy .env from a vault).
+- [DONE] **Post-scaffold hooks**: User-defined scripts in `~/.forge/hooks/post-scaffold.sh` that run after every scaffold (e.g. configure git remote, set up pre-commit hooks, copy .env from a vault).
 
 ---
 
@@ -86,7 +86,7 @@ Items marked with [DONE] have been implemented.
 
 ## Project Management
 
-- **Scaffold log**: `forge log` shows a history of all projects scaffolded — name, stack, date, backend used, directory.
+- [DONE] **Scaffold log**: Every scaffold appends a JSON-lines entry to `~/.forge/scaffold.log` — name, stack, backends, directory, timestamp.
 - **Project registry**: Track active Ubundi projects with their locations, stacks, and status.
 - **Scaffold analytics**: Which stacks are you building most? Which backend succeeds most often? Simple local stats.
 
@@ -111,7 +111,7 @@ Items marked with [DONE] have been implemented.
 
 ## Reproducibility & Auditability
 
-- **Scaffold manifest**: Write a `.forge/scaffold.json` file containing the stack, backend, model, prompt hash, conventions hash, selected templates, and timestamp so every generated project has traceable provenance.
+- [DONE] **Scaffold manifest**: Write a `.forge/scaffold.json` file containing the stack, backend, model, prompt hash, conventions hash, selected templates, and timestamp so every generated project has traceable provenance.
 - **Replay exact scaffold**: `forge replay <project-or-log-id>` re-runs a scaffold with the original inputs and locked conventions for debugging, comparison, or regeneration.
 - **Decision log**: Record which defaults were accepted, which were overridden, and which warnings were ignored so teams can understand why a project deviates from the golden path.
 - **Prompt + output bundle**: `forge bundle` saves the assembled prompt, manifest, backend choice, and validation results into one artifact for review, support, or future audits.
@@ -139,7 +139,7 @@ Items marked with [DONE] have been implemented.
 ## Developer Experience
 
 - **Plugin system**: Third-party plugins that add new stacks, backends, or post-scaffold hooks. Simple Python entry points.
-- **Shell completions**: Tab completion for `--use`, `--stack`, `--preset`, `--conventions` values.
+- [DONE] **Shell completions**: Tab completion for `--use`, `--stack`, `--preset`, `--conventions` values.
 - [DONE] **Verbose mode**: `forge --verbose` shows the full subprocess command, conventions file size, prompt length, and execution timing.
 - [DONE] **Config file**: `~/.forge/config.json` for persistent preferences (default backend, preferred editor, Docker availability, default project directory). Set up via the first-run setup wizard or `forge --setup`.
 - **Update checker**: Notify when a new version of Forge is available.

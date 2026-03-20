@@ -14,6 +14,10 @@ UbundiForge is a Python CLI that scaffolds new projects with AI coding tools whi
 - Optionally includes a `CLAUDE.md` template in generated projects
 - Scaffolds `agent_docs/` starter docs to match the `CLAUDE.md` progressive-disclosure flow
 - Creates the target project directory and runs the selected AI CLI inside it
+- Writes a `.forge/scaffold.json` manifest into every generated project for provenance
+- Logs every scaffold to `~/.forge/scaffold.log` for history
+- Runs post-scaffold hooks from `~/.forge/hooks/post-scaffold.sh`
+- Shell tab completion for all flags and options
 
 ## Supported Stacks
 
@@ -136,6 +140,72 @@ Open the project in your editor after scaffolding (uses the editor chosen during
 forge --open
 ```
 
+### Shell completions
+
+Enable tab completion for all `forge` flags:
+
+```bash
+# Generate and install the completion script (zsh)
+_FORGE_COMPLETE=source_zsh forge > ~/.zfunc/_forge
+
+# Rebuild the completion cache
+rm -f ~/.zcompdump*
+exec zsh
+```
+
+After setup, `forge --<tab>` shows all available flags with descriptions.
+
+### Scaffold manifest
+
+Every scaffolded project gets a `.forge/scaffold.json` file recording how it was built:
+
+```json
+{
+  "forge_version": "0.1.0",
+  "name": "my-app",
+  "stack": "nextjs",
+  "backends": ["claude"],
+  "routing": [{"phase": "architecture", "backend": "claude"}, ...],
+  "design_template": "ubundi-brand-guide",
+  "conventions_hash": "sha256:a1b2c3d4...",
+  "timestamp": "2026-03-20T08:30:00+00:00"
+}
+```
+
+This gives every generated project traceable provenance — stack, backends, model, conventions hash, and timestamp.
+
+### Scaffold log
+
+Forge appends a JSON-lines entry to `~/.forge/scaffold.log` after every scaffold. Each line records the project name, stack, backends used, directory, and timestamp.
+
+```bash
+# View your scaffold history
+cat ~/.forge/scaffold.log | python -m json.tool --json-lines
+```
+
+### Post-scaffold hooks
+
+Create `~/.forge/hooks/post-scaffold.sh` to run custom commands after every scaffold:
+
+```bash
+mkdir -p ~/.forge/hooks
+cat > ~/.forge/hooks/post-scaffold.sh << 'EOF'
+#!/bin/bash
+# Example: set up git remote, copy secrets, configure pre-commit
+echo "Post-scaffold hook running for $FORGE_PROJECT_NAME ($FORGE_STACK)"
+EOF
+chmod +x ~/.forge/hooks/post-scaffold.sh
+```
+
+The hook runs with the project directory as its working directory and receives these environment variables:
+
+| Variable | Description |
+|---|---|
+| `FORGE_PROJECT_DIR` | Absolute path to the new project |
+| `FORGE_PROJECT_NAME` | Project name |
+| `FORGE_STACK` | Stack type (e.g. `nextjs`, `fastapi`) |
+| `FORGE_DEMO_MODE` | `1` if demo mode, `0` otherwise |
+
 ### Debugging
 
 Show detailed execution info (command, timing, file sizes):
@@ -159,7 +229,9 @@ forge --version
 5. It builds a single scaffold prompt tailored to the chosen stack.
 6. It picks the best AI backend (with automatic fallback if needed).
 7. It launches the selected AI CLI in a new project directory with a progress spinner.
-8. After scaffolding, it ensures git is initialized and opens the project in your editor.
+8. After scaffolding, it writes a `.forge/scaffold.json` manifest into the project.
+9. It ensures git is initialized and opens the project in your editor.
+10. It runs your post-scaffold hook (if configured) and logs the scaffold to history.
 
 ## Project Structure
 
@@ -174,6 +246,7 @@ forge/
 │   ├── prompts.py            # Interactive question flow
 │   ├── router.py             # AI backend routing + fallback
 │   ├── runner.py             # Subprocess execution of AI CLIs
+│   ├── scaffold_log.py       # Scaffold history log and per-project manifest
 │   ├── safety.py             # Secret detection
 │   ├── scaffold_options.py   # Auth provider and CI action definitions
 │   ├── setup.py              # First-run setup wizard
@@ -214,3 +287,5 @@ uv run ruff check ubundiforge/ tests/
 - Config and preferences are stored at `~/.forge/config.json`.
 - Conventions are loaded from `~/.forge/conventions.md`. If that file does not exist, the setup wizard creates it with defaults.
 - The bundled `CLAUDE.md` template is loaded from `ubundiforge/templates/claude-md-template.md`.
+- Scaffold history is appended to `~/.forge/scaffold.log`.
+- Post-scaffold hooks go in `~/.forge/hooks/post-scaffold.sh`.

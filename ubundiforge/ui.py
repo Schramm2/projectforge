@@ -170,6 +170,35 @@ def make_step_panel(
     return make_panel(grouped_lines(lines), accent=accent, padding=(0, 1))
 
 
+def make_loader_panel(
+    title: str,
+    summary: str,
+    *,
+    elapsed: float,
+    spinner_frame: str,
+    spinner_style: str,
+    accent: str = "violet",
+    detail: str | None = None,
+) -> Panel:
+    """Create a polished live loader panel for long-running CLI work."""
+    header = Text()
+    header.append(f"{spinner_frame} ", style=f"bold {spinner_style}")
+    header.append(title, style=f"bold {TEXT_PRIMARY}")
+    header.append("  ", style="")
+    header.append(f"{elapsed:.0f}s", style=TEXT_MUTED)
+
+    lines: list[Text] = [header, Text(summary, style=f"bold {TEXT_SECONDARY}")]
+    if detail:
+        lines.append(Text(detail, style=TEXT_MUTED))
+
+    return make_panel(
+        grouped_lines(lines),
+        title="In Progress",
+        accent=accent,
+        padding=(0, 1),
+    )
+
+
 def header_panel(version: str | None = None) -> Panel:
     """Create the branded header panel for the CLI."""
     lines = grouped_lines(
