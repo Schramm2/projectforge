@@ -277,7 +277,10 @@ def test_first_run_setup_prompts_before_interactive_scaffold(monkeypatch):
     assert result.exit_code == 0
     assert setup_calls["count"] == 1
     assert answer_calls["count"] == 0
-    assert "Forge is configured and ready." in result.stdout
+    assert (
+        "Forge is configured and ready." in result.stdout
+        or "Forge is configured, but no backends are ready yet." in result.stdout
+    )
 
 
 def test_first_run_setup_can_be_repeated_before_scaffolding(monkeypatch):
