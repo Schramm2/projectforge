@@ -95,7 +95,19 @@ def needs_setup() -> bool:
 def load_forge_config() -> dict:
     """Load the saved Forge config, or return defaults if none exists."""
     if CONFIG_PATH.exists():
-        return json.loads(CONFIG_PATH.read_text())
+        try:
+            return json.loads(CONFIG_PATH.read_text())
+        except (json.JSONDecodeError, OSError):
+            from ubundiforge.ui import create_console, status_line
+
+            console = create_console()
+            console.print(
+                status_line(
+                    f"Config file is corrupted: {CONFIG_PATH}. Run forge --setup to recreate it.",
+                    accent="amber",
+                )
+            )
+            return {}
     return {}
 
 

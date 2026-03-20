@@ -1,0 +1,4 @@
+interface:
+  display_name: "Forge Scaffolder"
+  short_description: "Portable Forge agent guidance"
+  default_prompt: "Use $forge-scaffold to plan and execute a high-quality project scaffold with Forge."

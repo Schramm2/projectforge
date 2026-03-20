@@ -653,7 +653,15 @@ def main(
                 else:
                     parts.append(prompt)
             all_text = "\n\n".join(parts)
-            export_path.write_text(all_text)
+            try:
+                export_path.parent.mkdir(parents=True, exist_ok=True)
+                export_path.write_text(all_text)
+            except OSError as exc:
+                console.print()
+                console.print(
+                    status_line(f"Could not write to {export_path}: {exc}", accent="amber")
+                )
+                raise typer.Exit(1) from exc
             console.print()
             console.print(status_line(f"Prompt exported to {export_path}", accent="aqua"))
 

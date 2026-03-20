@@ -6,7 +6,6 @@ import platform
 import re
 import shutil
 import subprocess
-import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -246,7 +245,7 @@ def run_ai(
 
     cmd = _build_cmd(backend, prompt, model)
     if not cmd:
-        print(f"Unknown backend: {backend}", file=sys.stderr)
+        console.print(status_line(f"Unknown backend: {backend}", accent="amber"))
         return 1
 
     if verbose:
@@ -482,6 +481,7 @@ def run_ai_parallel(
         except FileNotFoundError:
             with lock:
                 trackers[label].returncode = 1
+                trackers[label].summary = f"{backend} command not found"
             return label, 1
 
         with lock:
@@ -566,6 +566,20 @@ def ensure_git_init(project_dir: Path) -> bool:
         True if the project has a git repo with at least one commit, False otherwise.
     """
     git_dir = project_dir / ".git"
+
+    try:
+        git_check = subprocess.run(
+            ["git", "--version"], capture_output=True, text=True
+        )
+    except FileNotFoundError:
+        console.print(
+            status_line("git is not installed. Install git to enable repo setup.", accent="amber")
+        )
+        return False
+
+    if git_check.returncode != 0:
+        console.print(status_line("git is not working correctly.", accent="amber"))
+        return False
 
     if not git_dir.exists():
         console.print(status_line("Git not initialized by AI — setting up...", accent="violet"))
