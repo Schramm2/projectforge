@@ -1,5 +1,9 @@
 # UbundiForge
 
+<p align="center">
+  <img src="assets/forge-flow.png" alt="UbundiForge AI Scaffolding Flow" width="100%">
+</p>
+
 UbundiForge is a Python CLI that scaffolds new projects with AI coding tools while baking in your Ubundi conventions from the start. It collects a few project details, chooses an AI backend, assembles a structured prompt, and hands off generation to Claude Code, Gemini CLI, or Codex.
 
 ## What It Does
@@ -112,6 +116,16 @@ forge
 ```
 
 Forge will walk you through the scaffold interactively, then show a review screen before anything is generated so you can edit basics, design/media, integrations, or demo mode without restarting the whole flow.
+
+<p align="center">
+  <img src="assets/forge-interactive.png" alt="Forge interactive questionnaire and review screen" width="100%">
+</p>
+
+Once you confirm, Forge routes each phase to the best available backend and runs them with a live progress display, followed by post-scaffold verification.
+
+<p align="center">
+  <img src="assets/forge-execution.png" alt="Forge multi-phase execution and verification" width="100%">
+</p>
 
 ### Non-interactive mode
 

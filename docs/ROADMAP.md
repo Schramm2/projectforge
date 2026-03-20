@@ -1,10 +1,17 @@
-# Forge Roadmap — Feature Ideas & Improvements
+# Forge Roadmap — Current Status & Next Steps
 
-Ideas for expanding Forge into a production-grade Ubundi project scaffolder. Organized by theme, not priority.
+Live roadmap for expanding Forge into a production-grade Ubundi project scaffolder. Organized by theme, not strict priority.
 
-Items marked with [DONE] have been implemented.
+Items marked with [DONE] are implemented in this repository as of `0.2.0`.
 
 ---
+
+## Setup & Onboarding
+
+- [DONE] **Backend readiness checks**: Setup distinguishes between installed backends and backends that are actually ready to scaffold, and routing skips known-not-ready tools.
+- [DONE] **First-run handoff**: After setup, new users can create a project immediately, review setup again, or exit cleanly and come back later.
+- [DONE] **Inline git identity setup**: Setup offers to configure global `git user.name` and `git user.email` when they are missing.
+- **Setup profiles**: Support different setup defaults for different working modes, such as "client delivery", "internal tool", and "prototype".
 
 ## Smarter AI Routing
 
@@ -60,7 +67,7 @@ Items marked with [DONE] have been implemented.
 ## Post-Scaffold Automation
 
 - [DONE] **Auto-install dependencies**: The verify phase detects package.json / pyproject.toml and runs the appropriate install (npm install / uv sync) automatically.
-- [DONE] **Auto-open in editor**: `forge --open` opens the new project in Cursor or VS Code after scaffolding.
+- [DONE] **Auto-open in editor**: `forge --open` opens the new project in the configured editor after scaffolding.
 - [DONE] **Auto-git-init**: Verifies git was initialized after scaffold; if not, runs `git init` and makes an initial commit.
 - [DONE] **Health check**: The verify phase starts the dev server and probes `/health` or `/ready` endpoints to confirm the project boots.
 - [DONE] **Post-scaffold verification**: `--verify/--no-verify` runs lint, typecheck, build, and test commands after scaffolding with a Rich table summary of results.
@@ -73,6 +80,7 @@ Items marked with [DONE] have been implemented.
 - **Saved presets**: `forge --save-preset api-starter` saves your current answers. Next time: `forge --preset api-starter` skips the questions entirely.
 - **Recent projects**: `forge --last` repeats the most recent scaffold with the same settings but a new name.
 - **Prompt editor**: `forge --edit-prompt` opens the assembled prompt in $EDITOR before sending it, so you can tweak it.
+- [DONE] **Review-and-edit flow**: Interactive scaffolding ends with a review screen where users can edit basics, design/media, integrations, or demo mode before generation starts.
 - [DONE] **Progress display**: Rich spinner with elapsed time while the AI CLI is working.
 - [DONE] **Non-interactive mode**: `forge --name pulse --stack fastapi --description "health API" --no-docker` for scripting and CI.
 - [DONE] **Demo mode**: `forge --demo` scaffolds projects that run without real API keys by using mock data and graceful fallbacks. Toggleable via `--demo/--no-demo`.
@@ -109,7 +117,7 @@ Items marked with [DONE] have been implemented.
 - **Ubundi standard packs**: `forge --standard api-service` or `forge --standard internal-tool` applies an approved bundle of stack choices, docs, CI, Docker, observability, and naming conventions with fewer questions.
 - **Policy checks before handoff**: Validate the chosen scaffold against Ubundi rules before sending it to the AI CLI — required docs present, approved runtime versions, allowed dependency families, and required files like `.env.example`.
 - **Dependency and license allowlists**: Warn or block when a scaffold asks for packages outside an approved set, or licenses that do not meet Ubundi policy.
-- [DONE] **Risky change confirmation**: Prompts for confirmation before overwriting an existing non-empty project directory.
+- [DONE] **Safer existing-directory handling**: When the target directory already exists and is non-empty, Forge lets the user rename the project, overwrite the directory, or cancel.
 
 ---
 
@@ -159,9 +167,9 @@ Items marked with [DONE] have been implemented.
 
 ---
 
-## Deployment & Distribution (Priority)
+## Deployment & Distribution
 
-This is the key milestone — getting Forge into the hands of Ubundi team members with a single command.
+Packaging groundwork is in place; release automation and wider distribution are the next layer.
 
 The target workflow:
 1. Team member runs `brew install ubundiforge`
@@ -170,10 +178,11 @@ The target workflow:
 4. Projects scaffold into their configured directory with Ubundi conventions baked in
 
 Steps to ship:
-- **Publish to PyPI**: `uv build && uv publish` (needs PyPI account + API token)
-- **Create Homebrew tap**: `Ubundi/homebrew-tap` repo on GitHub with a formula pointing at the PyPI package
-- **Homebrew formula**: `brew tap ubundi/tap && brew install ubundiforge`
+- [DONE] **Homebrew formula**: The repo includes `Formula/ubundiforge.rb`, a formula generator, and documented Homebrew release steps.
+- [DONE] **pipx entrypoint support**: Project metadata exposes the `forge` executable for `pipx install ubundiforge`.
+- [DONE] **Buildable package metadata**: `pyproject.toml` is set up for versioned source/wheel builds.
+- **Publish releases to PyPI**: `uv build && uv publish` as part of the release flow.
+- **Keep the Homebrew tap synced**: Push each tagged release into the tap with the correct tarball checksum.
 - Transfer repo from `matthewubundi/UbundiForge` to `Ubundi/ubundiforge` when ready
-- **pipx support**: `pipx install ubundiforge` for isolated global install (works automatically once on PyPI)
 - **Auto-update**: `forge update` pulls the latest version.
 - **Docker image**: Run Forge itself in a container with all three AI CLIs pre-installed.
