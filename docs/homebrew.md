@@ -17,7 +17,7 @@ Why not `forge`?
 
 1. Cut a Git tag that matches the package version, for example `v0.1.0`.
 2. Publish the source tarball where Homebrew can fetch it, typically:
-   `https://github.com/matthewubundi/forge/archive/refs/tags/v0.1.0.tar.gz`
+   `https://github.com/matthewubundi/UbundiForge/archive/refs/tags/v0.1.0.tar.gz`
 3. Compute the tarball checksum:
    `curl -Ls <tarball-url> | shasum -a 256`
 4. Regenerate the formula with the real release URL and checksum:

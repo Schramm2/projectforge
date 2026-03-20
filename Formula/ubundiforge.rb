@@ -2,11 +2,11 @@ class Ubundiforge < Formula
   include Language::Python::Virtualenv
 
   desc "Scaffold Ubundi-style projects with AI coding tools and shared conventions"
-  homepage "https://github.com/matthewubundi/forge"
-  url "https://github.com/matthewubundi/forge/archive/refs/tags/v0.1.0.tar.gz"
+  homepage "https://github.com/matthewubundi/UbundiForge"
+  url "https://github.com/matthewubundi/UbundiForge/archive/refs/tags/v0.1.0.tar.gz"
   sha256 "REPLACE_WITH_RELEASE_TARBALL_SHA256"
   license "MIT"
-  head "https://github.com/matthewubundi/forge.git", branch: "main"
+  head "https://github.com/matthewubundi/UbundiForge.git", branch: "main"
 
   depends_on "python@3.13"
 

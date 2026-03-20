@@ -9,8 +9,8 @@ from pathlib import Path
 from ubundiforge import __version__
 
 FORMULA_NAME = "ubundiforge"
-DEFAULT_HOMEPAGE = "https://github.com/matthewubundi/forge"
-DEFAULT_REPOSITORY = "https://github.com/matthewubundi/forge"
+DEFAULT_HOMEPAGE = "https://github.com/matthewubundi/UbundiForge"
+DEFAULT_REPOSITORY = "https://github.com/matthewubundi/UbundiForge"
 DEFAULT_SOURCE_URL = f"{DEFAULT_REPOSITORY}/archive/refs/tags/v{__version__}.tar.gz"
 DEFAULT_SOURCE_SHA256 = "REPLACE_WITH_RELEASE_TARBALL_SHA256"
 DEFAULT_PYTHON_FORMULA = "python@3.13"
