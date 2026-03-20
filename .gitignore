@@ -38,3 +38,8 @@ projects/
 
 # User media collections (images, fonts, etc.)
 media/
+
+# Claude Code
+.claude/
+CLAUDE.md
+agent_docs/
