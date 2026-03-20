@@ -238,7 +238,7 @@ def _backend_help_line(backend: str, status: BackendStatus) -> Text:
         return subtle(f"{backend} needs login. Run {login_command}.")
     if not status.installed:
         return subtle(f"{backend} is not installed or not on PATH.")
-    return subtle(f"{backend} is installed but readiness could not be verified.")
+    return subtle(f"{backend} is installed, but Forge could not auto-check readiness.")
 
 
 def _render_backend_readiness_notice(

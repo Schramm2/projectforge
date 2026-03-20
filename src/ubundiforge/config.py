@@ -43,7 +43,7 @@ class BackendStatus:
             return "Ready"
         if self.ready is False:
             return "Needs login"
-        return "Not verified"
+        return "Not auto-checked"
 
 
 def _run_status_command(
@@ -148,16 +148,40 @@ def _check_codex_status() -> BackendStatus:
 def _check_gemini_status() -> BackendStatus:
     """Inspect Gemini availability.
 
-    Gemini's bundled help does not expose a login-status command, so setup
-    can only verify that the CLI exists on PATH.
+    Gemini's CLI help does not expose a login-status command like Claude
+    or Codex. Instead, verify that the CLI itself responds to a cheap local
+    command without sending a model prompt.
     """
     if not check_backend_installed("gemini"):
         return BackendStatus(installed=False, ready=False)
 
+    version_result = _run_status_command(["gemini", "--version"])
+    if version_result and version_result.returncode == 0:
+        version = (version_result.stdout or version_result.stderr).strip()
+        detail = "Gemini CLI responded to --version."
+        if version:
+            detail = f"Gemini CLI responded successfully ({version.splitlines()[0]})."
+        return BackendStatus(
+            installed=True,
+            ready=True,
+            detail=detail,
+        )
+
+    help_result = _run_status_command(["gemini", "--help"])
+    if help_result and help_result.returncode == 0:
+        return BackendStatus(
+            installed=True,
+            ready=True,
+            detail="Gemini CLI help loaded successfully.",
+        )
+
     return BackendStatus(
         installed=True,
         ready=None,
-        detail="Gemini is installed; login readiness is not verified by setup.",
+        detail=(
+            "Gemini is installed, but setup could not confirm that the CLI was "
+            "runnable automatically."
+        ),
     )
 
 

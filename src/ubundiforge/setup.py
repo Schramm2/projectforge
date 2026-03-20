@@ -117,7 +117,7 @@ def _backend_readiness_cell(status: BackendStatus):
         return badge("Ready", "success")
     if status.ready is False:
         return badge("Needs login", "warning")
-    return badge("Not verified", "warning")
+    return badge("Not auto-checked", "warning")
 
 
 def needs_setup() -> bool:
@@ -301,6 +301,26 @@ def run_setup(console: Console) -> dict:
         ]
         lines.append(muted("Automatic routing will skip these backends until they are ready."))
         console.print(make_panel(grouped_lines(lines), title="Backend Login", accent="amber"))
+
+    unknown_backends = [
+        backend
+        for backend, status in backend_statuses.items()
+        if status.installed and status.ready is None
+    ]
+    if unknown_backends:
+        lines = [
+            subtle(
+                f"{backend} is installed, but Forge could not auto-check readiness safely."
+            )
+            for backend in unknown_backends
+        ]
+        lines.append(
+            muted(
+                "Forge can still route to these backends, but the first real scaffold run is the "
+                "final check."
+            )
+        )
+        console.print(make_panel(grouped_lines(lines), title="Backend Checks", accent="amber"))
 
     # --- Step 2: Routing summary ---
     console.print(make_step_panel(2, 8, "Backend routing", accent="violet"))
