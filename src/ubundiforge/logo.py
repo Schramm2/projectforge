@@ -1,125 +1,128 @@
-"""Ubundi ASCII logo display."""
-
-from math import ceil
-from pathlib import Path
+"""Ubundi block-art logo display with deep shadow."""
 
 from rich.console import Console
 from rich.text import Text
 
-from ubundiforge.ui import ACCENTS
-
-DEFAULT_MAX_WIDTH = 44
-DEFAULT_MAX_HEIGHT = 20
-MIN_RENDER_WIDTH = 18
-CHAR_DENSITY = {
-    " ": 0,
-    ".": 0,
-    ":": 1,
-    "-": 2,
-    "=": 3,
-    "+": 4,
-    "*": 5,
-    "#": 6,
-    "%": 7,
+# Block-pixel grids (1 = filled, 0 = empty). Each letter: 6 cols x 7 rows.
+_LETTERS = {
+    "U": [
+        [1, 1, 0, 1, 1, 0],
+        [1, 1, 0, 1, 1, 0],
+        [1, 1, 0, 1, 1, 0],
+        [1, 1, 0, 1, 1, 0],
+        [1, 1, 0, 1, 1, 0],
+        [1, 1, 1, 1, 1, 0],
+        [0, 1, 1, 1, 0, 0],
+    ],
+    "B": [
+        [1, 1, 1, 1, 0, 0],
+        [1, 1, 0, 0, 1, 0],
+        [1, 1, 0, 0, 1, 0],
+        [1, 1, 1, 1, 0, 0],
+        [1, 1, 0, 0, 1, 0],
+        [1, 1, 0, 0, 1, 0],
+        [1, 1, 1, 1, 0, 0],
+    ],
+    "N": [
+        [1, 1, 0, 1, 1, 0],
+        [1, 1, 1, 1, 1, 0],
+        [1, 1, 1, 1, 1, 0],
+        [1, 1, 1, 1, 1, 0],
+        [1, 1, 0, 1, 1, 0],
+        [1, 1, 0, 1, 1, 0],
+        [1, 1, 0, 1, 1, 0],
+    ],
+    "D": [
+        [1, 1, 1, 1, 0, 0],
+        [1, 1, 0, 0, 1, 0],
+        [1, 1, 0, 0, 1, 0],
+        [1, 1, 0, 0, 1, 0],
+        [1, 1, 0, 0, 1, 0],
+        [1, 1, 0, 0, 1, 0],
+        [1, 1, 1, 1, 0, 0],
+    ],
+    "I": [
+        [1, 1, 1, 1, 1, 0],
+        [0, 0, 1, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0],
+        [1, 1, 1, 1, 1, 0],
+    ],
 }
-LOGO_PATHS = (Path(__file__).resolve().parent / "assets" / "ascii-art.txt",)
-FALLBACK_LOGO = """\
- #%%%%%%%         %%%%%%%%
-+%%%  -%%+        %%%  =%%%
-%%%   %%%-        %%%   #%%
-%%% #%%%*          %%%% %%%
-:%%%%%%             *%%%%%%
- %%%%                 #%%%
-#%%%%%-              %%%%%%
-%%% %%%%%%=     -%%%%%%=%%%
- %%%#  %%%%%%%%%%%%%= -%%%#
-  %%%%%%*         =%%%%%%
-     *%%%%%%%%%%%%%%%%"""
+
+_BLOCK = "\u2588\u2588"
+_EMPTY = "  "
+_WORD = "UBUNDI"
+_ROWS = 7
+_LETTER_SPACING = "  "
+_SHADOW_OFFSET = 1  # rows down
+
+# Cell types for the composite grid
+_CELL_NONE = 0
+_CELL_MAIN = 1
+_CELL_SHADOW = 2
 
 
-def _load_logo_art() -> str | None:
-    """Load the bundled ASCII art if it exists in the installed package."""
-    for path in LOGO_PATHS:
-        if path.exists():
-            return path.read_text()
-    return None
+def _build_flat_row(row_idx: int) -> list[int]:
+    """Return a flat list of 0/1 values for one row across all letters."""
+    cells: list[int] = []
+    for i, ch in enumerate(_WORD):
+        grid = _LETTERS[ch]
+        for col in range(6):
+            cells.append(grid[row_idx][col])
+        if i < len(_WORD) - 1:
+            cells.append(0)  # letter spacing column
+    return cells
 
 
-def _normalize_lines(art: str) -> list[str]:
-    """Trim blank space around the art while preserving its inner layout."""
-    lines = art.splitlines()
-    while lines and not lines[0].strip():
-        lines.pop(0)
-    while lines and not lines[-1].strip():
-        lines.pop()
-    return lines
+def _build_composite() -> list[list[int]]:
+    """Build a composite grid with main blocks and shadow layer."""
+    main_width = len(_build_flat_row(0))
+    total_rows = _ROWS + _SHADOW_OFFSET
+    composite = [[_CELL_NONE] * main_width for _ in range(total_rows)]
 
+    # Place shadow first (offset down by _SHADOW_OFFSET)
+    for row_idx in range(_ROWS):
+        flat = _build_flat_row(row_idx)
+        for col, val in enumerate(flat):
+            if val:
+                shadow_row = row_idx + _SHADOW_OFFSET
+                if shadow_row < total_rows:
+                    composite[shadow_row][col] = _CELL_SHADOW
 
-def _compact_logo(art: str, *, max_width: int, max_height: int) -> str:
-    """Downsample large ASCII art into a compact terminal-friendly logo."""
-    lines = _normalize_lines(art)
-    if not lines:
-        return ""
+    # Place main blocks on top (overwrites shadow where they overlap)
+    for row_idx in range(_ROWS):
+        flat = _build_flat_row(row_idx)
+        for col, val in enumerate(flat):
+            if val:
+                composite[row_idx][col] = _CELL_MAIN
 
-    width = max(len(line) for line in lines)
-    padded_lines = [line.ljust(width) for line in lines]
-    x_step = max(1, ceil(width / max_width))
-    y_step = max(1, ceil(len(padded_lines) / max_height))
-
-    compacted: list[str] = []
-    for y in range(0, len(padded_lines), y_step):
-        row: list[str] = []
-        for x in range(0, width, x_step):
-            best_char = " "
-            best_density = 0
-            for source_row in padded_lines[y : y + y_step]:
-                for char in source_row[x : x + x_step]:
-                    density = CHAR_DENSITY.get(char, 1)
-                    if density > best_density:
-                        best_char = char
-                        best_density = density
-            row.append(best_char)
-        compacted.append("".join(row).rstrip())
-
-    compacted = [line for line in compacted if line.strip()]
-    if not compacted:
-        return ""
-
-    left_padding = min(len(line) - len(line.lstrip()) for line in compacted)
-    return "\n".join(line[left_padding:] for line in compacted)
-
-
-def render_logo(terminal_width: int | None = None) -> str:
-    """Return a compact logo string derived from the source asset when available."""
-    max_width = DEFAULT_MAX_WIDTH
-    if terminal_width is not None:
-        max_width = max(MIN_RENDER_WIDTH, min(DEFAULT_MAX_WIDTH, terminal_width - 4))
-
-    art = _load_logo_art()
-    if not art:
-        return FALLBACK_LOGO
-
-    compact_logo = _compact_logo(
-        art,
-        max_width=max_width,
-        max_height=DEFAULT_MAX_HEIGHT,
-    )
-    return compact_logo or FALLBACK_LOGO
+    return composite
 
 
 def render_logo_text(terminal_width: int | None = None) -> Text:
-    """Return the logo with a restrained two-tone accent treatment."""
-    lines = render_logo(terminal_width).splitlines()
-    mid = len(lines) // 2
+    """Return the block-art logo as a Rich Text with white blocks and gray shadow."""
+    composite = _build_composite()
     text = Text()
-    for index, line in enumerate(lines):
-        if index:
+    for row_idx, row in enumerate(composite):
+        if row_idx:
             text.append("\n")
-        color = ACCENTS["violet"] if index < mid else ACCENTS["aqua"]
-        text.append(line, style=f"bold {color}")
+        # Build line segments grouped by cell type for fewer style spans
+        col = 0
+        while col < len(row):
+            cell = row[col]
+            if cell == _CELL_MAIN:
+                text.append(_BLOCK, style="bold bright_white")
+            elif cell == _CELL_SHADOW:
+                text.append(_BLOCK, style="#444444")
+            else:
+                text.append(_EMPTY)
+            col += 1
     return text
 
 
 def print_logo(console: Console) -> None:
-    """Print the Ubundi logo with the brand accent palette."""
+    """Print the Ubundi logo in black and white with deep shadow."""
     console.print(render_logo_text(console.size.width))

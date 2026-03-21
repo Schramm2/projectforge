@@ -2,7 +2,7 @@
 
 Live roadmap for expanding Forge into a production-grade Ubundi project scaffolder. Organized by theme, not strict priority.
 
-Items marked with [DONE] are implemented in this repository as of `0.2.0`.
+Items marked with [DONE] are implemented in this repository as of `0.2.0`. Planned items are intentionally aspirational; example commands below describe direction, not guaranteed current CLI flags.
 
 ---
 
@@ -98,7 +98,7 @@ Items marked with [DONE] are implemented in this repository as of `0.2.0`.
 
 ## Project Management
 
-- [DONE] **Scaffold log**: Every scaffold appends a JSON-lines entry to `~/.forge/scaffold.log` — name, stack, backends, directory, timestamp.
+- [DONE] **Scaffold log**: Every scaffold appends a JSON-lines entry to `~/.forge/scaffold.log` — name, stack, backends, directory, demo mode, timestamp.
 - **Project registry**: Track active Ubundi projects with their locations, stacks, and status.
 - **Scaffold analytics**: Which stacks are you building most? Which backend succeeds most often? Simple local stats.
 
@@ -123,7 +123,7 @@ Items marked with [DONE] are implemented in this repository as of `0.2.0`.
 
 ## Reproducibility & Auditability
 
-- [DONE] **Scaffold manifest**: Write a `.forge/scaffold.json` file containing the stack, backend, model, prompt hash, conventions hash, selected templates, and timestamp so every generated project has traceable provenance.
+- [DONE] **Scaffold manifest**: Write a `.forge/scaffold.json` file containing stack, description, phase routing, model override, backend model preferences, selected options, conventions hash, and timestamp so every generated project has traceable provenance.
 - **Replay exact scaffold**: `forge replay <project-or-log-id>` re-runs a scaffold with the original inputs and locked conventions for debugging, comparison, or regeneration.
 - **Decision log**: Record which defaults were accepted, which were overridden, and which warnings were ignored so teams can understand why a project deviates from the golden path.
 - **Prompt + output bundle**: `forge bundle` saves the assembled prompt, manifest, backend choice, and validation results into one artifact for review, support, or future audits.
@@ -151,9 +151,9 @@ Items marked with [DONE] are implemented in this repository as of `0.2.0`.
 ## Developer Experience
 
 - **Plugin system**: Third-party plugins that add new stacks, backends, or post-scaffold hooks. Simple Python entry points.
-- [DONE] **Shell completions**: Tab completion for `--use`, `--stack`, `--preset`, `--conventions` values.
+- [DONE] **Shell completions**: Built-in Typer completion support via `--install-completion` / `--show-completion`, plus value completion for typed options such as `--use` and `--stack`.
 - [DONE] **Verbose mode**: `forge --verbose` shows the full subprocess command, conventions file size, prompt length, and execution timing.
-- [DONE] **Config file**: `~/.forge/config.json` for persistent preferences (default backend, preferred editor, Docker availability, default project directory). Set up via the first-run setup wizard or `forge --setup`.
+- [DONE] **Config file**: `~/.forge/config.json` stores preferred editor, detected backends, per-backend model preferences, Docker availability, and default project directory. Set up via the first-run setup wizard or `forge --setup`.
 - **Update checker**: Notify when a new version of Forge is available.
 
 ---

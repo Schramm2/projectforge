@@ -1,5 +1,7 @@
 # Forge Repo Research Prompt
 
+Internal working prompt. Replace `<forge_repo_root>` with the actual path to this repository before using it in another workspace.
+
 Use this prompt in Claude Code when you have a workspace that contains multiple existing Ubundi projects and you want to extract the conventions, stacks, libraries, and scaffold patterns that Forge should learn from.
 
 Best used from a parent directory that contains:
@@ -42,7 +44,7 @@ Your outputs must be useful for actually improving Forge, not just documenting t
 ## Workspace Assumptions
 
 - The workspace contains multiple Ubundi projects.
-- The Forge repo is at: `/Users/matthew-schramm-ubundi/Desktop/Side Projects/forge`
+- The Forge repo is at: `<forge_repo_root>`
 - Analyze sibling repos and nested repos that appear to be real product/code repositories.
 - Ignore obvious noise like `.git`, `node_modules`, `.next`, `dist`, `build`, `.venv`, coverage artifacts, generated caches, and vendored dependencies.
 
@@ -50,7 +52,7 @@ Your outputs must be useful for actually improving Forge, not just documenting t
 
 Create the following files under:
 
-`/Users/matthew-schramm-ubundi/Desktop/Side Projects/forge/research/forge-discovery/`
+`<forge_repo_root>/research/forge-discovery/`
 
 ### 1. `portfolio-inventory.md`
 

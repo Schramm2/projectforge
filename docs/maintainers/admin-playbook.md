@@ -43,6 +43,8 @@ If you want to change Ubundi's default visual language for frontend scaffolds, u
 - `src/ubundiforge/design_templates.py`
 - `src/ubundiforge/templates/design-templates/ubundi-brand-guide.md`
 
+If you want to add a new selectable design template, add it to `DESIGN_TEMPLATE_OPTIONS` and bundle a matching template file.
+
 ## Important behavior: local overrides win
 
 Forge does not blindly force the repo defaults every time it runs.
@@ -68,7 +70,7 @@ If Ubundi eventually wants centrally managed conventions that always update on u
 
 ## Adding a new stack
 
-Use `agent_docs/adding_a_stack.md` as the implementation checklist.
+Use [adding-a-stack.md](adding-a-stack.md) as the implementation checklist.
 
 In practice, a new stack usually requires changes in all of these places:
 
@@ -91,7 +93,7 @@ After making the code changes, verify with:
 
 ```bash
 uv run pytest
-uv run ruff check src/ubundiforge tests
+uv run ruff check .
 ./forge --dry-run --name test-project --stack <new-stack> --description "test scaffold"
 ```
 
@@ -132,7 +134,7 @@ Run:
 
 ```bash
 uv run pytest
-uv run ruff check src/ubundiforge tests
+uv run ruff check .
 ```
 
 If you changed stack behavior, also run a dry-run smoke test:
@@ -143,12 +145,12 @@ If you changed stack behavior, also run a dry-run smoke test:
 
 ### 4. Commit and tag the release
 
-Example for version `0.1.1`:
+Example for version `vX.Y.Z`:
 
 ```bash
 git add .
-git commit -m "release: v0.1.1"
-git tag v0.1.1
+git commit -m "release: vX.Y.Z"
+git tag vX.Y.Z
 git push origin main --tags
 ```
 
@@ -159,7 +161,7 @@ The Git tag must match the package version because the Homebrew formula points a
 Example:
 
 ```bash
-curl -Ls https://github.com/matthewubundi/UbundiForge/archive/refs/tags/v0.1.1.tar.gz | shasum -a 256
+curl -Ls https://github.com/matthewubundi/UbundiForge/archive/refs/tags/vX.Y.Z.tar.gz | shasum -a 256
 ```
 
 Save the resulting SHA-256 value.
@@ -169,8 +171,8 @@ Save the resulting SHA-256 value.
 Run:
 
 ```bash
-python3 scripts/generate_homebrew_formula.py \
-  --source-url https://github.com/matthewubundi/UbundiForge/archive/refs/tags/v0.1.1.tar.gz \
+uv run python scripts/generate_homebrew_formula.py \
+  --source-url https://github.com/matthewubundi/UbundiForge/archive/refs/tags/vX.Y.Z.tar.gz \
   --source-sha256 <sha256>
 ```
 

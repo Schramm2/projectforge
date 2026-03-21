@@ -1,5 +1,7 @@
 # FORGE — Ubundi Project Scaffolder
 
+> Historical design brief. This file preserves the original product spec and no longer reflects the current implementation line-for-line. Use `docs/guides/`, `docs/maintainers/`, and `src/ubundiforge/` as the source of truth for current behavior.
+
 > A Python CLI that wraps AI coding tools (Claude Code, Gemini CLI, Codex) to scaffold new projects with your conventions baked in. Feed this spec to Claude Code to build it.
 
 ---

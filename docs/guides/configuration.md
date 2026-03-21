@@ -10,10 +10,11 @@ Created automatically by the setup wizard on first run. Contains:
 
 | Key | Description |
 |-----|-------------|
-| `backend` | Preferred AI backend (`claude`, `gemini`, or `codex`). Forge falls back to others if unavailable. |
-| `editor` | Editor command for opening projects after scaffolding (e.g., `code`, `cursor`, `zed`). |
-| `project_dir` | Default parent directory for new projects. |
-| `model` | Model preferences per backend (optional overrides). |
+| `preferred_editor` | Editor command Forge tries first when opening the generated project. |
+| `available_backends` | Backends that were detected during setup. |
+| `backend_models` | Optional model overrides keyed by backend name. |
+| `docker_available` | Whether Docker was available during setup. |
+| `projects_dir` | Default parent directory for new projects. |
 
 To re-run the setup wizard and regenerate this file:
 
@@ -37,7 +38,7 @@ Typical contents:
 - Error handling and logging conventions.
 - Git workflow expectations (branch naming, commit messages).
 
-If the file does not exist, Forge proceeds without custom conventions. Create it manually or let the setup wizard generate a starter template.
+If the file does not exist, Forge creates a starter template automatically the first time conventions are loaded.
 
 ## Design templates
 
@@ -47,13 +48,13 @@ Design templates encode brand guidelines as prompt tokens so AI backends produce
 
 **Override paths (checked in order):**
 
-1. `.forge/design-templates/<name>.md` -- project-local override
-2. `~/.forge/design-templates/<name>.md` -- user-level override
+1. `.forge/design-templates/<template-id>.md` -- project-local override
+2. `~/.forge/design-templates/<template-id>.md` -- user-level override
 3. Built-in templates bundled with Forge
 
 Design templates only apply to stacks that produce frontend output: `nextjs` and `both` (monorepo). They are ignored for backend-only and CLI stacks.
 
-To create a custom design template, write a Markdown file describing your brand: colors, typography, spacing, component patterns, tone of voice. Place it in either override path using a descriptive name (e.g., `my-company-brand.md`).
+Today, Forge exposes one selectable design template id: `ubundi-brand-guide`. To customize it without changing code, create an override file at either `.forge/design-templates/ubundi-brand-guide.md` or `~/.forge/design-templates/ubundi-brand-guide.md`.
 
 ## Media assets
 
@@ -70,13 +71,20 @@ media/
     ...
 ```
 
-During development, the `media/` directory at the repo root is used. In production, specify a collection with the `--media` flag:
+Forge currently reads media collections from the repo's top-level `media/` directory. The `--media` flag takes a collection name, not an arbitrary filesystem path:
 
 ```bash
-forge --media ~/brand-assets/acme
+forge --media ubundi_assets
 ```
 
-Files from the collection are copied into the generated project's `public/` or `assets/` directory depending on the stack.
+If exactly one collection exists, Forge auto-selects it unless you pass `--no-media`.
+
+Files from the selected collection are copied into the generated project's static asset directory depending on the stack:
+
+- `nextjs` -> `public/`
+- `fastapi` / `fastapi-ai` -> `static/`
+- `both` -> `frontend/public/`
+- `python-cli`, `ts-package`, `python-worker` -> `assets/`
 
 ## Post-scaffold hooks
 
@@ -91,7 +99,7 @@ A shell script that runs after every successful scaffold. Use it for custom setu
 | `FORGE_PROJECT_DIR` | Absolute path to the generated project |
 | `FORGE_PROJECT_NAME` | Name of the project |
 | `FORGE_STACK` | Stack identifier (e.g., `fastapi`, `nextjs`) |
-| `FORGE_DEMO_MODE` | `true` or `false` |
+| `FORGE_DEMO_MODE` | `1` when demo mode is enabled, otherwise `0` |
 
 The hook must be executable (`chmod +x`) and must exit within 60 seconds or it will be killed.
 
@@ -115,6 +123,7 @@ An append-only JSON-lines file recording every scaffold run. Each line is a JSON
 | `stack` | Stack identifier |
 | `backends` | List of AI backends used |
 | `directory` | Absolute path to the generated project |
+| `demo_mode` | Whether demo mode was enabled |
 | `timestamp` | ISO 8601 timestamp |
 
 This log is never modified or truncated by Forge. Delete or rotate it manually if needed.
@@ -130,9 +139,15 @@ Written into every scaffolded project for provenance tracking. Contains:
 | `forge_version` | Version of Forge that created the project |
 | `name` | Project name |
 | `stack` | Stack identifier |
+| `description` | Project description provided by the user |
 | `backends` | AI backends used during generation |
-| `routing` | Routing decision details (why a backend was chosen) |
+| `routing` | Phase-to-backend mapping used for the scaffold |
+| `model_override` | Explicit `--model` value, when provided |
+| `backend_models` | Per-backend model preferences from config |
 | `design_template` | Design template applied, if any |
+| `media_collection` | Imported media collection, if any |
+| `auth_provider` | Auth provider requested, if any |
+| `demo_mode` | Whether demo mode was enabled |
 | `conventions_hash` | SHA-256 hash of the conventions file at generation time |
 | `timestamp` | ISO 8601 timestamp |
 

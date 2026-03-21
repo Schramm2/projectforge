@@ -29,7 +29,7 @@ pipx install ubundiforge
 
 ```bash
 git clone https://github.com/matthewubundi/UbundiForge.git
-cd forge
+cd UbundiForge
 uv sync --dev
 ./forge
 ```
@@ -62,7 +62,7 @@ After setup completes on first run, Forge gives you a short handoff instead of i
 2. Enter a project name (e.g., `my-app`).
 3. Choose a stack from the list (e.g., Next.js + React).
 4. Add a short description of what the project does.
-5. Accept the remaining defaults or customize auth, CI, Docker, and design template options.
+5. Accept the remaining defaults or customize auth, CI, Docker, design template, and media options.
 6. Review your choices. Forge shows a summary screen where you can edit basics, design/media, integrations, or demo mode before generation starts.
 7. Watch it build. You will see live progress as Forge routes your brief to the AI backend, which generates the project in phases.
 

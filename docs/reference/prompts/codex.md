@@ -1,3 +1,5 @@
+> Reference snapshot from upstream docs. Verify exact model names, flags, and examples against OpenAI's current documentation before using this operationally.
+
 # Prompt guidance for GPT-5.4
 
 GPT-5.4, our newest mainline model, is designed to balance long-running task performance, stronger control over style and behavior, and more disciplined execution across complex workflows. Building on advances from GPT-5 through GPT-5.3-Codex, GPT-5.4 improves token efficiency, sustains multi-step workflows more reliably, and performs well on long-horizon tasks.

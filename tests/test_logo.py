@@ -1,64 +1,19 @@
-"""Tests for compact logo rendering."""
+"""Tests for block-art logo rendering."""
 
-from ubundiforge.logo import DEFAULT_MAX_HEIGHT, DEFAULT_MAX_WIDTH, FALLBACK_LOGO, render_logo
-
-
-def test_render_logo_scales_asset_to_cli_friendly_size(tmp_path, monkeypatch):
-    art_path = tmp_path / "ascii-art.txt"
-    art_path.write_text(
-        "\n".join(
-            [
-                "................................................",
-                "....########..............########..............",
-                "..##########............##########..............",
-                ".###########............###########.............",
-                "....########..............########..............",
-                "................................................",
-                "....########..............########..............",
-                "..##########............##########..............",
-                ".###########............###########.............",
-                "....########..............########..............",
-                "................................................",
-                "....########..............########..............",
-                "..##########............##########..............",
-                ".###########............###########.............",
-            ]
-        )
-    )
-    monkeypatch.setattr("ubundiforge.logo.LOGO_PATHS", (art_path,))
-
-    rendered = render_logo(terminal_width=80)
-    lines = rendered.splitlines()
-
-    assert lines
-    assert len(lines) <= DEFAULT_MAX_HEIGHT
-    assert max(len(line) for line in lines) <= DEFAULT_MAX_WIDTH
-    assert "#" in rendered
-    assert "." not in rendered
+from ubundiforge.logo import render_logo_text
 
 
-def test_render_logo_respects_narrow_terminal_width(tmp_path, monkeypatch):
-    art_path = tmp_path / "ascii-art.txt"
-    art_path.write_text(
-        "\n".join(
-            [
-                "############################",
-                "############################",
-                "############################",
-                "############################",
-                "############################",
-                "############################",
-            ]
-        )
-    )
-    monkeypatch.setattr("ubundiforge.logo.LOGO_PATHS", (art_path,))
+def test_render_logo_text_produces_block_art():
+    text = render_logo_text()
+    plain = text.plain
+    lines = plain.splitlines()
 
-    rendered = render_logo(terminal_width=24)
-
-    assert max(len(line) for line in rendered.splitlines()) <= 20
+    assert len(lines) == 8  # 7 rows + 1 shadow row
+    assert "\u2588\u2588" in plain
 
 
-def test_render_logo_falls_back_when_asset_is_missing(monkeypatch):
-    monkeypatch.setattr("ubundiforge.logo.LOGO_PATHS", ())
-
-    assert render_logo() == FALLBACK_LOGO
+def test_render_logo_text_has_white_and_shadow_styles():
+    text = render_logo_text()
+    styles = {span.style for span in text._spans}
+    assert any("bright_white" in str(s) for s in styles)
+    assert any("#444444" in str(s) for s in styles)

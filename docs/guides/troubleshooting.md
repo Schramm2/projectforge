@@ -6,9 +6,9 @@
 
 **Fix:** Install one or more:
 
-- **Claude Code:** `npm install -g @anthropic-ai/claude-code`
-- **Gemini CLI:** `npm install -g @anthropic-ai/gemini-cli` (check [Gemini CLI docs](https://github.com/google-gemini/gemini-cli) for latest install method)
-- **Codex:** `npm install -g @openai/codex`
+- **Claude Code:** follow the [official setup guide](https://docs.anthropic.com/en/docs/claude-code), typically `npm install -g @anthropic-ai/claude-code`
+- **Gemini CLI:** follow the [official repository README](https://github.com/google-gemini/gemini-cli), typically `npm install -g @google/gemini-cli`
+- **Codex:** follow the [official repository README](https://github.com/openai/codex), typically `npm install -g @openai/codex`
 
 Verify with:
 
@@ -83,7 +83,7 @@ git --version
 Test the hook manually:
 
 ```bash
-FORGE_PROJECT_DIR=/tmp/test FORGE_PROJECT_NAME=test FORGE_STACK=fastapi FORGE_DEMO_MODE=false bash ~/.forge/hooks/post-scaffold.sh
+FORGE_PROJECT_DIR=/tmp/test FORGE_PROJECT_NAME=test FORGE_STACK=fastapi FORGE_DEMO_MODE=0 bash ~/.forge/hooks/post-scaffold.sh
 ```
 
 ## Shell completions not working
@@ -93,15 +93,15 @@ FORGE_PROJECT_DIR=/tmp/test FORGE_PROJECT_NAME=test FORGE_STACK=fastapi FORGE_DE
 **Fix (zsh):**
 
 ```bash
-mkdir -p ~/.zfunc
-_FORGE_COMPLETE=source_zsh forge > ~/.zfunc/_forge
-rm -f ~/.zcompdump*
+forge --install-completion
 exec zsh
 ```
 
-Ensure `~/.zfunc` is in your `fpath`. Add this to `~/.zshrc` if not present:
+If you want to manage the script manually, export it and place it on your `fpath`:
 
 ```bash
+mkdir -p ~/.zfunc
+forge --show-completion > ~/.zfunc/_forge
 fpath=(~/.zfunc $fpath)
 autoload -Uz compinit && compinit
 ```

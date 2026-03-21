@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="#installation">Installation</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="#quick-start">Quick Start</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="#supported-stacks">Stacks</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="docs/getting-started.md">Docs</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="CHANGELOG.md">Changelog</a>
+  <a href="#installation">Installation</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="#quick-start">Quick Start</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="#supported-stacks">Stacks</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="docs/README.md">Docs</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="CHANGELOG.md">Changelog</a>
 </p>
 
 ---
@@ -44,7 +44,7 @@ UbundiForge is a CLI that collects a few project details, picks the best AI back
 | TypeScript npm Package | `ts-package` | `npm-package`, `library` |
 | Python Worker | `python-worker` | `worker`, `service` |
 
-See [docs/stacks.md](docs/stacks.md) for detailed structure, libraries, and dev commands.
+See [docs/guides/stacks.md](docs/guides/stacks.md) for detailed structure, libraries, and dev commands.
 
 ## Requirements
 
@@ -159,7 +159,7 @@ All user config lives under `~/.forge/`:
 
 | File | Purpose |
 |------|---------|
-| `config.json` | Backend, editor, and project directory preferences |
+| `config.json` | Editor, detected backends, model preferences, Docker, and project directory settings |
 | `conventions.md` | Team coding standards injected into every scaffold prompt |
 | `hooks/post-scaffold.sh` | Custom script run after every scaffold |
 | `scaffold.log` | Append-only JSON-lines scaffold history |
@@ -170,7 +170,7 @@ Re-run setup at any time:
 forge --setup
 ```
 
-See [docs/configuration.md](docs/configuration.md) for the full reference.
+See [docs/guides/configuration.md](docs/guides/configuration.md) for the full reference.
 
 ## CLI Reference
 
@@ -213,12 +213,13 @@ See [docs/configuration.md](docs/configuration.md) for the full reference.
 
 | Guide | Description |
 |-------|-------------|
-| [Getting Started](docs/getting-started.md) | Installation, first run, first scaffold |
-| [Configuration](docs/configuration.md) | Config files, conventions, hooks, media assets |
-| [Stacks](docs/stacks.md) | Detailed reference for every supported stack |
-| [Admin Playbook](docs/admin-playbook.md) | Maintaining conventions, adding stacks, shipping releases |
-| [Troubleshooting](docs/troubleshooting.md) | Common issues and fixes |
-| [Homebrew Release](docs/homebrew.md) | Formula generation and release flow |
+| [Docs Home](docs/README.md) | Map of user, maintainer, internal, and reference docs |
+| [Getting Started](docs/guides/getting-started.md) | Installation, first run, first scaffold |
+| [Configuration](docs/guides/configuration.md) | Config files, conventions, hooks, media assets |
+| [Stacks](docs/guides/stacks.md) | Detailed reference for every supported stack |
+| [Admin Playbook](docs/maintainers/admin-playbook.md) | Maintaining conventions, adding stacks, shipping releases |
+| [Troubleshooting](docs/guides/troubleshooting.md) | Common issues and fixes |
+| [Homebrew Release](docs/maintainers/homebrew-release.md) | Formula generation and release flow |
 
 ## Development
 

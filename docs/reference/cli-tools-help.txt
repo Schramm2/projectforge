@@ -1,3 +1,5 @@
+NOTE: This file is a captured local snapshot of external CLI help output. Treat it as a working reference, not the canonical source for current flags or model names.
+
 matthew-schramm-ubundi@Matthews-MacBook-Air forge % claude --help
 Usage: claude [options] [command] [prompt]
 

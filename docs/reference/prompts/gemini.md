@@ -1,3 +1,5 @@
+> Reference snapshot from upstream docs. Verify exact model names, flags, and examples against Google's current documentation before using this operationally.
+
 *Prompt design* is the process of creating prompts, or natural language requests,
 that elicit accurate, high quality responses from a language model.
 

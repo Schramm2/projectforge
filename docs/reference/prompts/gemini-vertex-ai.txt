@@ -1,3 +1,5 @@
+NOTE: This file is a captured reference snapshot from upstream Gemini guidance. Verify exact model names, flags, and examples against the current upstream docs before relying on it operationally.
+
 Prompting is a key part of working with any Gemini model and the new features of Gemini 3 models can be prompted to help solve complex problems and achieve other tasks, such as interpreting large amounts of text, solving complex mathematical problems, or even creating images and videos.
 
 This guide provides a variety of prompting strategies to help you get the most from Gemini 3 on Vertex AI for a variety of use cases.

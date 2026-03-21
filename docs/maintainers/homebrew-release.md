@@ -1,4 +1,4 @@
-# Homebrew Release Notes
+# Homebrew Release
 
 Forge is packaged for Homebrew under the formula name `ubundiforge`.
 
@@ -15,13 +15,13 @@ Why not `forge`?
 
 ## Release Flow
 
-1. Cut a Git tag that matches the package version, for example `v0.1.0`.
+1. Cut a Git tag that matches the package version, for example `vX.Y.Z`.
 2. Publish the source tarball where Homebrew can fetch it, typically:
-   `https://github.com/matthewubundi/UbundiForge/archive/refs/tags/v0.1.0.tar.gz`
+   `https://github.com/matthewubundi/UbundiForge/archive/refs/tags/vX.Y.Z.tar.gz`
 3. Compute the tarball checksum:
    `curl -Ls <tarball-url> | shasum -a 256`
 4. Regenerate the formula with the real release URL and checksum:
-   `python3 scripts/generate_homebrew_formula.py --source-url <tarball-url> --source-sha256 <sha256>`
+   `uv run python scripts/generate_homebrew_formula.py --source-url <tarball-url> --source-sha256 <sha256>`
 5. Commit the updated `Formula/ubundiforge.rb`.
 6. Copy or sync that file into the Homebrew tap repository, typically `matthewubundi/homebrew-tap`.
 7. Validate in the tap:
