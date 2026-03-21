@@ -12,6 +12,8 @@ __pycache__/
 venv/
 env/
 
+.codex-skill-work/
+
 # Tool caches
 .pytest_cache/
 .ruff_cache/
