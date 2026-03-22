@@ -626,11 +626,42 @@ def run_phase_orchestrated(
     elapsed = time.monotonic() - exec_start
     results = exec_results
 
+    # Render subagent results panel
     completed_count = sum(1 for r in results if r.success)
     failed_count = len(results) - completed_count
-    _console.print(ui.status_line(
-        f"Subagents finished: {completed_count} done, {failed_count} failed ({elapsed:.0f}s)",
-        accent="aqua" if failed_count == 0 else "amber",
+    task_map = {t.id: t for t in plan.tasks}
+
+    summary_lines: list[Text] = []
+    for r in results:
+        task = task_map.get(r.task_id)
+        desc = task.description[:60] if task else r.task_id
+        if len(desc) < len(task.description if task else r.task_id):
+            desc = desc.rstrip() + "..."
+        line = Text("  ")
+        if r.success:
+            line.append("✓ ", style=ui.ACCENTS["aqua"])
+            line.append(desc, style=ui.TEXT_SECONDARY)
+            line.append(f"  {r.duration:.0f}s", style=ui.TEXT_MUTED)
+        else:
+            line.append("✗ ", style=ui.ACCENTS["plum"])
+            line.append(desc, style=ui.TEXT_SECONDARY)
+            line.append(f"  {r.summary[:40]}", style=ui.TEXT_MUTED)
+        summary_lines.append(line)
+
+    # Header line
+    header = Text()
+    header.append(f"  {completed_count}", style=f"bold {ui.ACCENTS['aqua']}")
+    header.append(" completed", style=ui.TEXT_SECONDARY)
+    if failed_count:
+        header.append(f"  {failed_count}", style=f"bold {ui.ACCENTS['plum']}")
+        header.append(" failed", style=ui.TEXT_SECONDARY)
+    header.append(f"  ({elapsed:.0f}s total)", style=ui.TEXT_MUTED)
+
+    accent = "aqua" if failed_count == 0 else "amber"
+    _console.print(ui.make_panel(
+        ui.grouped_lines([header, Text()] + summary_lines),
+        title="Subagent Results",
+        accent=accent,
     ))
 
     # Reconcile (non-fatal)
@@ -639,7 +670,5 @@ def run_phase_orchestrated(
         log.warning("Reconciliation exited with code %d (non-fatal)", rc)
 
     planned = len(results)
-    completed = sum(1 for r in results if r.success)
-    failed = planned - completed
-    stats = {"planned": planned, "completed": completed, "failed": failed}
+    stats = {"planned": planned, "completed": completed_count, "failed": failed_count}
     return (0 if all(r.success for r in results) else 1, stats)
