@@ -1,125 +1,170 @@
-"""Loads and manages convention and template files from ~/.forge/."""
+"""Loads convention sources from the bundled tree and legacy ~/.forge/ files."""
 
+from dataclasses import dataclass
 from pathlib import Path
+
+import yaml
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+BUNDLED_CONVENTIONS_DIR = REPO_ROOT / "conventions"
 
 FORGE_DIR = Path.home() / ".forge"
 CONVENTIONS_PATH = FORGE_DIR / "conventions.md"
 CLAUDE_MD_TEMPLATE_PATH = Path(__file__).parent / "templates" / "claude-md-template.md"
 
-DEFAULT_CONVENTIONS = """\
-# Ubundi Project Conventions
-
-Follow these conventions when generating any project files.
-
-## Brand & Styling (Frontend Projects)
-
-- Use Tailwind CSS for all styling
-- Ubundi brand palette:
-  - Backgrounds: dark blue-grey (#1A2332 to #2A3444)
-  - Accents: cyan-teal (#0FA5A5, #0CC5C5)
-  - Text: white on dark backgrounds
-  - Cards/panels: glassmorphism (backdrop-blur, semi-transparent bg)
-- Fonts: Inter for UI text, JetBrains Mono for code blocks
-- Configure fonts in tailwind.config
-- Dark mode is the default theme
-- Components should be modern, clean, minimal
-- No heavy shadows. Use subtle borders with opacity
-
-## Frontend Communication Patterns
-
-- One user action = one API call. Combine related sequential calls into single endpoints.
-- Use response data directly — don't discard it and refetch the same information.
-- Atomic state updates: update all related state from a single response to prevent flickering.
-- API client methods named after user actions, not backend structure.
-
-## Coding Standards
-
-### TypeScript / Next.js
-- TypeScript strict mode. No 'any' types.
-- App router (app/ directory)
-- Components in src/components/
-- Utilities in src/lib/
-- ESLint + Prettier configured
-
-### Python / FastAPI
-- Type hints on all functions and variables
-- Pydantic models for all data structures
-- Async endpoints where possible
-- No ORM — use raw SQL via asyncpg
-- API routes prefixed with /v1/
-- Structured error responses using Pydantic models for error bodies
-- FastAPI exception handlers for consistent error formatting
-- Ruff for linting and formatting
-- Docstrings (triple double quotes) on all public modules, functions, classes, and methods
-- Imports ordered: stdlib → third-party → local application. No wildcard imports.
-
-## Python Architecture
-
-Follow Clean Architecture (Onion Architecture). Dependencies point inward.
-
-### Layer Structure
-- domain/: Core business logic — entities, value objects, domain services,
-  interfaces (Protocols). Depends on NOTHING (stdlib only).
-- application/: Use cases and orchestration. Depends only on domain.
-- infrastructure/: External implementations — DB repositories, API clients,
-  config loading. Implements interfaces defined in domain.
-- api/: Presentation layer — FastAPI routes, request/response schemas.
-  Depends on application.
-- shared/: Cross-cutting utilities used across layers. Keep minimal.
-
-### Dependency Flow
-Presentation (api/) → Application → Domain ← Infrastructure
-
-### Service Layer Pattern
-- Encapsulate business logic in Service Classes (e.g., UserService), not standalone functions.
-- Inject dependencies via __init__ (database sessions, external clients).
-- No global state — all state passed through constructor or method params.
-
-### FastAPI Patterns
-- Use @lru_cache for singleton services in a dedicated dependencies.py file.
-- Load state once per request: load → process → persist. No repeated DB queries for the same data.
-- Inject services into route handlers — never instantiate inline.
-- Combined endpoints: if the frontend always calls two endpoints in sequence, combine them.
-
-### File Naming
-- Models: *_model.py (e.g., user_model.py)
-- Services: *_service.py (e.g., payment_service.py)
-- Repositories: *_repository.py (e.g., user_repository.py)
-- Tests: test_*.py (e.g., test_payment_service.py)
-
-## Always Include
-- .gitignore appropriate to the stack
-- .env.example showing all required environment variables
-- README.md with project name, description, setup instructions, and how to run
-- CLAUDE.md at root — a briefing for AI coding assistants containing:
-  project name, description, stack, folder structure, conventions, and any
-  project-specific notes. Write it as a direct briefing, not documentation.
-
-## Git
-
-- GitHub Flow: main branch always deployable, short-lived feature branches
-- Branch naming: type/description (e.g., feat/user-login, fix/header-alignment, docs/update-readme)
-- Conventional commit messages (e.g., feat: add login, fix: resolve crash)
-- Initialize git on project creation
-- PR template: Summary, Type of Change, Testing, Screenshots (if UI)
-"""
-
-
 MIN_CONVENTIONS_LENGTH = 50
-
 
 LOCAL_CONVENTIONS_PATH = Path.cwd() / ".forge" / "conventions.md"
 
+_DEFAULT_CONVENTIONS_PARTS = [
+    "global/shared.md",
+    "global/frontend-brand.md",
+    "global/frontend-communication.md",
+    "global/typescript-standards.md",
+    "global/python-standards.md",
+    "global/python-architecture.md",
+    "global/project-files.md",
+    "global/git.md",
+]
 
-def load_conventions() -> tuple[str, list[str]]:
-    """Load conventions, checking local .forge/conventions.md first, then ~/.forge/.
 
-    Returns:
-        Tuple of (conventions_content, warnings).
-    """
+def _read_text(path: Path) -> str:
+    if path.exists():
+        return path.read_text()
+    return ""
+
+
+def _compose_text(root: Path, relative_paths: list[str]) -> str:
+    parts = [
+        _read_text(root / relative_paths_item).strip()
+        for relative_paths_item in relative_paths
+    ]
+    content = "\n\n".join(part for part in parts if part)
+    if content:
+        return content
+    return "# Ubundi Project Conventions\n\nFollow the bundled conventions."
+
+
+DEFAULT_CONVENTIONS = _compose_text(BUNDLED_CONVENTIONS_DIR, _DEFAULT_CONVENTIONS_PARTS)
+
+
+@dataclass(frozen=True)
+class CompiledBundle:
+    """A compiled conventions bundle."""
+
+    prompt_block: str
+    warnings: list[str]
+
+
+def _read_yaml(path: Path) -> dict[str, object]:
+    if not path.exists():
+        return {}
+    data = yaml.safe_load(path.read_text())
+    if isinstance(data, dict):
+        return data
+    return {}
+
+
+def _dedupe_paths(paths: list[Path]) -> list[Path]:
+    seen: set[Path] = set()
+    deduped: list[Path] = []
+    for path in paths:
+        if path in seen:
+            continue
+        seen.add(path)
+        deduped.append(path)
+    return deduped
+
+
+def _discover_markdown_files(root: Path) -> list[Path]:
+    files = [path for path in root.rglob("*.md") if "manifests" not in path.parts]
+    return sorted(files)
+
+
+def _bundle_files_from_manifest(
+    root: Path,
+    registry: dict[str, object],
+    stack: str | None,
+) -> list[Path]:
+    bundle_definitions = registry.get("bundle_definitions")
+    if not isinstance(bundle_definitions, dict):
+        return []
+
+    selected: list[str] = []
+
+    default_bundle = bundle_definitions.get("default")
+    if isinstance(default_bundle, dict):
+        files = default_bundle.get("files")
+        if isinstance(files, list):
+            selected.extend(str(item) for item in files)
+
+    if stack:
+        stack_overrides = bundle_definitions.get("stack_overrides")
+        if isinstance(stack_overrides, dict):
+            override = stack_overrides.get(stack)
+            if isinstance(override, dict):
+                files = override.get("files")
+                if isinstance(files, list):
+                    selected.extend(str(item) for item in files)
+
+    return [root / rel_path for rel_path in selected]
+
+
+def build_registry(root: Path | None = None) -> dict[str, object]:
+    """Build a lightweight registry of the bundled conventions tree."""
+
+    resolved_root = root or BUNDLED_CONVENTIONS_DIR
+    manifests_dir = resolved_root / "manifests"
+
+    metadata: dict[str, dict[str, object]] = {}
+    for metadata_path in sorted(resolved_root.rglob("metadata.yaml")):
+        if "manifests" in metadata_path.parts:
+            continue
+        relative_dir = metadata_path.parent.relative_to(resolved_root).as_posix()
+        metadata[relative_dir] = _read_yaml(metadata_path)
+
+    return {
+        "root": resolved_root,
+        "bundle_definitions": _read_yaml(manifests_dir / "bundles.yaml"),
+        "browse_labels": _read_yaml(manifests_dir / "browse-labels.yaml"),
+        "metadata": metadata,
+    }
+
+
+def compile_bundle(registry: dict[str, object], stack: str | None = None) -> CompiledBundle:
+    """Compile a prompt block from the registry and optional stack id."""
+
+    root = registry["root"]
+    if not isinstance(root, Path):
+        root = BUNDLED_CONVENTIONS_DIR
+
+    bundle_files = _bundle_files_from_manifest(root, registry, stack)
+    if not bundle_files:
+        bundle_files = _discover_markdown_files(root)
+
+    bundle_files = _dedupe_paths([path for path in bundle_files if path.exists()])
+    content_parts = [path.read_text().strip() for path in bundle_files if path.read_text().strip()]
+    prompt_block = "\n\n".join(content_parts).strip()
+
+    warnings: list[str] = []
+    if not prompt_block:
+        warnings.append("Conventions bundle is empty.")
+    elif len(prompt_block) < MIN_CONVENTIONS_LENGTH:
+        warnings.append("Conventions bundle is very short — consider adding more detail.")
+
+    return CompiledBundle(prompt_block=prompt_block, warnings=warnings)
+
+
+def load_conventions(stack: str | None = None) -> tuple[str, list[str]]:
+    """Load conventions, preferring the bundled tree for stack-aware requests."""
+
+    if stack is not None:
+        bundle = compile_bundle(build_registry(), stack=stack)
+        if bundle.prompt_block:
+            return bundle.prompt_block, []
+
     warnings: list[str] = []
 
-    # Check for project-local conventions first
     if LOCAL_CONVENTIONS_PATH.exists():
         source = LOCAL_CONVENTIONS_PATH
         warnings.append(f"Using local conventions from {LOCAL_CONVENTIONS_PATH}")
@@ -146,6 +191,7 @@ def load_claude_md_template() -> str | None:
     Returns None if the file doesn't exist — the prompt builder will
     fall back to its generic instruction.
     """
+
     if CLAUDE_MD_TEMPLATE_PATH.exists():
         return CLAUDE_MD_TEMPLATE_PATH.read_text()
     return None

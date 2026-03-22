@@ -46,3 +46,15 @@ def test_missing_conventions_creates_default(tmp_path, monkeypatch):
     assert conv_path.exists()
     assert "Ubundi" in content
     assert any("created" in w.lower() for w in warnings)
+
+
+def test_load_conventions_prefers_bundled_tree(tmp_path, monkeypatch):
+    root = tmp_path / "conventions"
+    (root / "global").mkdir(parents=True)
+    (root / "global" / "shared.md").write_text("Use strict typing.")
+    monkeypatch.setattr("ubundiforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
+
+    content, warnings = load_conventions(stack="fastapi")
+
+    assert "strict typing" in content
+    assert warnings == []

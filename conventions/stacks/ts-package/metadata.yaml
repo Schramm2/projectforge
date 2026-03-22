@@ -1,0 +1,6 @@
+id: ts-package
+label: TypeScript package
+language: typescript
+browse_label: TypeScript package bundle
+markdown_files:
+  - overview.md

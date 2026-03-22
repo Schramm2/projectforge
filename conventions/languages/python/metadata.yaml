@@ -1,0 +1,8 @@
+id: python
+label: Python
+browse_label: Python conventions
+markdown_files:
+  - ../../global/python-standards.md
+  - ../../global/python-architecture.md
+  - ../../global/cross-recipe-python.md
+  - ../../global/cross-recipe-docker.md

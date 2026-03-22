@@ -1,0 +1,40 @@
+default:
+  label: global
+  files:
+    - global/shared.md
+    - global/frontend-brand.md
+    - global/frontend-communication.md
+    - global/typescript-standards.md
+    - global/python-standards.md
+    - global/python-architecture.md
+    - global/project-files.md
+    - global/git.md
+stack_overrides:
+  fastapi:
+    label: fastapi
+    files:
+      - stacks/fastapi/overview.md
+  fastapi-ai:
+    label: fastapi-ai
+    files:
+      - stacks/fastapi-ai/overview.md
+  nextjs:
+    label: nextjs
+    files:
+      - stacks/nextjs/overview.md
+  both:
+    label: both
+    files:
+      - stacks/both/overview.md
+  python-cli:
+    label: python-cli
+    files:
+      - stacks/python-cli/overview.md
+  ts-package:
+    label: ts-package
+    files:
+      - stacks/ts-package/overview.md
+  python-worker:
+    label: python-worker
+    files:
+      - stacks/python-worker/overview.md

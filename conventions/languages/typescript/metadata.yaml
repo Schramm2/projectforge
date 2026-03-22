@@ -1,0 +1,6 @@
+id: typescript
+label: TypeScript
+browse_label: TypeScript conventions
+markdown_files:
+  - ../../global/typescript-standards.md
+  - ../../global/cross-recipe-typescript.md
