@@ -453,9 +453,55 @@ def collect_answers(docker_available: bool = True) -> dict:
     }
 
     _ask_project_basics(answers, docker_available=docker_available)
-    _ask_design_and_media(answers)
-    _ask_customizations(answers)
-    _ask_demo_mode(answers)
+
+    # Smart defaults — offer to skip remaining questions if patterns detected
+    from ubundiforge.preferences import get_defaults
+
+    defaults = get_defaults()
+    # Filter to questions that haven't been answered yet (not basics)
+    applicable = {
+        k: v for k, v in defaults.items() if k not in ("name", "description", "stack", "docker")
+    }
+
+    if applicable:
+        # Format as human-readable labels
+        label_map = {
+            "auth_provider": "Auth",
+            "demo_mode": "Demo mode",
+            "design_template": "Design template",
+        }
+        display_parts = []
+        for k, v in applicable.items():
+            label = label_map.get(k, k)
+            display_val = v if v not in ("True", "False") else ("yes" if v == "True" else "no")
+            display_parts.append(f"{label}: {display_val}")
+
+        console.print(subtle(f"  Your usual setup: {', '.join(display_parts)}"))
+        use_defaults = prompt_confirm(
+            "Use your usual setup?",
+            default=True,
+        ).ask()
+        if use_defaults:
+            # Pre-fill answers with defaults but still go to review screen
+            for k, v in applicable.items():
+                if v == "True":
+                    answers[k] = True
+                elif v == "False":
+                    answers[k] = False
+                else:
+                    answers[k] = v
+            # Skip to review screen — DO NOT return early
+            # Jump past _ask_design_and_media, _ask_customizations, _ask_demo_mode
+            # and go straight to the review loop
+        else:
+            # User declined defaults — proceed with full question flow
+            _ask_design_and_media(answers)
+            _ask_customizations(answers)
+            _ask_demo_mode(answers)
+    else:
+        _ask_design_and_media(answers)
+        _ask_customizations(answers)
+        _ask_demo_mode(answers)
 
     while True:
         action = _review_answers(answers)

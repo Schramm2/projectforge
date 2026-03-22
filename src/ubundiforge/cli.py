@@ -32,6 +32,7 @@ from ubundiforge.media_assets import (
     scan_assets,
     target_asset_dir,
 )
+from ubundiforge.preferences import record_preferences
 from ubundiforge.prompt_builder import build_phase_prompt
 from ubundiforge.prompts import collect_answers
 from ubundiforge.quality import append_quality_signal, compute_backend_scores, read_quality_signals
@@ -1075,6 +1076,7 @@ def main(
 
     run_post_scaffold_hook(project_dir, answers)
     append_scaffold_log(answers, phase_backends, project_dir)
+    record_preferences(answers)
 
     elapsed = time.monotonic() - scaffold_start
     render_dashboard(
