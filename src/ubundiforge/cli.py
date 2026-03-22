@@ -52,7 +52,7 @@ from ubundiforge.runner import (
     run_post_scaffold_hook,
 )
 from ubundiforge.safety import check_for_secrets
-from ubundiforge.scaffold_log import append_scaffold_log, write_scaffold_manifest
+from ubundiforge.scaffold_log import SCAFFOLD_LOG_PATH, append_scaffold_log, write_scaffold_manifest
 from ubundiforge.scaffold_options import (
     AUTH_PROVIDER_OPTIONS,
     CI_TEMPLATE_MODES,
@@ -370,8 +370,36 @@ def _prompt_post_setup_next_step() -> str:
     return action
 
 
+@app.command()
+def stats() -> None:
+    """Show scaffold analytics and backend performance."""
+    import json
+
+    from ubundiforge.analytics import aggregate_stats, render_stats
+    from ubundiforge.quality import read_quality_signals
+
+    scaffold_entries: list[dict] = []
+    if SCAFFOLD_LOG_PATH.exists():
+        for line in SCAFFOLD_LOG_PATH.read_text().splitlines():
+            line = line.strip()
+            if line:
+                try:
+                    scaffold_entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+
+    quality_entries = read_quality_signals()
+
+    stats_data = aggregate_stats(
+        scaffold_entries=scaffold_entries,
+        quality_entries=quality_entries,
+    )
+    render_stats(console, stats_data)
+
+
 @app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     use: Annotated[
         str | None,
         typer.Option("--use", help="Override AI routing (claude, gemini, or codex)."),
@@ -491,6 +519,9 @@ def main(
     ] = None,
 ) -> None:
     """UbundiForge — Ubundi Project Scaffolder. Scaffold projects with AI + your conventions."""
+    if ctx.invoked_subcommand is not None:
+        return
+
     prompt_only = dry_run or bool(export)
     explicit_scaffold_request = _has_explicit_scaffold_request(
         use=use,
