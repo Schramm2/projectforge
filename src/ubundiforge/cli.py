@@ -19,6 +19,7 @@ from ubundiforge.config import (
     check_backend_installed,
     get_backend_statuses,
 )
+from ubundiforge.convention_models import ConventionValidationError
 from ubundiforge.conventions import (
     load_bundled_conventions,
     load_claude_md_template,
@@ -672,15 +673,39 @@ def replay(
         conventions = snapshot_path.read_text()
     else:
         replay_stack = stack or None
-        conventions, conv_warnings = load_bundled_conventions(stack=replay_stack)
+        loaded_stack = replay_stack
+        try:
+            conventions, conv_warnings = load_bundled_conventions(stack=replay_stack)
+        except ConventionValidationError as exc:
+            if replay_stack and str(exc) == f"Unknown convention record: stacks/{replay_stack}":
+                console.print(
+                    status_line(
+                        (
+                            f"Unknown stack '{replay_stack}' in replay manifest; "
+                            "falling back to current bundled conventions."
+                        ),
+                        accent="amber",
+                    )
+                )
+                loaded_stack = None
+                try:
+                    conventions, conv_warnings = load_bundled_conventions()
+                except ConventionValidationError as fallback_exc:
+                    console.print(
+                        status_line(f"Conventions error: {fallback_exc}", accent="amber")
+                    )
+                    raise typer.Exit(1) from fallback_exc
+            else:
+                console.print(status_line(f"Conventions error: {exc}", accent="amber"))
+                raise typer.Exit(1) from exc
         for warning in conv_warnings:
             console.print(f"[yellow]{warning}[/yellow]")
         console.print(
             status_line(
                 (
                     f"No conventions snapshot found. Using current bundled conventions "
-                    f"for stack '{stack}'."
-                    if stack
+                    f"for stack '{loaded_stack}'."
+                    if loaded_stack
                     else "No conventions snapshot found. Using current conventions."
                 ),
                 accent="amber",
@@ -1182,7 +1207,11 @@ def main(
     backend_models: dict[str, str] = forge_config.get("backend_models", {})
 
     # Load conventions and CLAUDE.md template
-    conventions, conv_warnings = load_conventions(stack=answers["stack"])
+    try:
+        conventions, conv_warnings = load_conventions(stack=answers["stack"])
+    except ConventionValidationError as exc:
+        console.print(status_line(f"Conventions error: {exc}", accent="amber"))
+        raise typer.Exit(1) from exc
     for warning in conv_warnings:
         console.print(f"[yellow]{warning}[/yellow]")
 

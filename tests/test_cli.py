@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 
 from ubundiforge.cli import app
 from ubundiforge.config import BackendStatus
+from ubundiforge.convention_models import ConventionValidationError
 from ubundiforge.setup import run_setup
 
 runner = CliRunner()
@@ -198,6 +199,34 @@ def test_dry_run_loads_compiled_conventions_for_requested_stack(monkeypatch):
     assert result.exit_code == 0
     assert seen_stacks == ["fastapi"]
     assert "compiled conventions for fastapi" in result.stdout
+
+
+def test_dry_run_reports_bundle_validation_errors(monkeypatch):
+    setup_called = [False]
+    _patch_prompt_only_dependencies(monkeypatch, setup_called=setup_called)
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_conventions",
+        lambda stack=None: (_ for _ in ()).throw(ConventionValidationError("broken bundle")),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "--dry-run",
+            "--name",
+            "bundle-smoke",
+            "--stack",
+            "fastapi",
+            "--description",
+            "Exercise stack-aware conventions",
+            "--no-docker",
+            "--no-open",
+            "--no-verify",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "broken bundle" in result.stdout
 
 
 def test_mock_backends_cover_full_cli_flow_without_installed_ai_clis(monkeypatch, tmp_path):
@@ -490,6 +519,74 @@ def test_replay_prefers_snapshot_over_compiled_bundle(monkeypatch, tmp_path):
     assert "snapshot conventions" in result.stdout
 
 
+def test_replay_reports_bundle_validation_errors(monkeypatch, tmp_path):
+    project_dir = tmp_path / "atlas"
+    forge_dir = project_dir / ".forge"
+    forge_dir.mkdir(parents=True)
+    (forge_dir / "scaffold.json").write_text(
+        json.dumps(
+            {
+                "name": "atlas",
+                "stack": "fastapi",
+                "description": "Replay me",
+                "routing": [{"phase": "architecture", "backend": "claude"}],
+            }
+        )
+    )
+
+    monkeypatch.chdir(project_dir)
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_bundled_conventions",
+        lambda stack=None: (_ for _ in ()).throw(ConventionValidationError("unknown stack")),
+    )
+    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
+
+    result = runner.invoke(app, ["replay", "--dry-run"])
+
+    assert result.exit_code == 1
+    assert "unknown stack" in result.stdout
+
+
+def test_replay_unknown_manifest_stack_falls_back_to_default_bundle(monkeypatch, tmp_path):
+    project_dir = tmp_path / "atlas"
+    forge_dir = project_dir / ".forge"
+    forge_dir.mkdir(parents=True)
+    (forge_dir / "scaffold.json").write_text(
+        json.dumps(
+            {
+                "name": "atlas",
+                "stack": "not-a-real-stack",
+                "description": "Replay me",
+                "routing": [{"phase": "architecture", "backend": "claude"}],
+            }
+        )
+    )
+
+    seen_stacks: list[str | None] = []
+
+    def _fake_load_bundled_conventions(stack=None):
+        seen_stacks.append(stack)
+        if stack == "not-a-real-stack":
+            raise ConventionValidationError("Unknown convention record: stacks/not-a-real-stack")
+        return ("compiled default conventions", [])
+
+    monkeypatch.chdir(project_dir)
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_bundled_conventions",
+        _fake_load_bundled_conventions,
+    )
+    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
+
+    result = runner.invoke(app, ["replay", "--dry-run"])
+    output = " ".join(result.stdout.lower().split())
+
+    assert result.exit_code == 0
+    assert seen_stacks == ["not-a-real-stack", None]
+    assert "compiled default conventions" in result.stdout
+    assert "falling back to current bundled conventions" in output
+    assert "no conventions snapshot found. using current conventions." in output
+
+
 def test_resolve_project_dir_allows_rename(monkeypatch, tmp_path):
     from ubundiforge.cli import _resolve_project_dir
 
@@ -558,4 +655,4 @@ def test_run_setup_does_not_create_legacy_conventions_file(monkeypatch, tmp_path
     assert config["available_backends"] == ["claude"]
     assert not conventions_path.exists()
     assert "bundled conventions" in output.lower()
-    assert "forge admin conventions" in output
+    assert "bundled source tree" in output.lower()

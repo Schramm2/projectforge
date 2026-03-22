@@ -612,8 +612,8 @@ def run_setup(console: Console) -> dict:
                     "Forge now compiles bundled conventions for each scaffolded stack.",
                     subtle(f"Bundled source tree: {BUNDLED_CONVENTIONS_DIR}"),
                     muted(
-                        "Repo admins can inspect or customize bundled sources with "
-                        "forge admin conventions."
+                        "Repo admins can inspect or customize bundled sources directly "
+                        "in this repo."
                     ),
                 ]
             ),

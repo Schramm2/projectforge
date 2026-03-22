@@ -140,17 +140,16 @@ def load_conventions(stack: str | None = None) -> tuple[str, list[str]]:
 
     if stack is not None:
         bundle_text, bundle_warnings = load_bundled_conventions(stack)
-        if bundle_text:
-            warnings = list(bundle_warnings)
-            if LOCAL_CONVENTIONS_PATH.exists():
-                warnings.insert(
-                    0,
-                    (
-                        "Ignoring placeholder local conventions from "
-                        f"{LOCAL_CONVENTIONS_PATH}; using bundled stack conventions."
-                    ),
-                )
-            return bundle_text, warnings
+        warnings = list(bundle_warnings)
+        if LOCAL_CONVENTIONS_PATH.exists():
+            warnings.insert(
+                0,
+                (
+                    "Ignoring placeholder local conventions from "
+                    f"{LOCAL_CONVENTIONS_PATH}; using bundled stack conventions."
+                ),
+            )
+        return bundle_text, warnings
 
     warnings: list[str] = []
 

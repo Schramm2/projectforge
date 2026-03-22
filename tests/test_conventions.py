@@ -171,3 +171,24 @@ def test_load_bundled_conventions_skips_legacy_local_and_user_files(tmp_path, mo
     assert content == "Compiled bundle for fastapi"
     assert warnings == ["bundle warning"]
     assert not user_path.exists()
+
+
+def test_load_conventions_stack_keeps_bundle_warnings_when_bundle_is_empty(tmp_path, monkeypatch):
+    user_path = tmp_path / "user-conventions.md"
+
+    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", user_path)
+    monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path / "forge-home")
+    monkeypatch.setattr(
+        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH",
+        tmp_path / ".forge" / "conventions.md",
+    )
+    monkeypatch.setattr(
+        "ubundiforge.conventions.load_bundled_conventions",
+        lambda stack=None: ("", ["bundle warning"]),
+    )
+
+    content, warnings = load_conventions(stack="fastapi")
+
+    assert content == ""
+    assert warnings == ["bundle warning"]
+    assert not user_path.exists()
