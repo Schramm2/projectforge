@@ -24,6 +24,7 @@ dependencies = [
     "typer>=0.15.0",
     "rich>=13.0.0",
     "questionary>=2.1.0",
+    "PyYAML>=6.0.2",
 ]
 
 [project.urls]
@@ -39,10 +40,12 @@ ubundiforge = "ubundiforge.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ubundiforge"]
+force-include = { "conventions" = "ubundiforge/conventions" }
 
 [tool.hatch.build.targets.sdist]
 include = [
     "/src/ubundiforge",
+    "/conventions",
     "/README.md",
     "/LICENSE",
 ]

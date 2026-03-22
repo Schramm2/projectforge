@@ -1,0 +1,6 @@
+id: python-worker
+label: Python Worker
+language: python
+browse_label: Python worker bundle
+markdown_files:
+  - overview.md

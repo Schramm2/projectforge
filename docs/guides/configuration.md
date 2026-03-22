@@ -26,19 +26,36 @@ You can also edit the file directly. It is standard JSON.
 
 ## Conventions
 
-**Path:** `~/.forge/conventions.md`
+Forge now treats the bundled `conventions/` tree in this repository as the canonical conventions source for released behavior.
 
-A Markdown file injected into every scaffold prompt. Use it to encode your team's standards so every generated project follows them consistently.
+Use the admin command to inspect and validate that tree:
 
-Typical contents:
+```bash
+forge admin conventions --validate
+forge admin conventions --preview-stack fastapi
+```
 
-- Coding standards (naming, formatting, patterns).
-- Project structure rules (where files go, module boundaries).
-- Tool preferences (package managers, linters, test runners).
-- Error handling and logging conventions.
-- Git workflow expectations (branch naming, commit messages).
+The bundled tree is organized by reusable layers:
 
-If the file does not exist, Forge creates a starter template automatically the first time conventions are loaded.
+```text
+conventions/
+  global/
+  languages/
+  stacks/
+  prompts/
+  manifests/
+```
+
+Markdown files hold the human-authored guidance, while metadata files and manifests control inheritance, ordering, and prompt bundle assembly.
+
+### Local override compatibility
+
+Forge still supports override files for local experimentation and project-specific behavior:
+
+- `.forge/conventions.md` inside a project
+- `~/.forge/conventions.md` for a user-level override
+
+These remain compatibility paths, not the primary maintainer workflow. Repo-admin changes intended for future releases should be made in the bundled `conventions/` tree and reviewed through `forge admin conventions`.
 
 ## Design templates
 

@@ -1,0 +1,8 @@
+global: Cross-project defaults
+fastapi: FastAPI
+fastapi-ai: FastAPI AI
+nextjs: Next.js
+both: Full-stack
+python-cli: Python CLI
+ts-package: TypeScript package
+python-worker: Python worker

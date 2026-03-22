@@ -1,0 +1,6 @@
+id: python-cli
+label: Python CLI
+language: python
+browse_label: Python CLI bundle
+markdown_files:
+  - overview.md

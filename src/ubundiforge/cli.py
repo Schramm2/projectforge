@@ -19,7 +19,22 @@ from ubundiforge.config import (
     check_backend_installed,
     get_backend_statuses,
 )
-from ubundiforge.conventions import load_claude_md_template, load_conventions
+from ubundiforge.convention_admin import (
+    list_scopes,
+    render_bundle_preview,
+    render_history_result,
+    render_record_summary,
+    render_validation_summary,
+    resolve_open_path,
+)
+from ubundiforge.convention_history import load_history
+from ubundiforge.convention_models import ConventionValidationError
+from ubundiforge.conventions import (
+    build_registry,
+    load_bundled_conventions,
+    load_claude_md_template,
+    load_conventions,
+)
 from ubundiforge.dashboard import render_dashboard
 from ubundiforge.design_templates import (
     DESIGN_TEMPLATE_OPTIONS,
@@ -82,15 +97,26 @@ from ubundiforge.ui import (
     make_panel,
     make_step_panel,
     muted,
+    path_text,
     status_line,
     subtle,
 )
 from ubundiforge.verify import verify_scaffold
 
 app = typer.Typer()
+admin_app = typer.Typer(help="Repo admin tools.")
+app.add_typer(admin_app, name="admin")
 console = create_console()
 
 _PROJECT_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+_TOP_LEVEL_CONVENTION_HISTORY_TARGETS = {
+    "conventions",
+    "global",
+    "languages",
+    "stacks",
+    "prompts",
+    "manifests",
+}
 _BACKEND_LOGIN_COMMANDS = {
     "claude": "claude auth login",
     "codex": "codex login",
@@ -185,7 +211,7 @@ def _render_loaded_context(
             if configured_model:
                 lines.append(subtle(f"{backend} model: {configured_model}"))
 
-    lines.append(subtle(f"Conventions: {len(conventions)} chars from ~/.forge/conventions.md"))
+    lines.append(subtle(f"Conventions: {len(conventions)} chars loaded"))
     if claude_md_loaded:
         lines.append(subtle("CLAUDE.md starter loaded"))
     if design_template_label:
@@ -379,6 +405,169 @@ def _prompt_post_setup_next_step() -> str:
     if action is None:
         raise typer.Exit()
     return action
+
+
+def _admin_history_target(value: str) -> str:
+    cleaned = value.strip().strip("/")
+    if not cleaned:
+        raise ConventionValidationError("A stack id or conventions path is required for history.")
+    if (
+        "/" in cleaned
+        or cleaned.endswith(".md")
+        or cleaned in _TOP_LEVEL_CONVENTION_HISTORY_TARGETS
+    ):
+        return cleaned
+    return f"stacks/{cleaned}"
+
+
+def _run_conventions_browse(registry) -> None:
+    scopes = list_scopes(registry)
+    scope_choice = prompt_select(
+        "Choose a conventions scope",
+        choices=[
+            questionary.Choice(f"{scope.label} ({len(scope.items)})", value=scope.name)
+            for scope in scopes
+        ],
+        default="stack",
+    ).ask()
+    if scope_choice is None:
+        raise typer.Exit(0)
+
+    selected_scope = next(scope for scope in scopes if scope.name == scope_choice)
+    if not selected_scope.items:
+        console.print(status_line(f"No entries found for {scope_choice}.", accent="amber"))
+        raise typer.Exit(0)
+
+    item_choice = prompt_select(
+        f"Choose a {selected_scope.name} entry",
+        choices=[
+            questionary.Choice(f"{item.key} — {item.label}", value=item.target)
+            for item in selected_scope.items
+        ],
+        default=selected_scope.items[0].target,
+    ).ask()
+    if item_choice is None:
+        raise typer.Exit(0)
+
+    if selected_scope.name == "prompt":
+        stack = None if item_choice == "default" else item_choice
+        console.print(render_bundle_preview(registry, stack))
+        return
+
+    console.print(render_record_summary(registry, item_choice))
+
+
+def _run_admin_conventions_interactive(registry) -> None:
+    action = prompt_select(
+        "Conventions admin",
+        choices=[
+            questionary.Choice("Validate bundled conventions", value="validate"),
+            questionary.Choice("Browse convention scopes", value="browse"),
+            questionary.Choice("Preview a compiled stack bundle", value="preview"),
+            questionary.Choice("Show git history for a stack", value="history"),
+            questionary.Choice("Resolve a markdown file to edit", value="open"),
+        ],
+        default="browse",
+    ).ask()
+    if action is None:
+        raise typer.Exit(0)
+
+    if action == "validate":
+        console.print(render_validation_summary(registry))
+        return
+    if action == "browse":
+        _run_conventions_browse(registry)
+        return
+    if action == "preview":
+        stack_choice = prompt_select(
+            "Choose a stack",
+            choices=[
+                questionary.Choice(stack_id, value=stack_id)
+                for stack_id in sorted(registry.stack_record_ids)
+            ],
+            default="fastapi" if "fastapi" in registry.stack_record_ids else None,
+        ).ask()
+        if stack_choice is None:
+            raise typer.Exit(0)
+        console.print(render_bundle_preview(registry, stack_choice))
+        return
+    if action == "history":
+        stack_choice = prompt_select(
+            "Choose a stack",
+            choices=[
+                questionary.Choice(stack_id, value=stack_id)
+                for stack_id in sorted(registry.stack_record_ids)
+            ],
+            default="fastapi" if "fastapi" in registry.stack_record_ids else None,
+        ).ask()
+        if stack_choice is None:
+            raise typer.Exit(0)
+        console.print(render_history_result(load_history(registry.root, f"stacks/{stack_choice}")))
+        return
+
+    open_target = prompt_text(
+        "Markdown path to open",
+        default="global/shared.md",
+    ).ask()
+    if open_target is None:
+        raise typer.Exit(0)
+    resolved_path = resolve_open_path(registry.root, open_target)
+    console.print(make_panel(path_text(resolved_path), title="Open Markdown", accent="plum"))
+
+
+@admin_app.command("conventions")
+def admin_conventions(
+    validate: Annotated[
+        bool,
+        typer.Option("--validate", help="Validate the bundled conventions registry."),
+    ] = False,
+    preview_stack: Annotated[
+        str | None,
+        typer.Option("--preview-stack", help="Preview the compiled bundle for a stack."),
+    ] = None,
+    history: Annotated[
+        str | None,
+        typer.Option("--history", help="Show git history for a stack id or conventions path."),
+    ] = None,
+    open_path: Annotated[
+        str | None,
+        typer.Option("--open", help="Resolve a markdown path under conventions/."),
+    ] = None,
+) -> None:
+    """Browse, validate, preview, and inspect bundled conventions."""
+
+    direct_actions = [
+        validate,
+        preview_stack is not None,
+        history is not None,
+        open_path is not None,
+    ]
+    if sum(1 for action in direct_actions if action) > 1:
+        console.print(status_line("Choose only one direct admin action at a time.", accent="amber"))
+        raise typer.Exit(1)
+
+    try:
+        registry = build_registry()
+        if validate:
+            console.print(render_validation_summary(registry))
+            return
+        if preview_stack is not None:
+            console.print(render_bundle_preview(registry, preview_stack))
+            return
+        if history is not None:
+            history_result = load_history(registry.root, _admin_history_target(history))
+            console.print(render_history_result(history_result))
+            return
+        if open_path is not None:
+            resolved_path = resolve_open_path(registry.root, open_path)
+            console.print(
+                make_panel(path_text(resolved_path), title="Open Markdown", accent="plum")
+            )
+            return
+        _run_admin_conventions_interactive(registry)
+    except ConventionValidationError as exc:
+        console.print(status_line(f"Conventions error: {exc}", accent="amber"))
+        raise typer.Exit(1) from exc
 
 
 @app.command()
@@ -662,15 +851,47 @@ def replay(
     console.print(header_panel(__version__))
     console.print(status_line(f"Replaying: {name} ({stack})", accent="violet"))
 
-    # Load conventions snapshot or current conventions
+    # Load conventions snapshot or current bundled conventions for the stack
     snapshot_path = project_dir / ".forge" / "conventions-snapshot.md"
     if snapshot_path.exists():
         conventions = snapshot_path.read_text()
     else:
-        conventions, _ = load_conventions()
+        replay_stack = stack or None
+        loaded_stack = replay_stack
+        try:
+            conventions, conv_warnings = load_bundled_conventions(stack=replay_stack)
+        except ConventionValidationError as exc:
+            if replay_stack and str(exc) == f"Unknown convention record: stacks/{replay_stack}":
+                console.print(
+                    status_line(
+                        (
+                            f"Unknown stack '{replay_stack}' in replay manifest; "
+                            "falling back to current bundled conventions."
+                        ),
+                        accent="amber",
+                    )
+                )
+                loaded_stack = None
+                try:
+                    conventions, conv_warnings = load_bundled_conventions()
+                except ConventionValidationError as fallback_exc:
+                    console.print(
+                        status_line(f"Conventions error: {fallback_exc}", accent="amber")
+                    )
+                    raise typer.Exit(1) from fallback_exc
+            else:
+                console.print(status_line(f"Conventions error: {exc}", accent="amber"))
+                raise typer.Exit(1) from exc
+        for warning in conv_warnings:
+            console.print(f"[yellow]{warning}[/yellow]")
         console.print(
             status_line(
-                "No conventions snapshot found. Using current conventions.",
+                (
+                    f"No conventions snapshot found. Using current bundled conventions "
+                    f"for stack '{loaded_stack}'."
+                    if loaded_stack
+                    else "No conventions snapshot found. Using current conventions."
+                ),
                 accent="amber",
             )
         )
@@ -1170,7 +1391,11 @@ def main(
     backend_models: dict[str, str] = forge_config.get("backend_models", {})
 
     # Load conventions and CLAUDE.md template
-    conventions, conv_warnings = load_conventions()
+    try:
+        conventions, conv_warnings = load_conventions(stack=answers["stack"])
+    except ConventionValidationError as exc:
+        console.print(status_line(f"Conventions error: {exc}", accent="amber"))
+        raise typer.Exit(1) from exc
     for warning in conv_warnings:
         console.print(f"[yellow]{warning}[/yellow]")
 

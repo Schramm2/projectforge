@@ -1,0 +1,6 @@
+id: fastapi
+label: FastAPI
+language: python
+browse_label: FastAPI bundle
+markdown_files:
+  - overview.md

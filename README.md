@@ -33,8 +33,9 @@ UbundiForge is a CLI that collects a few project details, picks the best AI back
 - **Multi-backend routing** -- picks the best AI backend per phase with quality-based learning
 - **Interactive scaffold flow** -- review-and-edit screen with smart defaults that learn your patterns
 - **Cinematic scaffold experience** -- phase timeline, activity feed, file tree, and post-scaffold dashboard
-- **Convention injection** -- loads shared standards from `~/.forge/conventions.md`
+- **Convention injection** -- compiles shared standards from the bundled `conventions/` tree, with local overrides still supported
 - **Convention auditing** -- `forge check` audits any project against your standards with `--fix` and `--export`
+- **Conventions admin** -- `forge admin conventions` validates, previews, and browses the bundled conventions system
 - **Project augmentation** -- `forge evolve` adds capabilities (auth, Stripe, WebSockets, etc.) to existing projects
 - **Scaffold analytics** -- `forge stats` shows your scaffold history and backend performance
 - **Scaffold replay** -- `forge replay --diff` reproduces past scaffolds and detects drift
@@ -165,7 +166,7 @@ All user config lives under `~/.forge/`:
 | File | Purpose |
 |------|---------|
 | `config.json` | Editor, backends, model preferences, Docker, sound, and project directory settings |
-| `conventions.md` | Team coding standards injected into every scaffold prompt |
+| `conventions.md` | Legacy user-level override file for prompt conventions (still supported) |
 | `hooks/post-scaffold.sh` | Custom script run after every scaffold |
 | `scaffold.log` | Append-only JSON-lines scaffold history |
 | `quality.jsonl` | Quality signals per scaffold (powers smart routing) |
@@ -189,6 +190,17 @@ forge stats                  # Scaffold analytics dashboard
 forge evolve [capability]    # Add capabilities to existing projects
 forge check                  # Convention drift detection
 forge replay                 # Reproduce past scaffolds
+forge admin conventions      # Validate, preview, and browse bundled conventions
+```
+
+Common admin conventions flows:
+
+```bash
+forge admin conventions --validate
+forge admin conventions --preview-stack fastapi
+forge admin conventions --history global
+forge admin conventions --open global/python-standards.md
+forge admin conventions
 ```
 
 ## AI Agent Skill

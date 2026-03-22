@@ -1,12 +1,16 @@
 """Tests for CLI execution paths."""
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
+from rich.console import Console
 from typer.testing import CliRunner
 
 from ubundiforge.cli import app
 from ubundiforge.config import BackendStatus
+from ubundiforge.convention_models import ConventionValidationError
+from ubundiforge.setup import run_setup
 
 runner = CliRunner()
 
@@ -23,7 +27,10 @@ def _patch_prompt_only_dependencies(monkeypatch, *, setup_called: list[bool]) ->
         },
     )
     monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: False)
-    monkeypatch.setattr("ubundiforge.cli.load_conventions", lambda: ("Use strict typing.", []))
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_conventions",
+        lambda stack=None: ("Use strict typing.", []),
+    )
     monkeypatch.setattr("ubundiforge.cli.load_claude_md_template", lambda: None)
 
     def _fake_run_setup(console) -> None:
@@ -162,6 +169,66 @@ def test_dry_run_integration_includes_auth_ci_and_extra_sections(monkeypatch):
     assert "DEMO MODE" in result.stdout
 
 
+def test_dry_run_loads_compiled_conventions_for_requested_stack(monkeypatch):
+    setup_called = [False]
+    _patch_prompt_only_dependencies(monkeypatch, setup_called=setup_called)
+    seen_stacks: list[str | None] = []
+
+    def _fake_load_conventions(stack=None):
+        seen_stacks.append(stack)
+        return (f"compiled conventions for {stack}", [])
+
+    monkeypatch.setattr("ubundiforge.cli.load_conventions", _fake_load_conventions)
+
+    result = runner.invoke(
+        app,
+        [
+            "--dry-run",
+            "--name",
+            "bundle-smoke",
+            "--stack",
+            "fastapi",
+            "--description",
+            "Exercise stack-aware conventions",
+            "--no-docker",
+            "--no-open",
+            "--no-verify",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert seen_stacks == ["fastapi"]
+    assert "compiled conventions for fastapi" in result.stdout
+
+
+def test_dry_run_reports_bundle_validation_errors(monkeypatch):
+    setup_called = [False]
+    _patch_prompt_only_dependencies(monkeypatch, setup_called=setup_called)
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_conventions",
+        lambda stack=None: (_ for _ in ()).throw(ConventionValidationError("broken bundle")),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "--dry-run",
+            "--name",
+            "bundle-smoke",
+            "--stack",
+            "fastapi",
+            "--description",
+            "Exercise stack-aware conventions",
+            "--no-docker",
+            "--no-open",
+            "--no-verify",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "broken bundle" in result.stdout
+
+
 def test_mock_backends_cover_full_cli_flow_without_installed_ai_clis(monkeypatch, tmp_path):
     monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
     monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: False)
@@ -169,7 +236,10 @@ def test_mock_backends_cover_full_cli_flow_without_installed_ai_clis(monkeypatch
         "ubundiforge.cli.load_forge_config",
         lambda: {"projects_dir": str(tmp_path)},
     )
-    monkeypatch.setattr("ubundiforge.cli.load_conventions", lambda: ("Use strict typing.", []))
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_conventions",
+        lambda stack=None: ("Use strict typing.", []),
+    )
     monkeypatch.setattr("ubundiforge.cli.load_claude_md_template", lambda: None)
     monkeypatch.setattr(
         "ubundiforge.cli.get_backend_statuses",
@@ -320,7 +390,10 @@ def test_first_run_with_explicit_scaffold_flags_skips_post_setup_prompt(monkeypa
         "ubundiforge.cli.load_forge_config",
         lambda: {"projects_dir": str(tmp_path)},
     )
-    monkeypatch.setattr("ubundiforge.cli.load_conventions", lambda: ("Use strict typing.", []))
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_conventions",
+        lambda stack=None: ("Use strict typing.", []),
+    )
     monkeypatch.setattr("ubundiforge.cli.load_claude_md_template", lambda: None)
     monkeypatch.setattr(
         "ubundiforge.cli.get_backend_statuses",
@@ -373,6 +446,147 @@ def test_first_run_with_explicit_scaffold_flags_skips_post_setup_prompt(monkeypa
     assert "Project Ready" in result.stdout
 
 
+def test_replay_without_snapshot_loads_compiled_conventions_for_manifest_stack(
+    monkeypatch,
+    tmp_path,
+):
+    project_dir = tmp_path / "atlas"
+    forge_dir = project_dir / ".forge"
+    forge_dir.mkdir(parents=True)
+    (forge_dir / "scaffold.json").write_text(
+        json.dumps(
+            {
+                "name": "atlas",
+                "stack": "fastapi",
+                "description": "Replay me",
+                "routing": [{"phase": "architecture", "backend": "claude"}],
+            }
+        )
+    )
+
+    seen_stacks: list[str | None] = []
+
+    def _fake_load_bundled_conventions(stack=None):
+        seen_stacks.append(stack)
+        return (f"compiled conventions for {stack}", [])
+
+    monkeypatch.chdir(project_dir)
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_bundled_conventions",
+        _fake_load_bundled_conventions,
+    )
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_conventions",
+        lambda stack=None: (_ for _ in ()).throw(AssertionError("should use bundled replay path")),
+    )
+    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
+
+    result = runner.invoke(app, ["replay", "--dry-run"])
+    output = " ".join(result.stdout.split())
+
+    assert result.exit_code == 0
+    assert seen_stacks == ["fastapi"]
+    assert "compiled conventions for fastapi" in output
+    assert "Using current bundled conventions for stack 'fastapi'." in output
+
+
+def test_replay_prefers_snapshot_over_compiled_bundle(monkeypatch, tmp_path):
+    project_dir = tmp_path / "atlas"
+    forge_dir = project_dir / ".forge"
+    forge_dir.mkdir(parents=True)
+    (forge_dir / "scaffold.json").write_text(
+        json.dumps(
+            {
+                "name": "atlas",
+                "stack": "fastapi",
+                "description": "Replay me",
+                "routing": [{"phase": "architecture", "backend": "claude"}],
+            }
+        )
+    )
+    (forge_dir / "conventions-snapshot.md").write_text("snapshot conventions")
+
+    monkeypatch.chdir(project_dir)
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_conventions",
+        lambda stack=None: (_ for _ in ()).throw(AssertionError("should not load current bundle")),
+    )
+    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
+
+    result = runner.invoke(app, ["replay", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "snapshot conventions" in result.stdout
+
+
+def test_replay_reports_bundle_validation_errors(monkeypatch, tmp_path):
+    project_dir = tmp_path / "atlas"
+    forge_dir = project_dir / ".forge"
+    forge_dir.mkdir(parents=True)
+    (forge_dir / "scaffold.json").write_text(
+        json.dumps(
+            {
+                "name": "atlas",
+                "stack": "fastapi",
+                "description": "Replay me",
+                "routing": [{"phase": "architecture", "backend": "claude"}],
+            }
+        )
+    )
+
+    monkeypatch.chdir(project_dir)
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_bundled_conventions",
+        lambda stack=None: (_ for _ in ()).throw(ConventionValidationError("unknown stack")),
+    )
+    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
+
+    result = runner.invoke(app, ["replay", "--dry-run"])
+
+    assert result.exit_code == 1
+    assert "unknown stack" in result.stdout
+
+
+def test_replay_unknown_manifest_stack_falls_back_to_default_bundle(monkeypatch, tmp_path):
+    project_dir = tmp_path / "atlas"
+    forge_dir = project_dir / ".forge"
+    forge_dir.mkdir(parents=True)
+    (forge_dir / "scaffold.json").write_text(
+        json.dumps(
+            {
+                "name": "atlas",
+                "stack": "not-a-real-stack",
+                "description": "Replay me",
+                "routing": [{"phase": "architecture", "backend": "claude"}],
+            }
+        )
+    )
+
+    seen_stacks: list[str | None] = []
+
+    def _fake_load_bundled_conventions(stack=None):
+        seen_stacks.append(stack)
+        if stack == "not-a-real-stack":
+            raise ConventionValidationError("Unknown convention record: stacks/not-a-real-stack")
+        return ("compiled default conventions", [])
+
+    monkeypatch.chdir(project_dir)
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_bundled_conventions",
+        _fake_load_bundled_conventions,
+    )
+    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
+
+    result = runner.invoke(app, ["replay", "--dry-run"])
+    output = " ".join(result.stdout.lower().split())
+
+    assert result.exit_code == 0
+    assert seen_stacks == ["not-a-real-stack", None]
+    assert "compiled default conventions" in result.stdout
+    assert "falling back to current bundled conventions" in output
+    assert "no conventions snapshot found. using current conventions." in output
+
+
 def test_resolve_project_dir_allows_rename(monkeypatch, tmp_path):
     from ubundiforge.cli import _resolve_project_dir
 
@@ -397,3 +611,125 @@ def test_resolve_project_dir_allows_rename(monkeypatch, tmp_path):
     assert answers["name"] == "renamed-project"
     assert project_dir == tmp_path / "renamed-project"
     assert (target / "keep.txt").exists()
+
+
+def test_run_setup_does_not_create_legacy_conventions_file(monkeypatch, tmp_path):
+    console = Console(record=True, width=120)
+    forge_dir = tmp_path / ".forge"
+    config_path = forge_dir / "config.json"
+    conventions_path = forge_dir / "conventions.md"
+
+    prompt_select_answers = iter(["claude-opus-4-6"])
+
+    monkeypatch.setattr("ubundiforge.setup.FORGE_DIR", forge_dir)
+    monkeypatch.setattr("ubundiforge.setup.CONFIG_PATH", config_path)
+    monkeypatch.setattr("ubundiforge.setup.CONVENTIONS_PATH", conventions_path)
+    monkeypatch.setattr(
+        "ubundiforge.setup.get_backend_statuses",
+        lambda: {
+            "claude": BackendStatus(installed=True, ready=True),
+            "gemini": BackendStatus(installed=False, ready=False),
+            "codex": BackendStatus(installed=False, ready=False),
+        },
+    )
+    monkeypatch.setattr("ubundiforge.setup.load_forge_config", lambda: {})
+    monkeypatch.setattr("ubundiforge.setup._check_editor_installed", lambda *_: (False, False))
+    monkeypatch.setattr(
+        "ubundiforge.setup.prompt_select",
+        lambda *args, **kwargs: SimpleNamespace(ask=lambda: next(prompt_select_answers)),
+    )
+    monkeypatch.setattr(
+        "ubundiforge.setup.prompt_text",
+        lambda *args, **kwargs: SimpleNamespace(ask=lambda: ""),
+    )
+    monkeypatch.setattr("ubundiforge.media_assets.list_collections", lambda: [])
+    monkeypatch.setattr("ubundiforge.media_assets.MEDIA_DIR", tmp_path / "media")
+    monkeypatch.setattr(
+        "ubundiforge.setup.shutil.which",
+        lambda cmd: None if cmd in {"git", "docker"} else f"/usr/bin/{cmd}",
+    )
+
+    config = run_setup(console)
+    output = console.export_text()
+
+    assert config["available_backends"] == ["claude"]
+    assert not conventions_path.exists()
+    assert "bundled conventions" in output.lower()
+    assert "bundled source tree" in output.lower()
+    assert "forge admin conventions" in output
+
+
+def test_admin_conventions_validate_passes() -> None:
+    result = runner.invoke(app, ["admin", "conventions", "--validate"])
+
+    assert result.exit_code == 0
+    assert "Validation passed" in result.stdout
+
+
+def test_admin_conventions_preview_stack() -> None:
+    result = runner.invoke(app, ["admin", "conventions", "--preview-stack", "fastapi"])
+
+    assert result.exit_code == 0
+    assert "Compiled bundle: fastapi" in result.stdout
+
+
+def test_admin_conventions_history_degrades_gracefully(monkeypatch) -> None:
+    from ubundiforge.convention_history import GitHistoryResult
+
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_history",
+        lambda root, target: GitHistoryResult(
+            target=target,
+            available=False,
+            entries=(),
+            message="Git history is unavailable.",
+        ),
+    )
+
+    result = runner.invoke(app, ["admin", "conventions", "--history", "fastapi"])
+
+    assert result.exit_code == 0
+    assert "Git history is unavailable." in result.stdout
+
+
+def test_admin_conventions_history_allows_top_level_scope_targets(monkeypatch) -> None:
+    from ubundiforge.convention_history import GitHistoryResult
+
+    seen_targets: list[str] = []
+
+    def _fake_load_history(root, target):
+        seen_targets.append(target)
+        return GitHistoryResult(
+            target=target,
+            available=True,
+            entries=("abc123 Update global conventions",),
+        )
+
+    monkeypatch.setattr("ubundiforge.cli.load_history", _fake_load_history)
+
+    result = runner.invoke(app, ["admin", "conventions", "--history", "global"])
+
+    assert result.exit_code == 0
+    assert seen_targets == ["global"]
+    assert "abc123 Update global conventions" in result.stdout
+
+
+def test_admin_conventions_open_prints_repo_markdown_path() -> None:
+    result = runner.invoke(app, ["admin", "conventions", "--open", "global/shared.md"])
+
+    assert result.exit_code == 0
+    assert "conventions/global/shared.md" in result.stdout
+
+
+def test_admin_conventions_defaults_to_interactive_menu(monkeypatch) -> None:
+    actions = iter(["validate"])
+
+    monkeypatch.setattr(
+        "ubundiforge.cli.prompt_select",
+        lambda *args, **kwargs: SimpleNamespace(ask=lambda: next(actions)),
+    )
+
+    result = runner.invoke(app, ["admin", "conventions"])
+
+    assert result.exit_code == 0
+    assert "Validation passed" in result.stdout

@@ -1,0 +1,6 @@
+id: nextjs
+label: Next.js
+language: typescript
+browse_label: Next.js bundle
+markdown_files:
+  - overview.md

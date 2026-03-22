@@ -158,6 +158,43 @@ def make_table(
     return table
 
 
+def make_path_table(
+    paths: Iterable[str | Path],
+    *,
+    root: Path | None = None,
+    title: str = "Files",
+    accent: str = "plum",
+) -> Table:
+    """Create a single-column table for displaying repo-relative paths."""
+
+    table = make_table(title=title, accent=accent)
+    table.add_column("Path", style=TEXT_SECONDARY)
+    for path in paths:
+        value = Path(path)
+        if root is not None and value.is_absolute():
+            try:
+                value = value.relative_to(root)
+            except ValueError:
+                value = Path(path)
+        table.add_row(str(value))
+    return table
+
+
+def make_history_panel(
+    entries: Iterable[str],
+    *,
+    title: str,
+    accent: str = "amber",
+    empty_message: str = "No history entries found.",
+) -> Panel:
+    """Render a compact panel for git history lines."""
+
+    lines = list(entries)
+    if not lines:
+        lines = [empty_message]
+    return make_panel(grouped_lines(lines), title=title, accent=accent)
+
+
 def make_step_panel(
     step: int,
     total: int,

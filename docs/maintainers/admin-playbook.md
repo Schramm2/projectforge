@@ -1,40 +1,88 @@
 # Admin Playbook
 
-This guide explains how to maintain UbundiForge as an administrator: where to update Ubundi conventions, how to add new stacks and capabilities, and how to publish a new Homebrew release so future scaffolds use the latest Forge behavior.
+This guide explains how to maintain UbundiForge as an administrator: where Ubundi conventions now live, how to update them safely, how to add new stacks and capabilities, and how to publish a release so future scaffolds pick up the latest bundled behavior.
 
 ## Mental model
 
-There are two broad kinds of Forge customization:
+There are now two distinct layers:
 
-1. Bundled Forge behavior, which lives in this repository and ships in every new Forge release.
-2. User-local overrides, which live in `~/.forge/` or project-local `.forge/` directories on the machine running Forge.
+1. Canonical bundled conventions, owned in this repository under `conventions/` and shipped in Forge releases.
+2. Local compatibility overrides, which still live in project-local `.forge/` folders or `~/.forge/` on a user's machine.
 
-If you want a change to become part of the product for future installs, edit this repository and ship a new Forge version.
+If the change should become part of the product, edit the bundled `conventions/` tree in this repo and ship a release.
 
-If you want a one-off local override for a specific user or project, edit the files under `~/.forge/` or `.forge/` instead.
+If the change is only for a local experiment or one project, use `.forge/conventions.md` or `~/.forge/conventions.md`.
 
-## What to edit for Ubundi conventions
+## The canonical conventions tree
 
-### Default conventions
+Forge now builds prompt-ready convention bundles from this layered source tree:
 
-Forge creates a starter conventions file from `DEFAULT_CONVENTIONS` in:
+```text
+conventions/
+  global/
+  languages/
+  stacks/
+  prompts/
+  manifests/
+```
 
+- Markdown files hold the human-readable standards.
+- Metadata files define inheritance and ordering.
+- Manifests define prompt bundle composition and browse labels.
+
+Use the admin command to inspect the system:
+
+```bash
+forge admin conventions --validate
+forge admin conventions --preview-stack fastapi
+forge admin conventions --history global
+forge admin conventions --open global/python-standards.md
+```
+
+## Normal admin flow: updating Python conventions
+
+If you want to change how Ubundi writes Python code:
+
+1. Run `forge admin conventions --preview-stack fastapi` to inspect the current compiled Python-facing bundle.
+2. Open the source Markdown file that currently owns the Python defaults, usually:
+   - `conventions/global/python-standards.md`
+   - `conventions/global/python-architecture.md`
+3. Edit the Markdown directly in the repo.
+4. If Python conventions later move into language-layer files, update the matching metadata file under:
+   - `conventions/languages/python/metadata.yaml`
+5. Validate the tree:
+   - `forge admin conventions --validate`
+6. Preview one or more affected stacks again:
+   - `forge admin conventions --preview-stack fastapi`
+   - `forge admin conventions --preview-stack python-worker`
+7. Inspect recent changes if needed:
+   - `forge admin conventions --history python`
+8. Commit the repo change and ship it in the next Forge release.
+
+Use the language layer for broad Python standards such as typing, imports, testing posture, or packaging defaults. Use a stack layer when the rule is specific to a stack such as FastAPI routing, worker structure, or monorepo conventions.
+
+## Where to edit bundled behavior
+
+### Conventions content
+
+Edit the bundled `conventions/` tree for:
+
+- coding standards
+- project structure rules
+- stack-specific implementation patterns
+- prompt bundle composition
+
+### Prompt assembly and compatibility
+
+Relevant code lives in:
+
+- `src/ubundiforge/convention_registry.py`
+- `src/ubundiforge/convention_compiler.py`
+- `src/ubundiforge/convention_admin.py`
+- `src/ubundiforge/convention_history.py`
 - `src/ubundiforge/conventions.py`
 
-This is the built-in Ubundi conventions starter used when `~/.forge/conventions.md` does not already exist.
-
-### Cross-project standards injected into every prompt
-
-Forge also injects shared stack-level standards from:
-
-- `src/ubundiforge/stacks.py`
-
-Specifically, update `CROSS_RECIPE_DEFAULTS` when you want to change the global prompt rules applied to all relevant scaffolds, such as:
-
-- Python packaging and linting defaults
-- TypeScript defaults
-- Docker defaults
-- cross-project architecture rules
+`src/ubundiforge/conventions.py` now acts mainly as the compatibility loader for bundled bundles plus legacy local overrides.
 
 ### Frontend brand and design direction
 
@@ -45,28 +93,20 @@ If you want to change Ubundi's default visual language for frontend scaffolds, u
 
 If you want to add a new selectable design template, add it to `DESIGN_TEMPLATE_OPTIONS` and bundle a matching template file.
 
-## Important behavior: local overrides win
+## Important behavior: local overrides still exist
 
-Forge does not blindly force the repo defaults every time it runs.
+Forge still honors local override files when present:
 
-Convention loading currently works like this:
+1. `.forge/conventions.md` inside a project
+2. `~/.forge/conventions.md` for a user
 
-1. If the current project contains `.forge/conventions.md`, Forge uses that.
-2. Otherwise, if `~/.forge/conventions.md` exists, Forge uses that.
-3. Otherwise, Forge creates `~/.forge/conventions.md` from the bundled default conventions.
-
-This means a new Forge release does not automatically overwrite an existing user's `~/.forge/conventions.md`.
+Those are compatibility paths and should not be treated as the repo-admin source of truth.
 
 In practice:
 
-- Changes to `DEFAULT_CONVENTIONS` mostly affect fresh installs and users who do not already have a conventions file.
-- Changes to prompt-building logic, stack metadata, routing, bundled design templates, verification rules, and CLI behavior do ship to everyone who upgrades Forge.
-- Project-local `.forge/` files can still override global behavior inside a specific scaffold target.
-
-If Ubundi eventually wants centrally managed conventions that always update on upgrade, Forge would need a product change such as:
-
-- merging bundled conventions with user overrides, or
-- a migration command that refreshes `~/.forge/conventions.md`
+- Bundled `conventions/` changes affect local development in this repo immediately.
+- Everyone else gets those bundled changes on the next Forge release.
+- Local `.forge/` overrides can still take precedence for a specific project or machine.
 
 ## Adding a new stack
 
@@ -101,7 +141,7 @@ uv run ruff check .
 
 Use this rough rule of thumb:
 
-- Edit `src/ubundiforge/conventions.py` for starter convention content.
+- Edit `conventions/` for bundled convention content.
 - Edit `src/ubundiforge/stacks.py` for stack structures, libraries, commands, services, and env hints.
 - Edit `src/ubundiforge/scaffold_options.py` for auth and CI options.
 - Edit `src/ubundiforge/design_templates.py` and bundled templates for visual/brand direction.
@@ -141,6 +181,7 @@ If you changed stack behavior, also run a dry-run smoke test:
 
 ```bash
 ./forge --dry-run --name release-smoke --stack fastapi --description "release smoke test"
+./forge admin conventions --validate
 ```
 
 ### 4. Push the release commit to `main`

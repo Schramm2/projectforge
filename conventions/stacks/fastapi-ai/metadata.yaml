@@ -1,0 +1,6 @@
+id: fastapi-ai
+label: FastAPI AI
+language: python
+browse_label: FastAPI AI bundle
+markdown_files:
+  - overview.md

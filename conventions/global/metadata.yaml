@@ -1,0 +1,12 @@
+id: global
+label: Cross-project defaults
+browse_label: Global conventions
+markdown_files:
+  - shared.md
+  - frontend-brand.md
+  - frontend-communication.md
+  - typescript-standards.md
+  - python-standards.md
+  - python-architecture.md
+  - project-files.md
+  - git.md
