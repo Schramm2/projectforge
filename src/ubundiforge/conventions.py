@@ -1,10 +1,11 @@
 """Loads convention sources from the bundled tree and legacy ~/.forge/ files."""
 
 import re
-from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
+from .convention_compiler import compile_bundle as _compile_bundle
+from .convention_models import CompiledBundle
+from .convention_registry import build_registry as _build_registry
 
 _PLACEHOLDER_LOCAL_EXACT_LINES = {
     "todo",
@@ -73,112 +74,16 @@ def _compose_text(root: Path, relative_paths: list[str]) -> str:
 
 DEFAULT_CONVENTIONS = _compose_text(BUNDLED_CONVENTIONS_DIR, _DEFAULT_CONVENTIONS_PARTS)
 
+def build_registry(root: Path | None = None):
+    """Build the conventions registry for the bundled or provided tree."""
 
-@dataclass(frozen=True)
-class CompiledBundle:
-    """A compiled conventions bundle."""
-
-    prompt_block: str
-    warnings: list[str]
+    return _build_registry(root or BUNDLED_CONVENTIONS_DIR)
 
 
-def _read_yaml(path: Path) -> dict[str, object]:
-    if not path.exists():
-        return {}
-    data = yaml.safe_load(path.read_text())
-    if isinstance(data, dict):
-        return data
-    return {}
-
-
-def _dedupe_paths(paths: list[Path]) -> list[Path]:
-    seen: set[Path] = set()
-    deduped: list[Path] = []
-    for path in paths:
-        if path in seen:
-            continue
-        seen.add(path)
-        deduped.append(path)
-    return deduped
-
-
-def _discover_markdown_files(root: Path) -> list[Path]:
-    files = [path for path in root.rglob("*.md") if "manifests" not in path.parts]
-    return sorted(files)
-
-
-def _bundle_files_from_manifest(
-    root: Path,
-    registry: dict[str, object],
-    stack: str | None,
-) -> list[Path]:
-    bundle_definitions = registry.get("bundle_definitions")
-    if not isinstance(bundle_definitions, dict):
-        return []
-
-    selected: list[str] = []
-
-    default_bundle = bundle_definitions.get("default")
-    if isinstance(default_bundle, dict):
-        files = default_bundle.get("files")
-        if isinstance(files, list):
-            selected.extend(str(item) for item in files)
-
-    if stack:
-        stack_overrides = bundle_definitions.get("stack_overrides")
-        if isinstance(stack_overrides, dict):
-            override = stack_overrides.get(stack)
-            if isinstance(override, dict):
-                files = override.get("files")
-                if isinstance(files, list):
-                    selected.extend(str(item) for item in files)
-
-    return [root / rel_path for rel_path in selected]
-
-
-def build_registry(root: Path | None = None) -> dict[str, object]:
-    """Build a lightweight registry of the bundled conventions tree."""
-
-    resolved_root = root or BUNDLED_CONVENTIONS_DIR
-    manifests_dir = resolved_root / "manifests"
-
-    metadata: dict[str, dict[str, object]] = {}
-    for metadata_path in sorted(resolved_root.rglob("metadata.yaml")):
-        if "manifests" in metadata_path.parts:
-            continue
-        relative_dir = metadata_path.parent.relative_to(resolved_root).as_posix()
-        metadata[relative_dir] = _read_yaml(metadata_path)
-
-    return {
-        "root": resolved_root,
-        "bundle_definitions": _read_yaml(manifests_dir / "bundles.yaml"),
-        "browse_labels": _read_yaml(manifests_dir / "browse-labels.yaml"),
-        "metadata": metadata,
-    }
-
-
-def compile_bundle(registry: dict[str, object], stack: str | None = None) -> CompiledBundle:
+def compile_bundle(registry, stack: str | None = None) -> CompiledBundle:
     """Compile a prompt block from the registry and optional stack id."""
 
-    root = registry["root"]
-    if not isinstance(root, Path):
-        root = BUNDLED_CONVENTIONS_DIR
-
-    bundle_files = _bundle_files_from_manifest(root, registry, stack)
-    if not bundle_files:
-        bundle_files = _discover_markdown_files(root)
-
-    bundle_files = _dedupe_paths([path for path in bundle_files if path.exists()])
-    content_parts = [path.read_text().strip() for path in bundle_files if path.read_text().strip()]
-    prompt_block = "\n\n".join(content_parts).strip()
-
-    warnings: list[str] = []
-    if not prompt_block:
-        warnings.append("Conventions bundle is empty.")
-    elif len(prompt_block) < MIN_CONVENTIONS_LENGTH:
-        warnings.append("Conventions bundle is very short — consider adding more detail.")
-
-    return CompiledBundle(prompt_block=prompt_block, warnings=warnings)
+    return _compile_bundle(registry, stack=stack)
 
 
 def _load_conventions_file(path: Path) -> tuple[str, list[str]]:
