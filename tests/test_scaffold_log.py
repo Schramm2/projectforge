@@ -89,3 +89,20 @@ def test_write_scaffold_manifest_creates_forge_dir(tmp_path):
     )
 
     assert (project_dir / ".forge" / "scaffold.json").exists()
+
+
+def test_write_scaffold_manifest_saves_conventions_snapshot(tmp_path):
+    project_dir = tmp_path / "test-project"
+    project_dir.mkdir()
+
+    conventions = "# My Conventions\n\nUse strict typing.\n"
+    write_scaffold_manifest(
+        {"name": "test-project", "stack": "fastapi"},
+        [("architecture", "claude")],
+        project_dir,
+        conventions,
+    )
+
+    snapshot = project_dir / ".forge" / "conventions-snapshot.md"
+    assert snapshot.exists()
+    assert snapshot.read_text() == conventions

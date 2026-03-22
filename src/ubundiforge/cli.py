@@ -11,9 +11,12 @@ import typer
 from rich.text import Text
 
 from ubundiforge import __version__
+from ubundiforge.card import inject_badge_into_readme, write_card
+from ubundiforge.checks import CheckResult, detect_stack, generate_fix, run_checks
 from ubundiforge.config import (
     SUPPORTED_BACKENDS,
     BackendStatus,
+    check_backend_installed,
     get_backend_statuses,
 )
 from ubundiforge.conventions import load_claude_md_template, load_conventions
@@ -40,7 +43,9 @@ from ubundiforge.prompts import collect_answers
 from ubundiforge.quality import append_quality_signal, compute_backend_scores, read_quality_signals
 from ubundiforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
 from ubundiforge.router import (
+    PHASE_ARCHITECTURE,
     PHASE_LABELS,
+    PHASE_VERIFY,
     STACK_PHASES,
     merge_adjacent_phases,
     pick_phase_backends,
@@ -63,8 +68,12 @@ from ubundiforge.scaffold_options import (
     ci_action_ids_for_stack,
 )
 from ubundiforge.setup import load_forge_config, needs_setup, run_setup
+from ubundiforge.sound import play_completion_sound
 from ubundiforge.ui import (
+    ACCENTS,
     BACKEND_ACCENTS,
+    TEXT_MUTED,
+    TEXT_SECONDARY,
     bullet,
     create_console,
     grouped_lines,
@@ -440,8 +449,6 @@ def evolve(
     dna = json.loads(manifest_path.read_text())
     stack = dna.get("stack", "")
 
-    from ubundiforge.logo import print_logo
-
     print_logo(console)
     console.print(header_panel(__version__))
     console.print(
@@ -486,8 +493,6 @@ def evolve(
         raise typer.Exit(0)
 
     # Route through standard backend routing (or --use override)
-    from ubundiforge.config import check_backend_installed
-
     if use:
         backend = use
         if not check_backend_installed(backend):
@@ -523,6 +528,284 @@ def evolve(
             )
         )
         raise typer.Exit(returncode)
+
+
+@app.command()
+def check(
+    fix: Annotated[
+        bool,
+        typer.Option("--fix", help="Auto-generate missing fixable files."),
+    ] = False,
+    export: Annotated[
+        str | None,
+        typer.Option("--export", help="Export the report to a markdown file."),
+    ] = None,
+) -> None:
+    """Audit a project against Ubundi conventions."""
+    project_dir = Path.cwd()
+    stack = detect_stack(project_dir)
+
+    console.print(header_panel(__version__))
+    console.print(status_line(f"Checking: {project_dir.name} ({stack})", accent="violet"))
+    console.print()
+
+    results = run_checks(project_dir)
+
+    passed = [r for r in results if r.passed]
+    warnings = [r for r in results if not r.passed and r.severity == "warn"]
+    failed = [r for r in results if not r.passed and r.severity == "fail"]
+
+    # Group by category
+    categories: dict[str, list[CheckResult]] = {}
+    for r in results:
+        categories.setdefault(r.category, []).append(r)
+
+    for category, checks in sorted(categories.items()):
+        console.print(muted(f"  {category.upper()}"))
+        for c in checks:
+            if c.passed:
+                icon = f"[{ACCENTS['aqua']}]✓[/]"
+                text = f"[{TEXT_SECONDARY}]{c.name}[/]"
+            elif c.severity == "warn":
+                icon = f"[{ACCENTS['amber']}]![/]"
+                text = f"[{ACCENTS['amber']}]{c.detail or c.name}[/]"
+            else:
+                icon = f"[{ACCENTS['plum']}]✗[/]"
+                text = f"[{ACCENTS['plum']}]{c.detail or c.name}[/]"
+            console.print(f"  {icon} {text}")
+        console.print()
+
+    # Summary line
+    summary = Text("  ")
+    summary.append(str(len(passed)), style=f"bold {ACCENTS['aqua']}")
+    summary.append(" passed  ", style=TEXT_MUTED)
+    if warnings:
+        summary.append(str(len(warnings)), style=f"bold {ACCENTS['amber']}")
+        summary.append(" warnings  ", style=TEXT_MUTED)
+    if failed:
+        summary.append(str(len(failed)), style=f"bold {ACCENTS['plum']}")
+        summary.append(" failed", style=TEXT_MUTED)
+    console.print(summary)
+
+    # Fix mode
+    if fix:
+        fixable = [r for r in results if r.fixable and not r.passed]
+        if fixable:
+            console.print()
+            for c in fixable:
+                if generate_fix(project_dir, c):
+                    console.print(status_line(f"Created {c.name}", accent="aqua"))
+        else:
+            console.print(status_line("Nothing to fix automatically.", accent="amber"))
+
+    # Export mode
+    if export:
+        lines = [f"# Convention Audit — {project_dir.name}\n"]
+        lines.append(f"Stack: {stack}\n")
+        for category, checks in sorted(categories.items()):
+            lines.append(f"\n## {category.title()}\n")
+            for c in checks:
+                icon = "✓" if c.passed else ("!" if c.severity == "warn" else "✗")
+                lines.append(f"- {icon} {c.name}{': ' + c.detail if c.detail else ''}")
+        summary_text = f"{len(passed)} passed, {len(warnings)} warnings, {len(failed)} failed"
+        lines.append(f"\n---\n{summary_text}\n")
+        Path(export).write_text("\n".join(lines))
+        console.print(status_line(f"Report exported to {export}", accent="aqua"))
+
+    if fix:
+        console.print(status_line("Run forge check again to verify fixes.", accent="violet"))
+
+
+@app.command()
+def replay(
+    diff: Annotated[
+        bool,
+        typer.Option("--diff", help="Compare replay output against current project."),
+    ] = False,
+    use: Annotated[
+        str | None,
+        typer.Option("--use", help="Override AI routing."),
+    ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option("--model", "-m", help="Model to pass to the AI CLI."),
+    ] = None,
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", help="Show detailed execution info."),
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Print the reconstructed prompt without executing."),
+    ] = False,
+) -> None:
+    """Replay a scaffold using the project's original inputs."""
+    import json
+    import tempfile
+
+    project_dir = Path.cwd()
+    manifest_path = project_dir / ".forge" / "scaffold.json"
+
+    if not manifest_path.exists():
+        console.print(
+            status_line(
+                "No .forge/scaffold.json found. Run this inside a Forge project.",
+                accent="amber",
+            )
+        )
+        raise typer.Exit(1)
+
+    dna = json.loads(manifest_path.read_text())
+    stack = dna.get("stack", "")
+    name = dna.get("name", project_dir.name)
+
+    console.print(header_panel(__version__))
+    console.print(status_line(f"Replaying: {name} ({stack})", accent="violet"))
+
+    # Load conventions snapshot or current conventions
+    snapshot_path = project_dir / ".forge" / "conventions-snapshot.md"
+    if snapshot_path.exists():
+        conventions = snapshot_path.read_text()
+    else:
+        conventions, _ = load_conventions()
+        console.print(
+            status_line(
+                "No conventions snapshot found. Using current conventions.",
+                accent="amber",
+            )
+        )
+
+    # Reconstruct answers from manifest
+    answers = {
+        "name": name,
+        "stack": stack,
+        "description": dna.get("description", ""),
+        "docker": "Dockerfile" in str(list(project_dir.rglob("Dockerfile"))),
+        "design_template": dna.get("design_template"),
+        "auth_provider": dna.get("auth_provider"),
+        "demo_mode": dna.get("demo_mode", False),
+        "extra": "",
+        "services": [],
+    }
+
+    # Reconstruct phase backends from routing
+    routing = dna.get("routing", [])
+    phase_backends = [(r["phase"], r["backend"]) for r in routing]
+
+    if not phase_backends:
+        phase_backends = pick_phase_backends(stack, override=use)
+
+    # Check backend availability
+    for _, backend in phase_backends:
+        actual = use or backend
+        if not check_backend_installed(actual):
+            console.print(
+                status_line(
+                    f"{actual} is not installed. Results may differ from original scaffold.",
+                    accent="amber",
+                )
+            )
+            # Fall back to standard routing
+            phase_backends = pick_phase_backends(stack, override=use)
+            break
+
+    # Build prompt
+    all_phases = STACK_PHASES.get(stack, ["architecture", "tests"])
+    phase_prompts = []
+    merged = merge_adjacent_phases(phase_backends)
+    for phases_group, backend in merged:
+        prompt = build_phase_prompt(phases_group, all_phases, answers, conventions, backend=backend)
+        phase_prompts.append((phases_group, backend, prompt))
+
+    if dry_run:
+        for phases_group, backend, prompt in phase_prompts:
+            label = " + ".join(phases_group)
+            console.print(f"\n--- {label} ({backend}) ---\n")
+            console.print(prompt)
+        raise typer.Exit(0)
+
+    # Execute into temp directory
+    replay_dir = Path(tempfile.mkdtemp(prefix=f"forge-replay-{name}-"))
+    console.print(status_line(f"Replaying into {replay_dir}", accent="violet"))
+
+    for phases_group, backend, prompt in phase_prompts:
+        label = " + ".join(phases_group)
+        effective_model = model or dna.get("backend_models", {}).get(backend)
+        returncode = run_ai(
+            backend,
+            prompt,
+            replay_dir,
+            model=effective_model,
+            verbose=verbose,
+            label=label,
+        )
+        if returncode != 0:
+            console.print(
+                status_line(
+                    f"Replay phase '{label}' failed (exit {returncode}).",
+                    accent="amber",
+                )
+            )
+            raise typer.Exit(returncode)
+
+    console.print(status_line(f"Replay complete at {replay_dir}", accent="aqua"))
+
+    # Diff mode
+    if diff:
+        import filecmp
+
+        def _collect_diffs(dcmp, prefix=""):
+            """Recursively collect diffs from a dircmp result."""
+            added, removed, changed = [], [], []
+            for f in dcmp.right_only:
+                added.append(f"{prefix}{f}")
+            for f in dcmp.left_only:
+                removed.append(f"{prefix}{f}")
+            for f in dcmp.diff_files:
+                changed.append(f"{prefix}{f}")
+            for subdir, sub_dcmp in dcmp.subdirs.items():
+                a, r, c = _collect_diffs(sub_dcmp, prefix=f"{prefix}{subdir}/")
+                added.extend(a)
+                removed.extend(r)
+                changed.extend(c)
+            return added, removed, changed
+
+        dcmp = filecmp.dircmp(
+            str(project_dir),
+            str(replay_dir),
+            ignore=[".forge", ".git", "__pycache__", "node_modules", ".venv"],
+        )
+        added, removed, changed = _collect_diffs(dcmp)
+
+        console.print()
+        if added:
+            for f in sorted(added):
+                console.print(status_line(f"+ {f}", accent="aqua"))
+        if changed:
+            for f in sorted(changed):
+                console.print(status_line(f"~ {f}", accent="amber"))
+        if removed:
+            for f in sorted(removed):
+                console.print(status_line(f"- {f}", accent="plum"))
+
+        if not added and not changed and not removed:
+            console.print(status_line("No structural differences found.", accent="aqua"))
+
+        # Save diff report
+        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
+        diff_file = project_dir / ".forge" / f"replay-diff-{date_str}.md"
+        lines = [f"# Replay Diff — {name}\n"]
+        if added:
+            lines.append("\n## Added\n")
+            lines.extend(f"- {f}" for f in sorted(added))
+        if changed:
+            lines.append("\n## Changed\n")
+            lines.extend(f"- {f}" for f in sorted(changed))
+        if removed:
+            lines.append("\n## Removed\n")
+            lines.extend(f"- {f}" for f in sorted(removed))
+        diff_file.write_text("\n".join(lines) + "\n")
+        console.print(status_line(f"Diff saved to {diff_file}", accent="aqua"))
 
 
 @app.callback(invoke_without_command=True)
@@ -842,8 +1125,6 @@ def main(
 
     # Identify which phases can run in parallel (everything between first and last)
     # Architecture must run first, verify must run last, middle phases run concurrently.
-    from ubundiforge.router import PHASE_ARCHITECTURE, PHASE_VERIFY
-
     serial_first: list[tuple[str, str]] = []
     parallel_middle: list[tuple[str, str]] = []
     serial_last: list[tuple[str, str]] = []
@@ -1246,6 +1527,20 @@ def main(
         verify_report=verify_report,
         elapsed=elapsed,
     )
+
+    scaffold_date = datetime.now(UTC).strftime("%Y-%m-%d")
+    backends_used = sorted({b for _, b in phase_backends})
+    write_card(
+        project_dir,
+        name=answers["name"],
+        stack=answers["stack"],
+        backends=backends_used,
+        date=scaffold_date,
+    )
+    inject_badge_into_readme(project_dir)
+
+    sound_enabled = forge_config.get("sound", False)
+    play_completion_sound(success=True, enabled=sound_enabled)
 
     if not git_ok:
         console.print(
