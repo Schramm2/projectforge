@@ -213,6 +213,49 @@ def make_loader_panel(
     )
 
 
+def make_phase_timeline(phases: list[dict]) -> Group:
+    """Create a horizontal phase progress indicator.
+
+    Each phase dict has: label, status (completed/active/pending), elapsed, accent.
+    """
+    # Phase labels row
+    label_line = Text("  ")
+    for phase in phases:
+        if phase["status"] == "completed":
+            label_line.append("● ", style=ACCENTS["aqua"])
+            label_line.append(phase["label"], style=TEXT_MUTED)
+            label_line.append(f" {phase['elapsed']:.0f}s", style=TEXT_MUTED)
+        elif phase["status"] == "active":
+            label_line.append("◉ ", style=ACCENTS[phase["accent"]])
+            label_line.append(phase["label"], style=f"bold {TEXT_PRIMARY}")
+            label_line.append(f" {phase['elapsed']:.0f}s", style=TEXT_MUTED)
+        else:
+            label_line.append("○ ", style=TEXT_MUTED)
+            label_line.append(phase["label"], style=TEXT_MUTED)
+        label_line.append("   ", style="")
+
+    # Progress bar
+    total = len(phases)
+    completed = sum(1 for p in phases if p["status"] == "completed")
+    active = sum(1 for p in phases if p["status"] == "active")
+    bar_width = min(60, total * 15)
+
+    completed_width = int(bar_width * completed / total)
+    active_width = int(bar_width * active / total) if active else 0
+    remaining_width = bar_width - completed_width - active_width
+
+    bar = Text("  ")
+    if completed_width:
+        bar.append("━" * completed_width, style=ACCENTS["aqua"])
+    if active_width:
+        active_accent = next((p["accent"] for p in phases if p["status"] == "active"), "violet")
+        bar.append("━" * active_width, style=ACCENTS[active_accent])
+    if remaining_width:
+        bar.append("━" * remaining_width, style=ACCENTS["indigo"])
+
+    return Group(label_line, bar)
+
+
 def header_panel(version: str | None = None) -> Panel:
     """Create the branded header panel for the CLI."""
     lines = grouped_lines(
