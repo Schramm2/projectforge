@@ -11,6 +11,7 @@ import typer
 from rich.text import Text
 
 from ubundiforge import __version__
+from ubundiforge.checks import CheckResult, detect_stack, generate_fix, run_checks
 from ubundiforge.config import (
     SUPPORTED_BACKENDS,
     BackendStatus,
@@ -64,7 +65,10 @@ from ubundiforge.scaffold_options import (
 )
 from ubundiforge.setup import load_forge_config, needs_setup, run_setup
 from ubundiforge.ui import (
+    ACCENTS,
     BACKEND_ACCENTS,
+    TEXT_MUTED,
+    TEXT_SECONDARY,
     bullet,
     create_console,
     grouped_lines,
@@ -523,6 +527,92 @@ def evolve(
             )
         )
         raise typer.Exit(returncode)
+
+
+@app.command()
+def check(
+    fix: Annotated[
+        bool,
+        typer.Option("--fix", help="Auto-generate missing fixable files."),
+    ] = False,
+    export: Annotated[
+        str | None,
+        typer.Option("--export", help="Export the report to a markdown file."),
+    ] = None,
+) -> None:
+    """Audit a project against Ubundi conventions."""
+    project_dir = Path.cwd()
+    stack = detect_stack(project_dir)
+
+    console.print(header_panel(__version__))
+    console.print(status_line(f"Checking: {project_dir.name} ({stack})", accent="violet"))
+    console.print()
+
+    results = run_checks(project_dir)
+
+    passed = [r for r in results if r.passed]
+    warnings = [r for r in results if not r.passed and r.severity == "warn"]
+    failed = [r for r in results if not r.passed and r.severity == "fail"]
+
+    # Group by category
+    categories: dict[str, list[CheckResult]] = {}
+    for r in results:
+        categories.setdefault(r.category, []).append(r)
+
+    for category, checks in sorted(categories.items()):
+        console.print(muted(f"  {category.upper()}"))
+        for c in checks:
+            if c.passed:
+                icon = f"[{ACCENTS['aqua']}]✓[/]"
+                text = f"[{TEXT_SECONDARY}]{c.name}[/]"
+            elif c.severity == "warn":
+                icon = f"[{ACCENTS['amber']}]![/]"
+                text = f"[{ACCENTS['amber']}]{c.detail or c.name}[/]"
+            else:
+                icon = f"[{ACCENTS['plum']}]✗[/]"
+                text = f"[{ACCENTS['plum']}]{c.detail or c.name}[/]"
+            console.print(f"  {icon} {text}")
+        console.print()
+
+    # Summary line
+    summary = Text("  ")
+    summary.append(str(len(passed)), style=f"bold {ACCENTS['aqua']}")
+    summary.append(" passed  ", style=TEXT_MUTED)
+    if warnings:
+        summary.append(str(len(warnings)), style=f"bold {ACCENTS['amber']}")
+        summary.append(" warnings  ", style=TEXT_MUTED)
+    if failed:
+        summary.append(str(len(failed)), style=f"bold {ACCENTS['plum']}")
+        summary.append(" failed", style=TEXT_MUTED)
+    console.print(summary)
+
+    # Fix mode
+    if fix:
+        fixable = [r for r in results if r.fixable and not r.passed]
+        if fixable:
+            console.print()
+            for c in fixable:
+                if generate_fix(project_dir, c):
+                    console.print(status_line(f"Created {c.name}", accent="aqua"))
+        else:
+            console.print(status_line("Nothing to fix automatically.", accent="amber"))
+
+    # Export mode
+    if export:
+        lines = [f"# Convention Audit — {project_dir.name}\n"]
+        lines.append(f"Stack: {stack}\n")
+        for category, checks in sorted(categories.items()):
+            lines.append(f"\n## {category.title()}\n")
+            for c in checks:
+                icon = "✓" if c.passed else ("!" if c.severity == "warn" else "✗")
+                lines.append(f"- {icon} {c.name}{': ' + c.detail if c.detail else ''}")
+        summary_text = f"{len(passed)} passed, {len(warnings)} warnings, {len(failed)} failed"
+        lines.append(f"\n---\n{summary_text}\n")
+        Path(export).write_text("\n".join(lines))
+        console.print(status_line(f"Report exported to {export}", accent="aqua"))
+
+    if fix:
+        console.print(status_line("Run forge check again to verify fixes.", accent="violet"))
 
 
 @app.callback(invoke_without_command=True)
