@@ -14,9 +14,7 @@ DEFAULT_REPOSITORY = "https://github.com/matthewubundi/UbundiForge"
 DEFAULT_SOURCE_URL = f"{DEFAULT_REPOSITORY}/archive/refs/tags/v{__version__}.tar.gz"
 DEFAULT_SOURCE_SHA256 = "REPLACE_WITH_RELEASE_TARBALL_SHA256"
 DEFAULT_PYTHON_FORMULA = "python@3.13"
-PROJECT_DESCRIPTION = (
-    "Scaffold Ubundi-style projects with AI coding tools and shared conventions"
-)
+PROJECT_DESCRIPTION = "Scaffold Ubundi-style projects with AI coding tools and shared conventions"
 
 
 @dataclass(frozen=True)

@@ -309,9 +309,7 @@ def run_setup(console: Console) -> dict:
     ]
     if unknown_backends:
         lines = [
-            subtle(
-                f"{backend} is installed, but Forge could not auto-check readiness safely."
-            )
+            subtle(f"{backend} is installed, but Forge could not auto-check readiness safely.")
             for backend in unknown_backends
         ]
         lines.append(

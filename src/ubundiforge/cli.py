@@ -62,7 +62,6 @@ from ubundiforge.setup import load_forge_config, needs_setup, run_setup
 from ubundiforge.ui import (
     BACKEND_ACCENTS,
     bullet,
-    command_text,
     create_console,
     grouped_lines,
     header_panel,
@@ -70,7 +69,6 @@ from ubundiforge.ui import (
     make_panel,
     make_step_panel,
     muted,
-    path_text,
     status_line,
     subtle,
 )
@@ -185,56 +183,6 @@ def _render_loaded_context(
     console.print(make_panel(grouped_lines(lines), title="Scaffold Context", accent="aqua"))
 
 
-def _render_completion(project_dir: Path, *, git_ok: bool) -> None:
-    """Render the final completion state."""
-    if git_ok:
-        lines = grouped_lines(
-            [
-                subtle("Project created at"),
-                path_text(project_dir),
-            ]
-        )
-        console.print(make_panel(lines, title="Scaffold Complete", accent="aqua"))
-        return
-
-    lines = grouped_lines(
-        [
-            subtle("Project created, but git initialization failed."),
-            path_text(project_dir),
-            muted('Run git init && git add -A && git commit -m "Initial commit" manually.'),
-        ]
-    )
-    console.print(make_panel(lines, title="Scaffold Complete", accent="amber"))
-
-
-def _render_next_steps(answers: dict, project_dir: Path, *, open_editor: bool) -> None:
-    """Render the next-step commands."""
-    lines: list[Text] = [command_text(f"cd {project_dir}")]
-
-    from ubundiforge.stacks import STACK_META
-
-    meta = STACK_META.get(answers["stack"])
-    if meta and meta.env_hints:
-        lines.append(subtle("Copy .env.example to .env.local and fill in your secrets."))
-    if meta and meta.dev_commands:
-        run_cmd = meta.dev_commands.get("run") or meta.dev_commands.get("dev")
-        if run_cmd:
-            lines.append(command_text(run_cmd))
-        test_cmd = meta.dev_commands.get("test")
-        if test_cmd:
-            lines.append(command_text(test_cmd))
-    if not open_editor:
-        lines.append(muted(f"Open your editor manually from {project_dir}."))
-
-    console.print(
-        make_panel(
-            grouped_lines(lines),
-            title="Next Steps",
-            accent="plum",
-        )
-    )
-
-
 def _backend_help_line(backend: str, status: BackendStatus) -> Text:
     """Return a user-facing readiness line for a backend."""
     if status.ready is False:
@@ -268,28 +216,6 @@ def _render_phase_failure(backend: str, label: str, returncode: int) -> None:
         muted("You can also force a different backend with --use if another one is ready."),
     ]
     console.print(make_panel(grouped_lines(lines), title="Execution", accent="amber"))
-
-
-def _render_verification_guidance(project_dir: Path) -> None:
-    """Render concrete next steps after verification failures."""
-    console.print()
-    console.print(
-        make_panel(
-            grouped_lines(
-                [
-                    subtle("Some verification checks failed."),
-                    subtle("The scaffold was still created successfully."),
-                    subtle(
-                        "Inspect the failing checks above, then rerun the relevant commands in:"
-                    ),
-                    path_text(project_dir),
-                    command_text(f"cd {project_dir}"),
-                ]
-            ),
-            title="Verification",
-            accent="amber",
-        )
-    )
 
 
 def _validate_project_name_for_collision(name: str) -> bool | str:
