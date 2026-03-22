@@ -3,8 +3,8 @@ class Ubundiforge < Formula
 
   desc "Scaffold Ubundi-style projects with AI coding tools and shared conventions"
   homepage "https://github.com/matthewubundi/UbundiForge"
-  url "https://github.com/matthewubundi/UbundiForge/archive/refs/tags/v0.2.0.tar.gz"
-  sha256 "51bf535513b821d63d3823cdd489f62315c31a2e44919115372a2c1f4356394a"
+  url "https://github.com/matthewubundi/UbundiForge/archive/refs/tags/v0.3.0.tar.gz"
+  sha256 "cc471b06eb0c99290d0abf30c36d60e800e68b40f7cb062579ff110ede174aef"
   license "MIT"
   head "https://github.com/matthewubundi/UbundiForge.git", branch: "main"
 
