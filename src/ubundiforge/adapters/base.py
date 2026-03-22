@@ -39,7 +39,11 @@ class CLIAdapterBase:
         """Run the backend CLI as a subprocess and stream progress events."""
         prompt = self.build_prompt(task)
         cmd = self.build_cmd(prompt, model=task.model)
-        label = f"{task.backend}:{task.id}"
+        # Use a short human-readable label: truncate description to ~60 chars
+        desc = task.description
+        if len(desc) > 60:
+            desc = desc[:57].rstrip() + "..."
+        label = f"{task.id}: {desc}"
 
         def emit(event_type: str, message: str) -> None:
             on_progress(
@@ -52,7 +56,7 @@ class CLIAdapterBase:
                 )
             )
 
-        emit("started", f"Starting {label}")
+        emit("started", "Working...")
 
         start = time.monotonic()
         last_lines: deque[str] = deque(maxlen=20)

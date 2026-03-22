@@ -5,9 +5,13 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+from rich.live import Live
+from rich.text import Text
 
 from ubundiforge import ui
 from ubundiforge.adapters import get_adapter
@@ -19,8 +23,10 @@ from ubundiforge.protocol import (
     ProgressEvent,
 )
 from ubundiforge.quality import QUALITY_LOG_PATH
+from ubundiforge.subprocess_utils import spinner_frame, spinner_style
 
 log = logging.getLogger(__name__)
+_console = ui.create_console()
 
 CONTEXT_CAP = 12_000  # characters
 
@@ -177,6 +183,19 @@ def accumulate_context(existing: str, new_summary: str) -> str:
 _PLANNING_TIMEOUT = 300  # seconds
 
 
+def _make_spinner_line(label: str, detail: str, elapsed: float, accent: str = "violet") -> Text:
+    """Build a single spinner line for Rich Live displays."""
+    frame = spinner_frame(elapsed)
+    style = spinner_style(accent, elapsed)
+    line = Text()
+    line.append(f"  {frame} ", style=f"bold {style}")
+    line.append(label, style=f"bold {ui.TEXT_PRIMARY}")
+    line.append("  ", style="")
+    line.append(detail, style=ui.TEXT_SECONDARY)
+    line.append(f"  {elapsed:.0f}s", style=ui.TEXT_MUTED)
+    return line
+
+
 def _make_single_task_plan(
     brief: str,
     phase: str,
@@ -216,37 +235,67 @@ def _get_plan(
     planning_prompt = adapter.build_planning_prompt(brief, phase, stack)
     cmd = adapter.build_cmd(planning_prompt, model=model)
 
-    for attempt in range(2):
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=_PLANNING_TIMEOUT,
-                cwd=str(project_dir),
-            )
-        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
-            log.warning("Planning subprocess error (attempt %d): %s", attempt + 1, exc)
-            continue
+    _console.print(ui.status_line(f"Planning decomposition for {phase}...", accent="violet"))
+    start = time.monotonic()
 
-        if result.returncode != 0:
-            log.warning("Planning call returned %d (attempt %d)", result.returncode, attempt + 1)
-            # Retry with JSON-only suffix
-            if attempt == 0:
-                cmd = adapter.build_cmd(
-                    planning_prompt + "\n\nRespond with JSON only.", model=model
+    import threading
+
+    plan_result = {"plan": None, "error": None, "done": False}
+
+    def _run_planning():
+        for attempt in range(2):
+            try:
+                result = subprocess.run(
+                    cmd if attempt == 0 else adapter.build_cmd(
+                        planning_prompt + "\n\nRespond with JSON only.", model=model
+                    ),
+                    capture_output=True,
+                    text=True,
+                    timeout=_PLANNING_TIMEOUT,
+                    cwd=str(project_dir),
                 )
-            continue
+            except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+                log.warning("Planning subprocess error (attempt %d): %s", attempt + 1, exc)
+                continue
 
-        plan = adapter.parse_plan(result.stdout, phase=phase, backend=backend)
-        if plan is not None:
-            return plan
+            if result.returncode != 0:
+                log.warning("Planning call returned %d (attempt %d)", result.returncode, attempt + 1)
+                continue
 
-        log.warning("Could not parse plan from output (attempt %d)", attempt + 1)
-        if attempt == 0:
-            cmd = adapter.build_cmd(planning_prompt + "\n\nRespond with JSON only.", model=model)
+            parsed = adapter.parse_plan(result.stdout, phase=phase, backend=backend)
+            if parsed is not None:
+                plan_result["plan"] = parsed
+                plan_result["done"] = True
+                return
 
-    log.warning("Planning failed after retries — falling back to single task.")
+            log.warning("Could not parse plan from output (attempt %d)", attempt + 1)
+
+        plan_result["done"] = True
+
+    worker = threading.Thread(target=_run_planning, daemon=True)
+    worker.start()
+
+    with Live(console=_console, refresh_per_second=10) as live:
+        while not plan_result["done"]:
+            elapsed = time.monotonic() - start
+            live.update(_make_spinner_line(
+                "Planning", f"Asking {backend} to decompose {phase}", elapsed, accent="violet"
+            ))
+            time.sleep(0.1)
+
+    worker.join(timeout=5)
+    elapsed = time.monotonic() - start
+
+    if plan_result["plan"] is not None:
+        plan = plan_result["plan"]
+        _console.print(ui.status_line(
+            f"Plan ready: {len(plan.tasks)} tasks in {elapsed:.0f}s", accent="aqua"
+        ))
+        return plan
+
+    _console.print(ui.status_line(
+        f"Planning failed — falling back to standard mode ({elapsed:.0f}s)", accent="amber"
+    ))
     return _make_single_task_plan(brief, phase, backend)
 
 
@@ -384,23 +433,50 @@ def _reconcile(
     model: str | None = None,
 ) -> int:
     """Lightweight cleanup CLI call after all tasks have finished."""
+    import threading
+
     prompt = (
         "Review the project directory for any conflicts, duplicated code, "
         "or inconsistencies introduced by parallel agents. Fix them."
     )
     cmd = adapter.build_cmd(prompt, model=model)
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=_PLANNING_TIMEOUT,
-            cwd=str(project_dir),
-        )
-        return result.returncode
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
-        log.warning("Reconciliation failed: %s", exc)
-        return 1
+    start = time.monotonic()
+    reconcile_result = {"returncode": 1, "done": False}
+
+    def _run():
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=_PLANNING_TIMEOUT,
+                cwd=str(project_dir),
+            )
+            reconcile_result["returncode"] = result.returncode
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+            log.warning("Reconciliation failed: %s", exc)
+        reconcile_result["done"] = True
+
+    worker = threading.Thread(target=_run, daemon=True)
+    worker.start()
+
+    with Live(console=_console, refresh_per_second=10) as live:
+        while not reconcile_result["done"]:
+            elapsed = time.monotonic() - start
+            live.update(_make_spinner_line(
+                "Reconciling", "Checking for conflicts and fixing imports", elapsed, accent="plum"
+            ))
+            time.sleep(0.1)
+
+    worker.join(timeout=5)
+    elapsed = time.monotonic() - start
+
+    rc = reconcile_result["returncode"]
+    if rc == 0:
+        _console.print(ui.status_line(f"Reconciliation complete ({elapsed:.0f}s)", accent="aqua"))
+    else:
+        _console.print(ui.status_line(f"Reconciliation had issues ({elapsed:.0f}s) — non-fatal", accent="amber"))
+    return rc
 
 
 def map_progress_to_activity(event: ProgressEvent) -> str:
@@ -479,20 +555,27 @@ def run_phase_orchestrated(
     adapter = get_adapter(backend, conventions)
     plan = _get_plan(adapter, prompt, phase, stack, backend, project_dir, model)
 
-    if verbose and len(plan.tasks) > 1:
-        log.info(
-            "Decomposition plan: %d tasks, %d groups — %s",
-            len(plan.tasks),
-            len(plan.execution_order),
-            plan.rationale,
-        )
+    if len(plan.tasks) > 1:
         _render_decomposition_plan(plan)
 
-    _console = ui.create_console()
+    # Activity tracking for subagent progress
+    _activities: list[dict] = []
+    _current_activity = ""
 
     def _on_progress(event: ProgressEvent) -> None:
-        if verbose:
-            _console.print(map_progress_to_activity(event))
+        nonlocal _current_activity
+        text = map_progress_to_activity(event)
+        if event.event_type == "started":
+            # Mark previous as done, add new active entry
+            if _activities:
+                _activities[-1]["completed"] = True
+            _activities.append({"summary": text, "completed": False})
+        elif event.event_type in ("completed", "failed"):
+            # Mark current task as done
+            if _activities:
+                _activities[-1]["completed"] = True
+                _activities[-1]["summary"] = text
+        _current_activity = text
 
     # Single task: execute directly (skip orchestration overhead)
     if len(plan.tasks) == 1:
@@ -504,12 +587,51 @@ def run_phase_orchestrated(
         stats = {"planned": 1, "completed": 1 if success else 0, "failed": 0 if success else 1}
         return (0 if success else 1, stats)
 
-    # Multi-task: execute the full task graph
+    # Multi-task: execute the full task graph with live progress display
     if phase_context:
         for t in plan.tasks:
             t.context = phase_context
 
-    results = _execute_task_graph(plan, adapter, project_dir, on_progress=_on_progress)
+    import threading
+
+    exec_done = {"done": False}
+    exec_results: list[AgentResult] = []
+
+    def _run_graph():
+        result = _execute_task_graph(plan, adapter, project_dir, on_progress=_on_progress)
+        exec_results.extend(result)
+        exec_done["done"] = True
+
+    exec_start = time.monotonic()
+    worker = threading.Thread(target=_run_graph, daemon=True)
+    worker.start()
+
+    with Live(console=_console, refresh_per_second=10) as live:
+        while not exec_done["done"]:
+            elapsed = time.monotonic() - exec_start
+            visible = _activities[-6:] if _activities else []
+            loader = ui.make_loader_panel(
+                f"{phase} agents",
+                _current_activity or "Starting subagent tasks...",
+                elapsed=elapsed,
+                spinner_frame=spinner_frame(elapsed),
+                spinner_style=spinner_style("violet", elapsed),
+                accent="violet",
+                activities=visible if visible else None,
+            )
+            live.update(loader)
+            time.sleep(0.1)
+
+    worker.join(timeout=5)
+    elapsed = time.monotonic() - exec_start
+    results = exec_results
+
+    completed_count = sum(1 for r in results if r.success)
+    failed_count = len(results) - completed_count
+    _console.print(ui.status_line(
+        f"Subagents finished: {completed_count} done, {failed_count} failed ({elapsed:.0f}s)",
+        accent="aqua" if failed_count == 0 else "amber",
+    ))
 
     # Reconcile (non-fatal)
     rc = _reconcile(adapter, project_dir, model)
