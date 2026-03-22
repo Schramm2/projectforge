@@ -64,3 +64,5 @@ def write_scaffold_manifest(
     forge_dir = project_dir / ".forge"
     forge_dir.mkdir(parents=True, exist_ok=True)
     (forge_dir / "scaffold.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    # Save conventions snapshot for replay
+    (forge_dir / "conventions-snapshot.md").write_text(conventions)
