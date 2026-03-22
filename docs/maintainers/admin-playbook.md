@@ -36,7 +36,7 @@ Use the admin command to inspect the system:
 forge admin conventions --validate
 forge admin conventions --preview-stack fastapi
 forge admin conventions --history global
-forge admin conventions --open languages/python/base.md
+forge admin conventions --open global/python-standards.md
 ```
 
 ## Normal admin flow: updating Python conventions
@@ -44,11 +44,11 @@ forge admin conventions --open languages/python/base.md
 If you want to change how Ubundi writes Python code:
 
 1. Run `forge admin conventions --preview-stack fastapi` to inspect the current compiled Python-facing bundle.
-2. Open the source Markdown file for the language layer, usually:
-   - `conventions/languages/python/base.md`
-   - and, when relevant, supporting files such as `testing.md` or `packaging.md`
+2. Open the source Markdown file that currently owns the Python defaults, usually:
+   - `conventions/global/python-standards.md`
+   - `conventions/global/python-architecture.md`
 3. Edit the Markdown directly in the repo.
-4. If you add or reorder files, update the matching metadata file:
+4. If Python conventions later move into language-layer files, update the matching metadata file under:
    - `conventions/languages/python/metadata.yaml`
 5. Validate the tree:
    - `forge admin conventions --validate`

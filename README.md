@@ -193,6 +193,16 @@ forge replay                 # Reproduce past scaffolds
 forge admin conventions      # Validate, preview, and browse bundled conventions
 ```
 
+Common admin conventions flows:
+
+```bash
+forge admin conventions --validate
+forge admin conventions --preview-stack fastapi
+forge admin conventions --history global
+forge admin conventions --open global/python-standards.md
+forge admin conventions
+```
+
 ## AI Agent Skill
 
 Forge ships with a portable skill at `skills/forge-scaffold/` that teaches AI agents (Claude Code, Codex, Gemini CLI, or any agent that can read files and run shell commands) how to use Forge professionally.
