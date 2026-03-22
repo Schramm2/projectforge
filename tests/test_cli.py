@@ -246,7 +246,7 @@ def test_mock_backends_cover_full_cli_flow_without_installed_ai_clis(monkeypatch
     assert (project_dir / "frontend-ui.txt").exists()
     assert (project_dir / "tests-automation.txt").exists()
     assert (project_dir / "verify-fix.txt").exists()
-    assert "Project created at" in result.stdout
+    assert "Project Ready" in result.stdout
 
 
 def test_first_run_setup_prompts_before_interactive_scaffold(monkeypatch):
@@ -369,7 +369,7 @@ def test_first_run_with_explicit_scaffold_flags_skips_post_setup_prompt(monkeypa
     assert result.exit_code == 0
     assert setup_calls["count"] == 1
     assert prompt_calls["count"] == 0
-    assert "Project created at" in result.stdout
+    assert "Project Ready" in result.stdout
 
 
 def test_resolve_project_dir_allows_rename(monkeypatch, tmp_path):

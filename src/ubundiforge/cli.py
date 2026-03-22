@@ -1,6 +1,7 @@
 """UbundiForge CLI — entry point."""
 
 import re
+import time
 from pathlib import Path
 from typing import Annotated
 
@@ -15,6 +16,7 @@ from ubundiforge.config import (
     get_backend_statuses,
 )
 from ubundiforge.conventions import load_claude_md_template, load_conventions
+from ubundiforge.dashboard import render_dashboard
 from ubundiforge.design_templates import (
     DESIGN_TEMPLATE_OPTIONS,
     design_template_ids_for_stack,
@@ -70,7 +72,7 @@ from ubundiforge.ui import (
     status_line,
     subtle,
 )
-from ubundiforge.verify import print_report, verify_scaffold
+from ubundiforge.verify import verify_scaffold
 
 app = typer.Typer()
 console = create_console()
@@ -276,8 +278,7 @@ def _render_verification_guidance(project_dir: Path) -> None:
                     subtle("Some verification checks failed."),
                     subtle("The scaffold was still created successfully."),
                     subtle(
-                        "Inspect the failing checks above, then rerun the relevant "
-                        "commands in:"
+                        "Inspect the failing checks above, then rerun the relevant commands in:"
                     ),
                     path_text(project_dir),
                     command_text(f"cd {project_dir}"),
@@ -422,10 +423,12 @@ def _prompt_post_setup_next_step() -> str:
     choices = []
     if has_usable:
         choices.append(questionary.Choice("Create a project now", value="create"))
-    choices.extend([
-        questionary.Choice("Review setup again", value="setup"),
-        questionary.Choice("Exit for now", value="exit"),
-    ])
+    choices.extend(
+        [
+            questionary.Choice("Review setup again", value="setup"),
+            questionary.Choice("Exit for now", value="exit"),
+        ]
+    )
 
     action = prompt_select(
         "What would you like to do next?",
@@ -768,9 +771,7 @@ def main(
             _render_backend_readiness_notice(
                 backend_statuses,
                 required_backends={
-                    backend
-                    for backend, status in backend_statuses.items()
-                    if status.installed
+                    backend for backend, status in backend_statuses.items() if status.installed
                 },
             )
             raise typer.Exit(1)
@@ -967,6 +968,8 @@ def main(
         for warning in copy_result.warnings:
             console.print(f"[yellow]{warning}[/yellow]")
 
+    scaffold_start = time.monotonic()
+
     # --- Execute phases: serial first, parallel middle, serial last ---
     total_phases = len(phase_backends)
     step = 1
@@ -1073,7 +1076,7 @@ def main(
             raise typer.Exit(returncode)
         step += 1
 
-    # Post-scaffold: manifest, log, git init, verify, hooks, and open editor
+    # Post-scaffold: manifest, log, git init, verify, hooks, dashboard
     write_scaffold_manifest(
         answers,
         phase_backends,
@@ -1085,19 +1088,27 @@ def main(
 
     git_ok = ensure_git_init(project_dir)
 
+    verify_report = None
     if verify:
-        report = verify_scaffold(answers["stack"], project_dir, verbose=verbose)
-        print_report(report, console)
-        if not report.all_passed:
-            _render_verification_guidance(project_dir)
+        verify_report = verify_scaffold(answers["stack"], project_dir, verbose=verbose)
 
     run_post_scaffold_hook(project_dir, answers)
     append_scaffold_log(answers, phase_backends, project_dir)
 
-    console.print()
-    _render_completion(project_dir, git_ok=git_ok)
-    console.print()
-    _render_next_steps(answers, project_dir, open_editor=open_editor)
+    elapsed = time.monotonic() - scaffold_start
+    render_dashboard(
+        console=console,
+        answers=answers,
+        phase_backends=phase_backends,
+        project_dir=project_dir,
+        verify_report=verify_report,
+        elapsed=elapsed,
+    )
+
+    if not git_ok:
+        console.print(
+            muted('Run git init && git add -A && git commit -m "Initial commit" manually.')
+        )
 
     if open_editor:
         preferred = forge_config.get("preferred_editor", "")
