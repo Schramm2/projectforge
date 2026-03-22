@@ -94,7 +94,7 @@ def test_is_noisy_code_fence():
 
 
 def test_is_noisy_json_brace():
-    assert is_noisy_progress_line("{\"key\": \"value\"}") is True
+    assert is_noisy_progress_line('{"key": "value"}') is True
 
 
 def test_is_noisy_deeply_nested_path():

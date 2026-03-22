@@ -63,8 +63,7 @@ def _read_text(path: Path) -> str:
 
 def _compose_text(root: Path, relative_paths: list[str]) -> str:
     parts = [
-        _read_text(root / relative_paths_item).strip()
-        for relative_paths_item in relative_paths
+        _read_text(root / relative_paths_item).strip() for relative_paths_item in relative_paths
     ]
     content = "\n\n".join(part for part in parts if part)
     if content:
@@ -78,6 +77,7 @@ LEGACY_DEFAULT_CONVENTIONS = _compose_text(
 )
 # Backward-compatible alias for legacy callers and tests that still reference the old name.
 DEFAULT_CONVENTIONS = LEGACY_DEFAULT_CONVENTIONS
+
 
 def build_registry(root: Path | None = None):
     """Build the conventions registry for the bundled or provided tree."""
@@ -111,11 +111,7 @@ def _load_conventions_file(path: Path) -> tuple[str, list[str]]:
 
 
 def _looks_placeholder_local_conventions(content: str) -> bool:
-    lines = [
-        line.lstrip("#>*- ").strip().lower()
-        for line in content.splitlines()
-        if line.strip()
-    ]
+    lines = [line.lstrip("#>*- ").strip().lower() for line in content.splitlines() if line.strip()]
     if not lines:
         return True
 

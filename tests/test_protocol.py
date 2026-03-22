@@ -33,8 +33,13 @@ class TestAgentTask:
 
     def test_context_defaults_empty(self):
         task = AgentTask(
-            id="t", description="d", file_territory=[], context="",
-            dependencies=[], phase="p", backend="b",
+            id="t",
+            description="d",
+            file_territory=[],
+            context="",
+            dependencies=[],
+            phase="p",
+            backend="b",
         )
         assert task.context == ""
 
@@ -80,8 +85,11 @@ class TestProgressEvent:
     def test_event_types(self):
         for event_type in ("started", "progress", "completed", "failed"):
             event = ProgressEvent(
-                task_id="t", agent_label="a", event_type=event_type,
-                message="m", timestamp=0.0,
+                task_id="t",
+                agent_label="a",
+                event_type=event_type,
+                message="m",
+                timestamp=0.0,
             )
             assert event.event_type == event_type
 
@@ -89,12 +97,22 @@ class TestProgressEvent:
 class TestDecompositionPlan:
     def test_create_plan(self):
         task1 = AgentTask(
-            id="task-1", description="Skeleton", file_territory=["pyproject.toml"],
-            context="", dependencies=[], phase="architecture", backend="claude",
+            id="task-1",
+            description="Skeleton",
+            file_territory=["pyproject.toml"],
+            context="",
+            dependencies=[],
+            phase="architecture",
+            backend="claude",
         )
         task2 = AgentTask(
-            id="task-2", description="Models", file_territory=["models/"],
-            context="", dependencies=["task-1"], phase="architecture", backend="claude",
+            id="task-2",
+            description="Models",
+            file_territory=["models/"],
+            context="",
+            dependencies=["task-1"],
+            phase="architecture",
+            backend="claude",
         )
         plan = DecompositionPlan(
             tasks=[task1, task2],
@@ -106,23 +124,39 @@ class TestDecompositionPlan:
 
     def test_single_task_plan(self):
         task = AgentTask(
-            id="task-1", description="Do everything", file_territory=[],
-            context="", dependencies=[], phase="architecture", backend="claude",
+            id="task-1",
+            description="Do everything",
+            file_territory=[],
+            context="",
+            dependencies=[],
+            phase="architecture",
+            backend="claude",
         )
         plan = DecompositionPlan(
-            tasks=[task], execution_order=[["task-1"]],
+            tasks=[task],
+            execution_order=[["task-1"]],
             rationale="Single task fallback",
         )
         assert len(plan.tasks) == 1
 
     def test_task_lookup(self):
         task1 = AgentTask(
-            id="task-1", description="A", file_territory=[], context="",
-            dependencies=[], phase="p", backend="b",
+            id="task-1",
+            description="A",
+            file_territory=[],
+            context="",
+            dependencies=[],
+            phase="p",
+            backend="b",
         )
         task2 = AgentTask(
-            id="task-2", description="B", file_territory=[], context="",
-            dependencies=[], phase="p", backend="b",
+            id="task-2",
+            description="B",
+            file_territory=[],
+            context="",
+            dependencies=[],
+            phase="p",
+            backend="b",
         )
         plan = DecompositionPlan(
             tasks=[task1, task2],

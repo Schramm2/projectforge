@@ -326,9 +326,7 @@ class TestRunPhaseOrchestrated:
         adapter.execute.return_value = _ok_result("sole-task")
 
         with patch("ubundiforge.orchestrator.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=1, stdout="garbage", stderr=""
-            )
+            mock_run.return_value = MagicMock(returncode=1, stdout="garbage", stderr="")
             rc, stats = run_phase_orchestrated(
                 phase="scaffold",
                 backend="claude",
