@@ -65,6 +65,7 @@ from ubundiforge.scaffold_options import (
     ci_action_ids_for_stack,
 )
 from ubundiforge.setup import load_forge_config, needs_setup, run_setup
+from ubundiforge.sound import play_completion_sound
 from ubundiforge.ui import (
     ACCENTS,
     BACKEND_ACCENTS,
@@ -1348,6 +1349,9 @@ def main(
         date=scaffold_date,
     )
     inject_badge_into_readme(project_dir)
+
+    sound_enabled = forge_config.get("sound", False)
+    play_completion_sound(success=True, enabled=sound_enabled)
 
     if not git_ok:
         console.print(
