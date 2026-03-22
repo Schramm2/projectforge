@@ -43,7 +43,9 @@ from ubundiforge.prompts import collect_answers
 from ubundiforge.quality import append_quality_signal, compute_backend_scores, read_quality_signals
 from ubundiforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
 from ubundiforge.router import (
+    PHASE_ARCHITECTURE,
     PHASE_LABELS,
+    PHASE_VERIFY,
     STACK_PHASES,
     merge_adjacent_phases,
     pick_phase_backends,
@@ -447,8 +449,6 @@ def evolve(
     dna = json.loads(manifest_path.read_text())
     stack = dna.get("stack", "")
 
-    from ubundiforge.logo import print_logo
-
     print_logo(console)
     console.print(header_panel(__version__))
     console.print(
@@ -493,8 +493,6 @@ def evolve(
         raise typer.Exit(0)
 
     # Route through standard backend routing (or --use override)
-    from ubundiforge.config import check_backend_installed
-
     if use:
         backend = use
         if not check_backend_installed(backend):
@@ -1127,8 +1125,6 @@ def main(
 
     # Identify which phases can run in parallel (everything between first and last)
     # Architecture must run first, verify must run last, middle phases run concurrently.
-    from ubundiforge.router import PHASE_ARCHITECTURE, PHASE_VERIFY
-
     serial_first: list[tuple[str, str]] = []
     parallel_middle: list[tuple[str, str]] = []
     serial_last: list[tuple[str, str]] = []
