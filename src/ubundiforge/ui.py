@@ -10,6 +10,7 @@ from rich.console import Console, Group, RenderableType
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
+from rich.tree import Tree
 
 TEXT_PRIMARY = "#F7F9FF"
 TEXT_SECONDARY = "#C6CEE6"
@@ -272,3 +273,64 @@ def header_panel(version: str | None = None) -> Panel:
     )
     subtitle = f"v{version}" if version else None
     return make_panel(lines, title="Forge", subtitle=subtitle, accent="violet")
+
+
+_HIDDEN_TREE_DIRS = {".git", ".venv", "__pycache__", "node_modules", ".forge", ".ruff_cache"}
+_CONFIG_FILES = {
+    "pyproject.toml",
+    "package.json",
+    "Dockerfile",
+    "docker-compose.yml",
+    "tsconfig.json",
+    ".env.example",
+    "CLAUDE.md",
+    ".pre-commit-config.yaml",
+    ".gitignore",
+    "next.config.ts",
+    "tailwind.config.ts",
+    "vitest.config.ts",
+}
+
+
+def make_file_tree(project_dir: Path) -> Group:
+    """Render a color-coded file tree of a scaffolded project."""
+    tree = Tree(
+        Text(f"{project_dir.name}/", style=f"bold {ACCENTS['aqua']}"),
+        guide_style=TEXT_MUTED,
+    )
+
+    file_count = 0
+    line_count = 0
+
+    def _add_dir(parent_tree: Tree, directory: Path) -> None:
+        nonlocal file_count, line_count
+        entries = sorted(directory.iterdir(), key=lambda p: (p.is_file(), p.name))
+        for entry in entries:
+            name = entry.name
+            if name in _HIDDEN_TREE_DIRS or name.startswith("."):
+                if name not in _CONFIG_FILES:
+                    continue
+            if entry.is_dir():
+                branch = parent_tree.add(Text(f"{name}/", style=ACCENTS["violet"]))
+                _add_dir(branch, entry)
+            else:
+                file_count += 1
+                try:
+                    line_count += len(entry.read_text(errors="replace").splitlines())
+                except OSError:
+                    pass
+                if name in _CONFIG_FILES:
+                    parent_tree.add(Text(name, style=ACCENTS["plum"]))
+                else:
+                    parent_tree.add(Text(name, style=ACCENTS["aqua"]))
+
+    _add_dir(tree, project_dir)
+
+    summary = Text("  ")
+    summary.append(str(file_count), style=f"bold {ACCENTS['amber']}")
+    summary.append(" files", style=TEXT_MUTED)
+    summary.append(" · ", style=TEXT_MUTED)
+    summary.append(f"{line_count:,}", style=f"bold {ACCENTS['amber']}")
+    summary.append(" lines", style=TEXT_MUTED)
+
+    return Group(tree, summary)

@@ -1,8 +1,9 @@
 from io import StringIO
+from pathlib import Path
 
 from rich.console import Console
 
-from ubundiforge.ui import make_loader_panel, make_phase_timeline
+from ubundiforge.ui import make_file_tree, make_loader_panel, make_phase_timeline
 
 
 def test_loader_panel_with_activity_feed():
@@ -85,3 +86,40 @@ def test_phase_timeline_all_completed():
     renderable = make_phase_timeline(phases)
     console = Console(file=StringIO(), width=80)
     console.print(renderable)
+
+
+def _render_to_string(renderable) -> str:
+    """Render a Rich renderable to a plain string."""
+    console = Console(file=StringIO(), width=80, color_system=None)
+    console.print(renderable)
+    return console.file.getvalue()
+
+
+def test_file_tree_renders_files(tmp_path: Path):
+    """File tree renders a directory with files."""
+    (tmp_path / "api").mkdir()
+    (tmp_path / "api" / "routes.py").write_text("x = 1\n")
+    (tmp_path / "pyproject.toml").write_text("[project]\n")
+
+    tree = make_file_tree(tmp_path)
+    console = Console(file=StringIO(), width=80)
+    console.print(tree)
+
+
+def test_file_tree_ignores_hidden(tmp_path: Path):
+    """File tree skips .git and other hidden directories."""
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "config").write_text("x\n")
+    (tmp_path / "main.py").write_text("x = 1\n")
+
+    tree = make_file_tree(tmp_path)
+    output = _render_to_string(tree)
+    assert ".git" not in output
+    assert "main.py" in output
+
+
+def test_file_tree_empty_dir(tmp_path: Path):
+    """File tree handles an empty directory."""
+    tree = make_file_tree(tmp_path)
+    console = Console(file=StringIO(), width=80)
+    console.print(tree)

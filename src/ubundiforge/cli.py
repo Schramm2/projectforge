@@ -66,6 +66,7 @@ from ubundiforge.ui import (
     create_console,
     grouped_lines,
     header_panel,
+    make_file_tree,
     make_panel,
     make_step_panel,
     muted,
@@ -1013,6 +1014,8 @@ def main(
         if returncode != 0:
             _render_phase_failure(backend, label, returncode)
             raise typer.Exit(returncode)
+        console.print()
+        console.print(make_file_tree(project_dir))
         step += 1
 
     # Step 2: Run middle phases (parallel if multiple, serial if single)
@@ -1048,6 +1051,8 @@ def main(
                 if returncode != 0:
                     _render_phase_failure("parallel backend", label, returncode)
                     raise typer.Exit(returncode)
+            console.print()
+            console.print(make_file_tree(project_dir))
             step += len(parallel_middle)
         else:
             for phase, backend in parallel_middle:
@@ -1077,6 +1082,8 @@ def main(
                 if returncode != 0:
                     _render_phase_failure(backend, label, returncode)
                     raise typer.Exit(returncode)
+                console.print()
+                console.print(make_file_tree(project_dir))
                 step += 1
 
     # Step 3: Run verify (serial)
@@ -1105,6 +1112,8 @@ def main(
         if returncode != 0:
             _render_phase_failure(backend, label, returncode)
             raise typer.Exit(returncode)
+        console.print()
+        console.print(make_file_tree(project_dir))
         step += 1
 
     # Post-scaffold: manifest, log, git init, verify, hooks, dashboard
