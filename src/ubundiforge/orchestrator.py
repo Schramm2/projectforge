@@ -469,10 +469,12 @@ def run_phase_orchestrated(
     model: str | None = None,
     verbose: bool = False,
     phase_context: str | None = None,
-) -> int:
+) -> tuple[int, dict]:
     """Main entry point for orchestrated phase execution.
 
-    Returns 0 if all tasks succeeded, 1 if any failed.
+    Returns ``(returncode, agent_stats)`` where *returncode* is 0 if all tasks
+    succeeded (1 otherwise) and *agent_stats* is a dict with keys:
+    ``planned``, ``completed``, ``failed``.
     """
     adapter = get_adapter(backend, conventions)
     plan = _get_plan(adapter, prompt, phase, stack, backend, project_dir, model)
@@ -498,7 +500,9 @@ def run_phase_orchestrated(
         if phase_context:
             task.context = phase_context
         result = adapter.execute(task, project_dir, _on_progress)
-        return 0 if result.success else 1
+        success = result.success
+        stats = {"planned": 1, "completed": 1 if success else 0, "failed": 0 if success else 1}
+        return (0 if success else 1, stats)
 
     # Multi-task: execute the full task graph
     if phase_context:
@@ -512,4 +516,8 @@ def run_phase_orchestrated(
     if rc != 0:
         log.warning("Reconciliation exited with code %d (non-fatal)", rc)
 
-    return 0 if all(r.success for r in results) else 1
+    planned = len(results)
+    completed = sum(1 for r in results if r.success)
+    failed = planned - completed
+    stats = {"planned": planned, "completed": completed, "failed": failed}
+    return (0 if all(r.success for r in results) else 1, stats)

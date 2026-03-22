@@ -81,3 +81,42 @@ def test_render_dashboard_without_verify(tmp_path: Path):
         verify_report=None,
         elapsed=90.0,
     )
+
+
+def test_render_dashboard_with_agent_stats(tmp_path: Path):
+    """When agent_stats is provided, 'Agent tasks' row appears in output."""
+    answers = {"name": "pulse", "stack": "fastapi", "description": "health API"}
+    phase_backends = [("architecture", "claude"), ("tests", "codex")]
+    buf = StringIO()
+    console = Console(file=buf, width=80)
+    render_dashboard(
+        console=console,
+        answers=answers,
+        phase_backends=phase_backends,
+        project_dir=tmp_path,
+        verify_report=None,
+        elapsed=42.0,
+        agent_stats={"planned": 4, "completed": 4, "failed": 0},
+    )
+    output = buf.getvalue()
+    assert "4" in output
+    assert "planned" in output.lower() or "AGENT" in output
+
+
+def test_render_dashboard_without_agent_stats(tmp_path: Path):
+    """When agent_stats is absent, 'Agent tasks' section is not rendered."""
+    answers = {"name": "pulse", "stack": "fastapi", "description": "health API"}
+    phase_backends = [("architecture", "claude")]
+    buf = StringIO()
+    console = Console(file=buf, width=80)
+    render_dashboard(
+        console=console,
+        answers=answers,
+        phase_backends=phase_backends,
+        project_dir=tmp_path,
+        verify_report=None,
+        elapsed=42.0,
+    )
+    output = buf.getvalue()
+    assert "AGENT TASKS" not in output
+    assert "planned" not in output.lower()

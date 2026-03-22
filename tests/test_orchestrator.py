@@ -329,7 +329,7 @@ class TestRunPhaseOrchestrated:
             mock_run.return_value = MagicMock(
                 returncode=1, stdout="garbage", stderr=""
             )
-            rc = run_phase_orchestrated(
+            rc, stats = run_phase_orchestrated(
                 phase="scaffold",
                 backend="claude",
                 prompt="Build everything",
@@ -338,5 +338,8 @@ class TestRunPhaseOrchestrated:
             )
 
         assert rc == 0
+        assert stats["planned"] == 1
+        assert stats["completed"] == 1
+        assert stats["failed"] == 0
         # Should have executed the single fallback task
         assert adapter.execute.call_count == 1

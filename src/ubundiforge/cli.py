@@ -1604,6 +1604,10 @@ def main(
             }
         )
 
+    # Accumulated agent task stats across all orchestrated phases (agents mode only)
+    _agent_stats: dict = {"planned": 0, "completed": 0, "failed": 0}
+    _any_orchestrated = False
+
     # --- Execute phases: serial first, parallel middle, serial last ---
     total_phases = len(phase_backends)
     step = 1
@@ -1623,7 +1627,7 @@ def main(
         if agents:
             from ubundiforge.orchestrator import run_phase_orchestrated
 
-            returncode = run_phase_orchestrated(
+            returncode, _phase_stats = run_phase_orchestrated(
                 phase=phase,
                 backend=backend,
                 prompt=phase_prompt,
@@ -1633,6 +1637,9 @@ def main(
                 model=effective_model,
                 verbose=verbose,
             )
+            _any_orchestrated = True
+            for key in ("planned", "completed", "failed"):
+                _agent_stats[key] += _phase_stats.get(key, 0)
         else:
             returncode = run_ai(
                 backend,
@@ -1671,7 +1678,7 @@ def main(
                 phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
                 phase_context[phase_idx]["status"] = "active"
                 phase_start = time.monotonic()
-                returncode = run_phase_orchestrated(
+                returncode, _phase_stats = run_phase_orchestrated(
                     phase=phase,
                     backend=backend,
                     prompt=phase_prompt,
@@ -1681,6 +1688,9 @@ def main(
                     model=effective_model,
                     verbose=verbose,
                 )
+                _any_orchestrated = True
+                for key in ("planned", "completed", "failed"):
+                    _agent_stats[key] += _phase_stats.get(key, 0)
                 phase_context[phase_idx]["status"] = "completed"
                 phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
                 if returncode != 0:
@@ -1770,7 +1780,7 @@ def main(
         if agents:
             from ubundiforge.orchestrator import run_phase_orchestrated
 
-            returncode = run_phase_orchestrated(
+            returncode, _phase_stats = run_phase_orchestrated(
                 phase=phase,
                 backend=backend,
                 prompt=phase_prompt,
@@ -1780,6 +1790,9 @@ def main(
                 model=effective_model,
                 verbose=verbose,
             )
+            _any_orchestrated = True
+            for key in ("planned", "completed", "failed"):
+                _agent_stats[key] += _phase_stats.get(key, 0)
         else:
             returncode = run_ai(
                 backend,
@@ -1833,6 +1846,7 @@ def main(
         project_dir=project_dir,
         verify_report=verify_report,
         elapsed=elapsed,
+        agent_stats=_agent_stats if _any_orchestrated else None,
     )
 
     scaffold_date = datetime.now(UTC).strftime("%Y-%m-%d")
