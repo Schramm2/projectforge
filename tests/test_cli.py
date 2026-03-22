@@ -656,3 +656,57 @@ def test_run_setup_does_not_create_legacy_conventions_file(monkeypatch, tmp_path
     assert not conventions_path.exists()
     assert "bundled conventions" in output.lower()
     assert "bundled source tree" in output.lower()
+
+
+def test_admin_conventions_validate_passes() -> None:
+    result = runner.invoke(app, ["admin", "conventions", "--validate"])
+
+    assert result.exit_code == 0
+    assert "Validation passed" in result.stdout
+
+
+def test_admin_conventions_preview_stack() -> None:
+    result = runner.invoke(app, ["admin", "conventions", "--preview-stack", "fastapi"])
+
+    assert result.exit_code == 0
+    assert "Compiled bundle: fastapi" in result.stdout
+
+
+def test_admin_conventions_history_degrades_gracefully(monkeypatch) -> None:
+    from ubundiforge.convention_history import GitHistoryResult
+
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_history",
+        lambda root, target: GitHistoryResult(
+            target=target,
+            available=False,
+            entries=(),
+            message="Git history is unavailable.",
+        ),
+    )
+
+    result = runner.invoke(app, ["admin", "conventions", "--history", "fastapi"])
+
+    assert result.exit_code == 0
+    assert "Git history is unavailable." in result.stdout
+
+
+def test_admin_conventions_open_prints_repo_markdown_path() -> None:
+    result = runner.invoke(app, ["admin", "conventions", "--open", "global/shared.md"])
+
+    assert result.exit_code == 0
+    assert "conventions/global/shared.md" in result.stdout
+
+
+def test_admin_conventions_defaults_to_interactive_menu(monkeypatch) -> None:
+    actions = iter(["validate"])
+
+    monkeypatch.setattr(
+        "ubundiforge.cli.prompt_select",
+        lambda *args, **kwargs: SimpleNamespace(ask=lambda: next(actions)),
+    )
+
+    result = runner.invoke(app, ["admin", "conventions"])
+
+    assert result.exit_code == 0
+    assert "Validation passed" in result.stdout
