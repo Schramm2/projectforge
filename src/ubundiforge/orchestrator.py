@@ -9,6 +9,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from ubundiforge import ui
 from ubundiforge.adapters import get_adapter
 from ubundiforge.protocol import (
     AgentResult,
@@ -227,9 +228,7 @@ def _get_plan(
             continue
 
         if result.returncode != 0:
-            log.warning(
-                "Planning call returned %d (attempt %d)", result.returncode, attempt + 1
-            )
+            log.warning("Planning call returned %d (attempt %d)", result.returncode, attempt + 1)
             # Retry with JSON-only suffix
             if attempt == 0:
                 cmd = adapter.build_cmd(
@@ -243,9 +242,7 @@ def _get_plan(
 
         log.warning("Could not parse plan from output (attempt %d)", attempt + 1)
         if attempt == 0:
-            cmd = adapter.build_cmd(
-                planning_prompt + "\n\nRespond with JSON only.", model=model
-            )
+            cmd = adapter.build_cmd(planning_prompt + "\n\nRespond with JSON only.", model=model)
 
     log.warning("Planning failed after retries — falling back to single task.")
     return _make_single_task_plan(brief, phase, backend)
@@ -315,9 +312,7 @@ def _execute_task_graph(
                 if not res.success:
                     failed_ids.add(res.task_id)
                 group_summaries.append(
-                    build_context_summary(
-                        task_map[res.task_id], created, modified, project_dir
-                    )
+                    build_context_summary(task_map[res.task_id], created, modified, project_dir)
                 )
             combined_summary = "\n\n".join(group_summaries)
             accumulated_context = accumulate_context(accumulated_context, combined_summary)
@@ -386,6 +381,62 @@ def _reconcile(
         return 1
 
 
+def map_progress_to_activity(event: ProgressEvent) -> str:
+    """Convert a ProgressEvent into a single activity feed string.
+
+    - "started"   -> "{agent_label}: {message}"
+    - "progress"  -> "{agent_label}: {message}"
+    - "completed" -> "{agent_label}: Done"
+    - "failed"    -> "{agent_label}: Failed — {message}"
+    """
+    if event.event_type == "completed":
+        return f"{event.agent_label}: Done"
+    if event.event_type == "failed":
+        return f"{event.agent_label}: Failed \u2014 {event.message}"
+    # "started" and "progress" both forward the message
+    return f"{event.agent_label}: {event.message}"
+
+
+def _render_decomposition_plan(plan: DecompositionPlan) -> None:
+    """Render a DecompositionPlan to the console using Rich primitives."""
+    console = ui.create_console()
+    task_map = {t.id: t for t in plan.tasks}
+
+    lines: list = []
+
+    if plan.rationale:
+        lines.append(ui.subtle(plan.rationale))
+
+    for step_idx, group in enumerate(plan.execution_order, start=1):
+        valid_ids = [tid for tid in group if tid in task_map]
+        if not valid_ids:
+            continue
+
+        is_parallel = len(valid_ids) > 1
+        label_suffix = " (parallel)" if is_parallel else ""
+
+        header = ui.highlight(
+            f"Step {step_idx}{label_suffix}",
+            accent="violet",
+            bold=True,
+        )
+        lines.append(header)
+
+        for tid in valid_ids:
+            task = task_map[tid]
+            lines.append(ui.bullet(task.description))
+            if task.file_territory:
+                territory = ", ".join(task.file_territory)
+                lines.append(ui.muted(f"  files: {territory}"))
+
+    panel = ui.make_panel(
+        ui.grouped_lines(lines),
+        title="Decomposition Plan",
+        accent="violet",
+    )
+    console.print(panel)
+
+
 def run_phase_orchestrated(
     phase: str,
     backend: str,
@@ -411,16 +462,20 @@ def run_phase_orchestrated(
             len(plan.execution_order),
             plan.rationale,
         )
+        _render_decomposition_plan(plan)
 
-    def _noop_progress(event: ProgressEvent) -> None:
-        pass
+    _console = ui.create_console()
+
+    def _on_progress(event: ProgressEvent) -> None:
+        if verbose:
+            _console.print(map_progress_to_activity(event))
 
     # Single task: execute directly (skip orchestration overhead)
     if len(plan.tasks) == 1:
         task = plan.tasks[0]
         if phase_context:
             task.context = phase_context
-        result = adapter.execute(task, project_dir, _noop_progress)
+        result = adapter.execute(task, project_dir, _on_progress)
         return 0 if result.success else 1
 
     # Multi-task: execute the full task graph
@@ -428,7 +483,7 @@ def run_phase_orchestrated(
         for t in plan.tasks:
             t.context = phase_context
 
-    results = _execute_task_graph(plan, adapter, project_dir, on_progress=_noop_progress)
+    results = _execute_task_graph(plan, adapter, project_dir, on_progress=_on_progress)
 
     # Reconcile (non-fatal)
     rc = _reconcile(adapter, project_dir, model)
