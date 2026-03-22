@@ -35,7 +35,7 @@ def test_render_homebrew_formula_contains_expected_install_surface():
         resources=runtime_formula_resources(ROOT / "uv.lock"),
     )
 
-    assert 'class Ubundiforge < Formula' in formula
+    assert "class Ubundiforge < Formula" in formula
     assert 'depends_on "python@3.13"' in formula
     assert 'conflicts_with "forge"' in formula
     assert 'resource "typer" do' in formula
