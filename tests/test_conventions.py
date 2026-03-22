@@ -53,8 +53,30 @@ def test_load_conventions_prefers_bundled_tree(tmp_path, monkeypatch):
     (root / "global").mkdir(parents=True)
     (root / "global" / "shared.md").write_text("Use strict typing.")
     monkeypatch.setattr("ubundiforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
+    monkeypatch.setattr(
+        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH",
+        tmp_path / ".forge" / "conventions.md",
+    )
 
     content, warnings = load_conventions(stack="fastapi")
 
     assert "strict typing" in content
-    assert warnings == []
+    assert warnings
+    assert any("short" in w.lower() for w in warnings)
+
+
+def test_load_conventions_stack_prefers_local_override(tmp_path, monkeypatch):
+    root = tmp_path / "conventions"
+    (root / "global").mkdir(parents=True)
+    (root / "global" / "shared.md").write_text("Use strict typing in bundled content.")
+    local = tmp_path / ".forge" / "conventions.md"
+    local.parent.mkdir(parents=True)
+    local.write_text("Local rules always win.")
+
+    monkeypatch.setattr("ubundiforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
+    monkeypatch.setattr("ubundiforge.conventions.LOCAL_CONVENTIONS_PATH", local)
+
+    content, warnings = load_conventions(stack="fastapi")
+
+    assert content == "Local rules always win."
+    assert any("local conventions" in w.lower() for w in warnings)

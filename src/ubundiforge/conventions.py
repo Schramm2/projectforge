@@ -5,8 +5,13 @@ from pathlib import Path
 
 import yaml
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-BUNDLED_CONVENTIONS_DIR = REPO_ROOT / "conventions"
+_PACKAGE_CONVENTIONS_DIR = Path(__file__).resolve().with_name("conventions")
+_REPO_CONVENTIONS_DIR = Path(__file__).resolve().parents[2] / "conventions"
+BUNDLED_CONVENTIONS_DIR = (
+    _PACKAGE_CONVENTIONS_DIR
+    if _PACKAGE_CONVENTIONS_DIR.exists()
+    else _REPO_CONVENTIONS_DIR
+)
 
 FORGE_DIR = Path.home() / ".forge"
 CONVENTIONS_PATH = FORGE_DIR / "conventions.md"
@@ -155,32 +160,41 @@ def compile_bundle(registry: dict[str, object], stack: str | None = None) -> Com
     return CompiledBundle(prompt_block=prompt_block, warnings=warnings)
 
 
-def load_conventions(stack: str | None = None) -> tuple[str, list[str]]:
-    """Load conventions, preferring the bundled tree for stack-aware requests."""
-
-    if stack is not None:
-        bundle = compile_bundle(build_registry(), stack=stack)
-        if bundle.prompt_block:
-            return bundle.prompt_block, []
-
+def _load_conventions_file(path: Path) -> tuple[str, list[str]]:
     warnings: list[str] = []
-
-    if LOCAL_CONVENTIONS_PATH.exists():
-        source = LOCAL_CONVENTIONS_PATH
-        warnings.append(f"Using local conventions from {LOCAL_CONVENTIONS_PATH}")
-    else:
-        source = CONVENTIONS_PATH
-        if not source.exists():
-            FORGE_DIR.mkdir(parents=True, exist_ok=True)
-            source.write_text(DEFAULT_CONVENTIONS)
-            warnings.append("Created default conventions at ~/.forge/conventions.md")
-
-    content = source.read_text()
+    content = path.read_text()
 
     if not content.strip():
         warnings.append("Conventions file is empty — scaffolds will lack guidance.")
     elif len(content.strip()) < MIN_CONVENTIONS_LENGTH:
         warnings.append("Conventions file is very short — consider adding more detail.")
+
+    return content, warnings
+
+
+def load_conventions(stack: str | None = None) -> tuple[str, list[str]]:
+    """Load conventions, preferring the bundled tree for stack-aware requests."""
+
+    if LOCAL_CONVENTIONS_PATH.exists():
+        content, warnings = _load_conventions_file(LOCAL_CONVENTIONS_PATH)
+        warnings.insert(0, f"Using local conventions from {LOCAL_CONVENTIONS_PATH}")
+        return content, warnings
+
+    if stack is not None:
+        bundle = compile_bundle(build_registry(), stack=stack)
+        if bundle.prompt_block:
+            return bundle.prompt_block, bundle.warnings
+
+    warnings: list[str] = []
+
+    source = CONVENTIONS_PATH
+    if not source.exists():
+        FORGE_DIR.mkdir(parents=True, exist_ok=True)
+        source.write_text(DEFAULT_CONVENTIONS)
+        warnings.append("Created default conventions at ~/.forge/conventions.md")
+
+    content, source_warnings = _load_conventions_file(source)
+    warnings.extend(source_warnings)
 
     return content, warnings
 

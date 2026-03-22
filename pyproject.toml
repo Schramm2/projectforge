@@ -40,7 +40,7 @@ ubundiforge = "ubundiforge.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ubundiforge"]
-artifacts = ["conventions/**/*"]
+force-include = { "conventions" = "ubundiforge/conventions" }
 
 [tool.hatch.build.targets.sdist]
 include = [
