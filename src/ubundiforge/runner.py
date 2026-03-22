@@ -16,11 +16,13 @@ from rich.live import Live
 from rich.text import Text
 
 from ubundiforge.ui import (
+    BACKEND_ACCENTS,
     badge,
     create_console,
     grouped_lines,
     make_loader_panel,
     make_panel,
+    make_phase_timeline,
     make_table,
     muted,
     status_line,
@@ -36,11 +38,6 @@ _PULSE_STYLES = {
     "amber": ("#77603A", "#F3BB58", "#F7D99C", "#F3BB58"),
     "violet": ("#5F4A87", "#A16EFA", "#D3BCFF", "#A16EFA"),
     "plum": ("#7B4A79", "#D768D2", "#F0B6ED", "#D768D2"),
-}
-_BACKEND_ACCENTS = {
-    "claude": "violet",
-    "gemini": "amber",
-    "codex": "aqua",
 }
 
 
@@ -100,7 +97,7 @@ _PHASE_TIMEOUT = 1800  # 30 minutes per phase
 
 def _phase_accent(backend: str) -> str:
     """Return the accent color that best matches a backend."""
-    return _BACKEND_ACCENTS.get(backend, "violet")
+    return BACKEND_ACCENTS.get(backend, "violet")
 
 
 def _initial_phase_summary(label: str, backend: str) -> str:
@@ -252,6 +249,7 @@ def run_ai(
     model: str | None = None,
     verbose: bool = False,
     label: str = "",
+    phase_context: list[dict] | None = None,
 ) -> int:
     """Execute the AI CLI with the assembled prompt.
 
@@ -357,18 +355,22 @@ def run_ai(
                 with lock:
                     current_activities = tracker.visible_steps()
                     current_detail = last_line if last_line != tracker.current else None
-                live.update(
-                    make_loader_panel(
-                        display_label,
-                        tracker.current,
-                        elapsed=elapsed,
-                        spinner_frame=_spinner_frame(elapsed),
-                        spinner_style=_spinner_style(accent, elapsed),
-                        accent=accent,
-                        detail=current_detail,
-                        activities=current_activities,
-                    )
+                loader = make_loader_panel(
+                    display_label,
+                    tracker.current,
+                    elapsed=elapsed,
+                    spinner_frame=_spinner_frame(elapsed),
+                    spinner_style=_spinner_style(accent, elapsed),
+                    accent=accent,
+                    detail=current_detail,
+                    activities=current_activities,
                 )
+                if phase_context:
+                    from rich.console import Group as RichGroup
+
+                    live.update(RichGroup(make_phase_timeline(phase_context), Text(), loader))
+                else:
+                    live.update(loader)
                 time.sleep(0.2)
 
             reader.join(timeout=5)

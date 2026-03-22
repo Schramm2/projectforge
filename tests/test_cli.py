@@ -192,6 +192,7 @@ def test_mock_backends_cover_full_cli_flow_without_installed_ai_clis(monkeypatch
         model: str | None = None,
         verbose: bool = False,
         label: str = "",
+        phase_context: list[dict] | None = None,
     ) -> int:
         phase_calls.append(label)
         project_dir.mkdir(parents=True, exist_ok=True)

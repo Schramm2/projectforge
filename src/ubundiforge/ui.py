@@ -24,6 +24,12 @@ ACCENTS = {
     "indigo": "#2D365C",
 }
 
+BACKEND_ACCENTS: dict[str, str] = {
+    "claude": "violet",
+    "gemini": "amber",
+    "codex": "aqua",
+}
+
 _BADGE_STYLES = {
     "success": (TEXT_PRIMARY, ACCENTS["aqua"]),
     "warning": ("#10131E", ACCENTS["amber"]),

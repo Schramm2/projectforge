@@ -60,6 +60,7 @@ from ubundiforge.scaffold_options import (
 )
 from ubundiforge.setup import load_forge_config, needs_setup, run_setup
 from ubundiforge.ui import (
+    BACKEND_ACCENTS,
     bullet,
     command_text,
     create_console,
@@ -970,6 +971,18 @@ def main(
 
     scaffold_start = time.monotonic()
 
+    # Build phase context for the timeline display
+    phase_context: list[dict] = []
+    for phase, backend in phase_backends:
+        phase_context.append(
+            {
+                "label": PHASE_LABELS.get(phase, phase),
+                "status": "pending",
+                "elapsed": 0.0,
+                "accent": BACKEND_ACCENTS.get(backend, "violet"),
+            }
+        )
+
     # --- Execute phases: serial first, parallel middle, serial last ---
     total_phases = len(phase_backends)
     step = 1
@@ -983,6 +996,9 @@ def main(
         )
         phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
         effective_model = model or backend_models.get(backend)
+        phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
+        phase_context[phase_idx]["status"] = "active"
+        phase_start = time.monotonic()
         returncode = run_ai(
             backend,
             phase_prompt,
@@ -990,7 +1006,10 @@ def main(
             model=effective_model,
             verbose=verbose,
             label=label,
+            phase_context=phase_context,
         )
+        phase_context[phase_idx]["status"] = "completed"
+        phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
         if returncode != 0:
             _render_phase_failure(backend, label, returncode)
             raise typer.Exit(returncode)
@@ -1041,6 +1060,9 @@ def main(
                 )
                 phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
                 effective_model = model or backend_models.get(backend)
+                phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
+                phase_context[phase_idx]["status"] = "active"
+                phase_start = time.monotonic()
                 returncode = run_ai(
                     backend,
                     phase_prompt,
@@ -1048,7 +1070,10 @@ def main(
                     model=effective_model,
                     verbose=verbose,
                     label=label,
+                    phase_context=phase_context,
                 )
+                phase_context[phase_idx]["status"] = "completed"
+                phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
                 if returncode != 0:
                     _render_phase_failure(backend, label, returncode)
                     raise typer.Exit(returncode)
@@ -1063,6 +1088,9 @@ def main(
         )
         phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
         effective_model = model or backend_models.get(backend)
+        phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
+        phase_context[phase_idx]["status"] = "active"
+        phase_start = time.monotonic()
         returncode = run_ai(
             backend,
             phase_prompt,
@@ -1070,7 +1098,10 @@ def main(
             model=effective_model,
             verbose=verbose,
             label=label,
+            phase_context=phase_context,
         )
+        phase_context[phase_idx]["status"] = "completed"
+        phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
         if returncode != 0:
             _render_phase_failure(backend, label, returncode)
             raise typer.Exit(returncode)
