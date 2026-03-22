@@ -38,6 +38,7 @@ def test_collect_answers_allows_review_edit_before_scaffold(monkeypatch):
     monkeypatch.setattr("ubundiforge.prompts._ask_customizations", _fake_integrations)
     monkeypatch.setattr("ubundiforge.prompts._ask_demo_mode", _fake_demo)
     monkeypatch.setattr("ubundiforge.prompts._review_answers", lambda answers: next(actions))
+    monkeypatch.setattr("ubundiforge.preferences.get_defaults", lambda: {})
 
     answers = collect_answers(docker_available=True)
 

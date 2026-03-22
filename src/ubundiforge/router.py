@@ -78,6 +78,7 @@ def pick_phase_backends(
     description: str = "",
     prefer_installed_backends: bool = True,
     available_backends: set[str] | None = None,
+    quality_scores: dict[str, dict[str, float]] | None = None,
 ) -> list[tuple[str, str]]:
     """Pick the best backend for each scaffold phase.
 
@@ -121,6 +122,20 @@ def pick_phase_backends(
                 backend = next(iter(available))
             else:
                 backend = "claude"  # Will fail at install check later
+
+        # Quality score override (only when margin > 0.1)
+        if quality_scores and phase in quality_scores:
+            phase_scores = quality_scores[phase]
+            best_backend = max(
+                (b for b in phase_scores if b in available),
+                key=lambda b: phase_scores[b],
+                default=None,
+            )
+            if best_backend and best_backend != backend:
+                ideal_score = phase_scores.get(backend, 0.0)
+                best_score = phase_scores.get(best_backend, 0.0)
+                if best_score - ideal_score > 0.1:
+                    backend = best_backend
         result.append((phase, backend))
 
     return result

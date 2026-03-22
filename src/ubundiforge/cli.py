@@ -2,6 +2,7 @@
 
 import re
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -23,6 +24,7 @@ from ubundiforge.design_templates import (
     design_template_supported_for_stack,
     load_design_template,
 )
+from ubundiforge.evolutions import build_evolve_prompt, get_capabilities, get_capability
 from ubundiforge.logo import print_logo
 from ubundiforge.media_assets import (
     MEDIA_DIR,
@@ -32,8 +34,10 @@ from ubundiforge.media_assets import (
     scan_assets,
     target_asset_dir,
 )
+from ubundiforge.preferences import record_preferences
 from ubundiforge.prompt_builder import build_phase_prompt
 from ubundiforge.prompts import collect_answers
+from ubundiforge.quality import append_quality_signal, compute_backend_scores, read_quality_signals
 from ubundiforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
 from ubundiforge.router import (
     PHASE_LABELS,
@@ -50,7 +54,7 @@ from ubundiforge.runner import (
     run_post_scaffold_hook,
 )
 from ubundiforge.safety import check_for_secrets
-from ubundiforge.scaffold_log import append_scaffold_log, write_scaffold_manifest
+from ubundiforge.scaffold_log import SCAFFOLD_LOG_PATH, append_scaffold_log, write_scaffold_manifest
 from ubundiforge.scaffold_options import (
     AUTH_PROVIDER_OPTIONS,
     CI_TEMPLATE_MODES,
@@ -368,8 +372,162 @@ def _prompt_post_setup_next_step() -> str:
     return action
 
 
+@app.command()
+def stats() -> None:
+    """Show scaffold analytics and backend performance."""
+    import json
+
+    from ubundiforge.analytics import aggregate_stats, render_stats
+    from ubundiforge.quality import read_quality_signals
+
+    scaffold_entries: list[dict] = []
+    if SCAFFOLD_LOG_PATH.exists():
+        for line in SCAFFOLD_LOG_PATH.read_text().splitlines():
+            line = line.strip()
+            if line:
+                try:
+                    scaffold_entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+
+    quality_entries = read_quality_signals()
+
+    stats_data = aggregate_stats(
+        scaffold_entries=scaffold_entries,
+        quality_entries=quality_entries,
+    )
+    render_stats(console, stats_data)
+
+
+@app.command()
+def evolve(
+    capability: Annotated[
+        str | None,
+        typer.Argument(help="Capability to add (e.g., auth, websockets, stripe)."),
+    ] = None,
+    use: Annotated[
+        str | None,
+        typer.Option("--use", help="Override AI routing."),
+    ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option("--model", "-m", help="Model to pass to the AI CLI."),
+    ] = None,
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", help="Show detailed execution info."),
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Print the prompt without executing."),
+    ] = False,
+) -> None:
+    """Add a capability to an existing Forge project."""
+    import json
+
+    project_dir = Path.cwd()
+    manifest_path = project_dir / ".forge" / "scaffold.json"
+
+    if not manifest_path.exists():
+        console.print(
+            status_line(
+                "No .forge/scaffold.json found. Run this inside a Forge project.",
+                accent="amber",
+            )
+        )
+        raise typer.Exit(1)
+
+    dna = json.loads(manifest_path.read_text())
+    stack = dna.get("stack", "")
+
+    from ubundiforge.logo import print_logo
+
+    print_logo(console)
+    console.print(header_panel(__version__))
+    console.print(
+        status_line(f"Project: {dna.get('name', project_dir.name)} ({stack})", accent="violet")
+    )
+
+    caps = get_capabilities(stack)
+    if not caps:
+        console.print(
+            status_line(
+                f"No evolution capabilities defined for stack '{stack}'.",
+                accent="amber",
+            )
+        )
+        raise typer.Exit(1)
+
+    # Select capability
+    if capability:
+        cap = get_capability(stack, capability)
+        if not cap:
+            valid = ", ".join(c["name"] for c in caps)
+            console.print(
+                status_line(
+                    f"Unknown capability '{capability}'. Choose from: {valid}",
+                    accent="amber",
+                )
+            )
+            raise typer.Exit(1)
+    else:
+        choices = [
+            questionary.Choice(f"{c['name']} — {c['description']}", value=c["name"]) for c in caps
+        ]
+        selected = prompt_select("What would you like to add?", choices=choices).ask()
+        if selected is None:
+            raise typer.Exit(0)
+        cap = get_capability(stack, selected)
+
+    prompt = build_evolve_prompt(project_dir, cap)
+
+    if dry_run:
+        console.print(prompt)
+        raise typer.Exit(0)
+
+    # Route through standard backend routing (or --use override)
+    from ubundiforge.config import check_backend_installed
+
+    if use:
+        backend = use
+        if not check_backend_installed(backend):
+            console.print(status_line(f"{backend} is not installed.", accent="amber"))
+            raise typer.Exit(1)
+    else:
+        phase_plan = pick_phase_backends(stack, override=None)
+        backend = phase_plan[0][1] if phase_plan else "claude"
+
+    console.print(status_line(f"Adding {cap['name']} via {backend}...", accent="violet"))
+
+    returncode = run_ai(
+        backend, prompt, project_dir, model=model, verbose=verbose, label=f"Evolve: {cap['name']}"
+    )
+
+    if returncode == 0:
+        evolutions = dna.get("evolutions", [])
+        evolutions.append(
+            {
+                "capability": cap["name"],
+                "backend": backend,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
+        dna["evolutions"] = evolutions
+        manifest_path.write_text(json.dumps(dna, indent=2) + "\n")
+        console.print(status_line(f"Successfully added {cap['name']}", accent="aqua"))
+    else:
+        console.print(
+            status_line(
+                f"Evolution failed (exit {returncode}). Try --verbose for details.",
+                accent="amber",
+            )
+        )
+        raise typer.Exit(returncode)
+
+
 @app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     use: Annotated[
         str | None,
         typer.Option("--use", help="Override AI routing (claude, gemini, or codex)."),
@@ -489,6 +647,9 @@ def main(
     ] = None,
 ) -> None:
     """UbundiForge — Ubundi Project Scaffolder. Scaffold projects with AI + your conventions."""
+    if ctx.invoked_subcommand is not None:
+        return
+
     prompt_only = dry_run or bool(export)
     explicit_scaffold_request = _has_explicit_scaffold_request(
         use=use,
@@ -661,12 +822,20 @@ def main(
         if backend_statuses
         else None
     )
+    quality_signals = read_quality_signals()
+    quality_scores: dict[str, dict[str, float]] = {}
+    for phase_name in STACK_PHASES.get(answers["stack"], []):
+        scores = compute_backend_scores(quality_signals, stack=answers["stack"], phase=phase_name)
+        if scores:
+            quality_scores[phase_name] = scores
+
     phase_backends = pick_phase_backends(
         answers["stack"],
         override=use,
         description=answers.get("description", ""),
         prefer_installed_backends=not prompt_only,
         available_backends=available_backends,
+        quality_scores=quality_scores or None,
     )
     merged_groups = merge_adjacent_phases(phase_backends)
     all_phases = STACK_PHASES.get(answers["stack"], ["architecture", "tests"])
@@ -1058,8 +1227,15 @@ def main(
     if verify:
         verify_report = verify_scaffold(answers["stack"], project_dir, verbose=verbose)
 
+    append_quality_signal(
+        stack=answers["stack"],
+        phase_backends=phase_backends,
+        verify_report=verify_report,
+    )
+
     run_post_scaffold_hook(project_dir, answers)
     append_scaffold_log(answers, phase_backends, project_dir)
+    record_preferences(answers)
 
     elapsed = time.monotonic() - scaffold_start
     render_dashboard(
