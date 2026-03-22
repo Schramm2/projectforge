@@ -11,12 +11,14 @@ from pathlib import Path
 
 from ubundiforge import ui
 from ubundiforge.adapters import get_adapter
+from ubundiforge.agent_quality import append_agent_quality_signal
 from ubundiforge.protocol import (
     AgentResult,
     AgentTask,
     DecompositionPlan,
     ProgressEvent,
 )
+from ubundiforge.quality import QUALITY_LOG_PATH
 
 log = logging.getLogger(__name__)
 
@@ -314,6 +316,16 @@ def _execute_task_graph(
                 group_summaries.append(
                     build_context_summary(task_map[res.task_id], created, modified, project_dir)
                 )
+                _task = task_map[res.task_id]
+                append_agent_quality_signal(
+                    log_path=QUALITY_LOG_PATH,
+                    phase=_task.phase,
+                    backend=_task.backend,
+                    task_id=res.task_id,
+                    task_description=_task.description,
+                    success=res.success,
+                    duration=res.duration,
+                )
             combined_summary = "\n\n".join(group_summaries)
             accumulated_context = accumulate_context(accumulated_context, combined_summary)
             results.extend(group_results)
@@ -348,6 +360,16 @@ def _execute_task_graph(
 
                 if not result.success:
                     failed_ids.add(tid)
+
+                append_agent_quality_signal(
+                    log_path=QUALITY_LOG_PATH,
+                    phase=task.phase,
+                    backend=task.backend,
+                    task_id=tid,
+                    task_description=task.description,
+                    success=result.success,
+                    duration=result.duration,
+                )
 
                 summary = build_context_summary(task, created, modified, project_dir)
                 accumulated_context = accumulate_context(accumulated_context, summary)
