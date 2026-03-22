@@ -417,7 +417,10 @@ def test_first_run_with_explicit_scaffold_flags_skips_post_setup_prompt(monkeypa
     assert "Project Ready" in result.stdout
 
 
-def test_replay_without_snapshot_loads_compiled_conventions_for_manifest_stack(monkeypatch, tmp_path):
+def test_replay_without_snapshot_loads_compiled_conventions_for_manifest_stack(
+    monkeypatch,
+    tmp_path,
+):
     project_dir = tmp_path / "atlas"
     forge_dir = project_dir / ".forge"
     forge_dir.mkdir(parents=True)
