@@ -179,6 +179,7 @@ def make_loader_panel(
     spinner_style: str,
     accent: str = "violet",
     detail: str | None = None,
+    activities: list[dict] | None = None,
 ) -> Panel:
     """Create a polished live loader panel for long-running CLI work."""
     header = Text()
@@ -187,9 +188,22 @@ def make_loader_panel(
     header.append("  ", style="")
     header.append(f"{elapsed:.0f}s", style=TEXT_MUTED)
 
-    lines: list[Text] = [header, Text(summary, style=f"bold {TEXT_SECONDARY}")]
-    if detail:
-        lines.append(Text(detail, style=TEXT_MUTED))
+    lines: list[Text] = [header]
+
+    if activities:
+        for step in activities:
+            line = Text("  ")
+            if step["completed"]:
+                line.append("✓ ", style=ACCENTS["aqua"])
+                line.append(step["summary"], style=TEXT_MUTED)
+            else:
+                line.append(f"{spinner_frame} ", style=f"bold {spinner_style}")
+                line.append(step["summary"], style=f"bold {TEXT_SECONDARY}")
+            lines.append(line)
+    else:
+        lines.append(Text(summary, style=f"bold {TEXT_SECONDARY}"))
+        if detail:
+            lines.append(Text(detail, style=TEXT_MUTED))
 
     return make_panel(
         grouped_lines(lines),

@@ -294,13 +294,14 @@ def run_ai(
 
     start = time.monotonic()
     accent = _phase_accent(backend)
-    summary = _initial_phase_summary(display_label, backend)
+    tracker = ActivityTracker()
+    tracker.update(_initial_phase_summary(display_label, backend))
     last_line = ""
     lock = threading.Lock()
 
     def _stream_stdout(pipe: io.BufferedReader, live: Live) -> None:
         """Read stdout line-by-line and update the polished loader state."""
-        nonlocal summary, last_line
+        nonlocal last_line
         try:
             for raw_line in iter(pipe.readline, b""):
                 line = raw_line.decode("utf-8", errors="replace").rstrip("\n")
@@ -310,7 +311,9 @@ def run_ai(
                         continue
                     with lock:
                         last_line = clean
-                        summary = _progress_summary_for_line(clean, summary)
+                        new_summary = _summarize_output_line(clean)
+                        if new_summary and new_summary != tracker.current:
+                            tracker.update(new_summary)
                     if verbose:
                         live.console.print(line)
         except ValueError:
@@ -352,17 +355,18 @@ def run_ai(
                     )
                     return 1
                 with lock:
-                    current_summary = summary
-                    current_detail = last_line if last_line != current_summary else None
+                    current_activities = tracker.visible_steps()
+                    current_detail = last_line if last_line != tracker.current else None
                 live.update(
                     make_loader_panel(
                         display_label,
-                        current_summary,
+                        tracker.current,
                         elapsed=elapsed,
                         spinner_frame=_spinner_frame(elapsed),
                         spinner_style=_spinner_style(accent, elapsed),
                         accent=accent,
                         detail=current_detail,
+                        activities=current_activities,
                     )
                 )
                 time.sleep(0.2)
