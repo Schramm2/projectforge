@@ -19,12 +19,6 @@ brew tap matthewubundi/tap
 brew install ubundiforge
 ```
 
-### pipx (isolated global install)
-
-```bash
-pipx install ubundiforge
-```
-
 ### From source
 
 ```bash

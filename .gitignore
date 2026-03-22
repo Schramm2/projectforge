@@ -7,6 +7,8 @@ __pycache__/
 *.pyd
 .Python
 
+.env
+
 # Virtual environments
 .venv/
 venv/
@@ -45,3 +47,9 @@ media/
 .claude/
 CLAUDE.md
 agent_docs/
+
+# Superpowers brainstorm sessions
+.superpowers/
+
+# Internal planning docs (not for public repo)
+docs/superpowers/

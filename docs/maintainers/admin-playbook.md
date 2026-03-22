@@ -143,20 +143,33 @@ If you changed stack behavior, also run a dry-run smoke test:
 ./forge --dry-run --name release-smoke --stack fastapi --description "release smoke test"
 ```
 
-### 4. Commit and tag the release
+### 4. Push the release commit to `main`
 
 Example for version `vX.Y.Z`:
 
 ```bash
 git add .
 git commit -m "release: vX.Y.Z"
-git tag vX.Y.Z
-git push origin main --tags
+git push origin main
 ```
 
-The Git tag must match the package version because the Homebrew formula points at the GitHub release tarball for that tag.
+The Homebrew release workflow handles the rest automatically:
 
-### 5. Compute the release tarball checksum
+- creates `vX.Y.Z` if it does not already exist
+- creates the GitHub release
+- regenerates `Formula/ubundiforge.rb`
+- commits the updated formula back to this repo
+- syncs the formula into the Homebrew tap repo
+
+See `docs/maintainers/homebrew-release.md` for the Homebrew release runbook, including the release steps, expected workflow behavior, verification checks, and the `sync_only=true` recovery flow.
+
+If the workflow creates the tag but fails before the formula or tap update completes, re-run `.github/workflows/release-homebrew.yml` manually with `sync_only=true`. That recovery mode re-syncs the formula and tap without trying to cut the tag again.
+
+### 5. Manual fallback
+
+If automation is unavailable, you can still run the old manual flow.
+
+#### Compute the release tarball checksum
 
 Example:
 
@@ -166,7 +179,7 @@ curl -Ls https://github.com/matthewubundi/UbundiForge/archive/refs/tags/vX.Y.Z.t
 
 Save the resulting SHA-256 value.
 
-### 6. Regenerate the Homebrew formula
+#### Regenerate the Homebrew formula
 
 Run:
 
@@ -180,11 +193,11 @@ This updates:
 
 - `Formula/ubundiforge.rb`
 
-### 7. Commit the updated formula in this repo
+#### Commit the updated formula in this repo
 
 Commit the regenerated formula so the main repo reflects the exact release metadata that was published.
 
-### 8. Sync the formula into the Homebrew tap repo
+#### Sync the formula into the Homebrew tap repo
 
 Copy or sync `Formula/ubundiforge.rb` into the tap repository, typically:
 
@@ -192,7 +205,7 @@ Copy or sync `Formula/ubundiforge.rb` into the tap repository, typically:
 
 The tap repo is what Homebrew users install from.
 
-### 9. Validate the tap
+#### Validate the tap
 
 In the tap context, run:
 
@@ -201,7 +214,7 @@ brew install --build-from-source matthewubundi/tap/ubundiforge
 brew test matthewubundi/tap/ubundiforge
 ```
 
-### 10. Push the tap update
+#### Push the tap update
 
 Once validation passes, commit and push the tap repo change.
 
@@ -218,11 +231,8 @@ For a normal admin release:
 2. Bump version in `pyproject.toml` and `src/ubundiforge/__init__.py`.
 3. Refresh `uv.lock` if dependencies changed.
 4. Run tests and a dry-run scaffold.
-5. Tag and push the release.
-6. Generate `Formula/ubundiforge.rb` with the real tarball URL and SHA.
-7. Sync that formula to the tap repo.
-8. Test with `brew install` and `brew test`.
-9. Push the tap update.
+5. Push the release commit to `main`.
+6. Confirm the release workflow tagged, released, and updated both formulas.
 
 ## Future improvement ideas
 

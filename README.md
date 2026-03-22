@@ -63,12 +63,6 @@ brew tap matthewubundi/tap
 brew install ubundiforge
 ```
 
-### pipx
-
-```bash
-pipx install ubundiforge
-```
-
 ### From source
 
 ```bash

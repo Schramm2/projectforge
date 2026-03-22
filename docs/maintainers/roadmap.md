@@ -50,8 +50,16 @@ Items marked with [DONE] are implemented in this repository as of `0.2.0`. Plann
 - [DONE] **TypeScript package stack**: `ts-package` stack for npm package scaffolding.
 - [DONE] **Python worker stack**: `python-worker` stack for background workers and services.
 - [DONE] **AI-powered API stack**: `fastapi-ai` stack for FastAPI services with LLM/embeddings integration.
+- [DONE] **Scaffold options & auth providers**: Configurable auth providers (Clerk, Supabase Auth, Auth.js, Better Auth), CI template modes, and per-stack service selections via `scaffold_options.py`.
 - **Sub-stack prompts**: After selecting "Next.js + React", ask follow-ups like "Auth provider?" (Supabase, Clerk, NextAuth), "Database?" (Postgres, SQLite, none), "UI library?" (shadcn/ui, Radix, none).
 - **Stack detection from existing project**: Run `forge` inside an existing repo and have it detect the stack from package.json / pyproject.toml, then scaffold missing pieces (e.g. add Docker to an existing project).
+
+---
+
+## Design & Media
+
+- [DONE] **Design templates**: Bundled, global (`~/.forge/design-templates/`), and project-local design template resolution. Includes Ubundi Brand Guide template. Templates are integrated into the scaffold prompt and selectable during the interactive flow.
+- [DONE] **Media assets & collections**: Media asset detection and copying from repo-local `media/` collections. Supports images, fonts, and vectors across all stacks with manifest generation and prompt integration via `media_assets.py`.
 
 ---
 
@@ -179,9 +187,9 @@ The target workflow:
 
 Steps to ship:
 - [DONE] **Homebrew formula**: The repo includes `Formula/ubundiforge.rb`, a formula generator, and documented Homebrew release steps.
-- [DONE] **pipx entrypoint support**: Project metadata exposes the `forge` executable for `pipx install ubundiforge`.
+- [DONE] **Automated Homebrew release flow**: Pushing a new version to `main` creates the release tag, GitHub release, regenerates the Homebrew formula, and syncs the tap.
 - [DONE] **Buildable package metadata**: `pyproject.toml` is set up for versioned source/wheel builds.
-- **Publish releases to PyPI**: `uv build && uv publish` as part of the release flow.
+- **Publish releases to PyPI**: optional later, if Forge needs a Python package distribution channel.
 - **Keep the Homebrew tap synced**: Push each tagged release into the tap with the correct tarball checksum.
 - Transfer repo from `matthewubundi/UbundiForge` to `Ubundi/ubundiforge` when ready
 - **Auto-update**: `forge update` pulls the latest version.

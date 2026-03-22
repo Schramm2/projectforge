@@ -1,0 +1,233 @@
+name: Release Homebrew
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - pyproject.toml
+      - src/ubundiforge/__init__.py
+      - uv.lock
+      - scripts/generate_homebrew_formula.py
+      - src/ubundiforge/homebrew.py
+  workflow_dispatch:
+    inputs:
+      sync_only:
+        description: Sync the Homebrew formula and tap for the current version without creating a new tag or release
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-homebrew
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO || 'matthewubundi/homebrew-tap' }}
+      TAP_BRANCH: ${{ vars.HOMEBREW_TAP_BRANCH || 'main' }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: python -m pip install --upgrade pip uv
+
+      - name: Sync dependencies
+        run: uv sync --dev
+
+      - name: Resolve release metadata
+        id: meta
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import tomllib
+          from pathlib import Path
+
+          root = Path(".")
+          version = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
+          init_text = (root / "src/ubundiforge/__init__.py").read_text()
+          match = re.search(r'__version__\s*=\s*"([^"]+)"', init_text)
+          if not match:
+              raise SystemExit("Could not find __version__ in src/ubundiforge/__init__.py")
+          init_version = match.group(1)
+          if version != init_version:
+              raise SystemExit(
+                  "Version mismatch: pyproject.toml has "
+                  f"{version}, src/ubundiforge/__init__.py has {init_version}"
+              )
+          parts = version.split(".")
+          if len(parts) != 3 or not all(part.isdigit() for part in parts):
+              raise SystemExit(
+                  f"Version must use semantic versioning (X.Y.Z). Got: {version}"
+              )
+
+          tag = f"v{version}"
+          output = Path(os.environ["GITHUB_OUTPUT"])
+          with output.open("a") as fh:
+              fh.write(f"version={version}\n")
+              fh.write(f"tag={tag}\n")
+          PY
+
+      - name: Check whether tag already exists
+        id: tag_check
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/${{ steps.meta.outputs.tag }}" >/dev/null 2>&1; then
+            echo "already_released=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already_released=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Decide release mode
+        id: mode
+        env:
+          SYNC_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.sync_only || 'false' }}
+        run: |
+          if [ "$SYNC_ONLY" = "true" ]; then
+            if [ "${{ steps.tag_check.outputs.already_released }}" != "true" ]; then
+              echo "::error::sync_only was requested, but tag ${{ steps.meta.outputs.tag }} does not exist yet."
+              exit 1
+            fi
+            echo "run_checks=false" >> "$GITHUB_OUTPUT"
+            echo "publish_release=false" >> "$GITHUB_OUTPUT"
+            echo "sync_formula=true" >> "$GITHUB_OUTPUT"
+            echo "Manual sync-only mode enabled for ${{ steps.meta.outputs.tag }}."
+            exit 0
+          fi
+
+          if [ "${{ steps.tag_check.outputs.already_released }}" = "true" ]; then
+            echo "run_checks=false" >> "$GITHUB_OUTPUT"
+            echo "publish_release=false" >> "$GITHUB_OUTPUT"
+            echo "sync_formula=false" >> "$GITHUB_OUTPUT"
+            echo "Tag ${{ steps.meta.outputs.tag }} already exists. Skipping release."
+            exit 0
+          fi
+
+          echo "run_checks=true" >> "$GITHUB_OUTPUT"
+          echo "publish_release=true" >> "$GITHUB_OUTPUT"
+          echo "sync_formula=true" >> "$GITHUB_OUTPUT"
+
+      - name: Lint
+        if: steps.mode.outputs.run_checks == 'true'
+        run: uv run ruff check .
+
+      - name: Ensure tap token is configured
+        if: steps.mode.outputs.sync_formula == 'true'
+        run: |
+          if [ -z "${{ secrets.HOMEBREW_TAP_TOKEN }}" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN is not configured. Add a token with write access to ${TAP_REPO}."
+            exit 1
+          fi
+
+      - name: Check out Homebrew tap
+        if: steps.mode.outputs.sync_formula == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TAP_REPO }}
+          ref: ${{ env.TAP_BRANCH }}
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Run tests
+        if: steps.mode.outputs.run_checks == 'true'
+        run: uv run pytest
+
+      - name: Build package
+        if: steps.mode.outputs.run_checks == 'true'
+        run: uv build
+
+      - name: Smoke-test forge dry run
+        if: steps.mode.outputs.run_checks == 'true'
+        run: |
+          uv run python -m ubundiforge \
+            --dry-run \
+            --name release-smoke \
+            --stack fastapi \
+            --description "Release smoke test" \
+            --no-docker \
+            --no-open \
+            --no-verify > /tmp/forge-release-smoke.txt
+          grep -q "Release smoke test" /tmp/forge-release-smoke.txt
+
+      - name: Create and push release tag
+        if: steps.mode.outputs.publish_release == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.meta.outputs.tag }}" -m "release: ${{ steps.meta.outputs.tag }}"
+          git push origin "${{ steps.meta.outputs.tag }}"
+
+      - name: Create GitHub release
+        if: steps.mode.outputs.publish_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.meta.outputs.tag }}" \
+            --verify-tag \
+            --target "${GITHUB_SHA}" \
+            --title "${{ steps.meta.outputs.tag }}" \
+            --generate-notes
+
+      - name: Compute release tarball checksum
+        if: steps.mode.outputs.sync_formula == 'true'
+        id: checksum
+        run: |
+          source_url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${{ steps.meta.outputs.tag }}.tar.gz"
+          curl -fsSL "$source_url" -o /tmp/ubundiforge-release.tar.gz
+          source_sha256="$(sha256sum /tmp/ubundiforge-release.tar.gz | awk '{print $1}')"
+          echo "source_url=$source_url" >> "$GITHUB_OUTPUT"
+          echo "source_sha256=$source_sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Regenerate Homebrew formula
+        if: steps.mode.outputs.sync_formula == 'true'
+        run: |
+          uv run python scripts/generate_homebrew_formula.py \
+            --source-url "${{ steps.checksum.outputs.source_url }}" \
+            --source-sha256 "${{ steps.checksum.outputs.source_sha256 }}"
+
+      - name: Commit updated formula to main repo
+        if: steps.mode.outputs.sync_formula == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/ubundiforge.rb
+          if git diff --cached --quiet; then
+            echo "Formula already up to date in main repo."
+            exit 0
+          fi
+          git commit -m "release: update Homebrew formula for ${{ steps.meta.outputs.tag }}"
+          git push origin HEAD:main
+
+      - name: Sync formula into Homebrew tap
+        if: steps.mode.outputs.sync_formula == 'true'
+        run: |
+          mkdir -p homebrew-tap/Formula
+          cp Formula/ubundiforge.rb homebrew-tap/Formula/ubundiforge.rb
+
+      - name: Commit and push Homebrew tap update
+        if: steps.mode.outputs.sync_formula == 'true'
+        run: |
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/ubundiforge.rb
+          if git diff --cached --quiet; then
+            echo "Homebrew tap already up to date."
+            exit 0
+          fi
+          git commit -m "release: ${GITHUB_REPOSITORY##*/} ${{ steps.meta.outputs.tag }}"
+          git push origin HEAD:${TAP_BRANCH}
