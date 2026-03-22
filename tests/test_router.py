@@ -234,3 +234,42 @@ def test_merge_two_phase_same_backend():
 
 def test_merge_empty_input():
     assert merge_adjacent_phases([]) == []
+
+
+# --- Quality score integration tests ---
+
+
+def test_quality_scores_override_ideal_backend():
+    """Quality scores override ideal backend when margin > 0.1."""
+    scores = {"architecture": {"gemini": 0.95, "claude": 0.7}}
+    result = pick_phase_backends(
+        "fastapi",
+        available_backends={"claude", "gemini"},
+        quality_scores=scores,
+    )
+    arch_backend = next(b for p, b in result if p == "architecture")
+    assert arch_backend == "gemini"
+
+
+def test_quality_scores_no_override_small_margin():
+    """Quality scores do NOT override when margin <= 0.1."""
+    scores = {"architecture": {"gemini": 0.85, "claude": 0.80}}
+    result = pick_phase_backends(
+        "fastapi",
+        available_backends={"claude", "gemini"},
+        quality_scores=scores,
+    )
+    arch_backend = next(b for p, b in result if p == "architecture")
+    assert arch_backend == "claude"
+
+
+def test_quality_scores_ignored_for_missing_phase():
+    """Phases not in quality_scores use ideal backend."""
+    scores = {"tests": {"codex": 0.9}}
+    result = pick_phase_backends(
+        "fastapi",
+        available_backends={"claude", "codex"},
+        quality_scores=scores,
+    )
+    arch_backend = next(b for p, b in result if p == "architecture")
+    assert arch_backend == "claude"

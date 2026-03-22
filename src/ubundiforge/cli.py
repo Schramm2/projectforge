@@ -34,6 +34,7 @@ from ubundiforge.media_assets import (
 )
 from ubundiforge.prompt_builder import build_phase_prompt
 from ubundiforge.prompts import collect_answers
+from ubundiforge.quality import append_quality_signal, compute_backend_scores, read_quality_signals
 from ubundiforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
 from ubundiforge.router import (
     PHASE_LABELS,
@@ -661,12 +662,20 @@ def main(
         if backend_statuses
         else None
     )
+    quality_signals = read_quality_signals()
+    quality_scores: dict[str, dict[str, float]] = {}
+    for phase_name in STACK_PHASES.get(answers["stack"], []):
+        scores = compute_backend_scores(quality_signals, stack=answers["stack"], phase=phase_name)
+        if scores:
+            quality_scores[phase_name] = scores
+
     phase_backends = pick_phase_backends(
         answers["stack"],
         override=use,
         description=answers.get("description", ""),
         prefer_installed_backends=not prompt_only,
         available_backends=available_backends,
+        quality_scores=quality_scores or None,
     )
     merged_groups = merge_adjacent_phases(phase_backends)
     all_phases = STACK_PHASES.get(answers["stack"], ["architecture", "tests"])
@@ -1057,6 +1066,12 @@ def main(
     verify_report = None
     if verify:
         verify_report = verify_scaffold(answers["stack"], project_dir, verbose=verbose)
+
+    append_quality_signal(
+        stack=answers["stack"],
+        phase_backends=phase_backends,
+        verify_report=verify_report,
+    )
 
     run_post_scaffold_hook(project_dir, answers)
     append_scaffold_log(answers, phase_backends, project_dir)
