@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-03-22
+
+### Added
+
+- `forge stats` with scaffold analytics and backend performance tracking.
+- `forge evolve` for augmenting existing projects with additional capabilities.
+- `forge check` for convention drift auditing, with `--fix` and `--export` support.
+- `forge replay` with conventions snapshots and `--diff` support for rerunning past scaffolds.
+- Quality memory and smart defaults so backend routing and answers improve over time.
+- Signature moments in the scaffold flow, including completion sound, Forge badge, and project card output.
+
+### Changed
+
+- The scaffold experience now includes a richer dashboard with a phase timeline, activity feed, file tree, and post-run report card.
+- Public docs, screenshots, diagrams, and Homebrew release automation were refreshed for the `0.3.0` release.
+
 ## [0.2.0] - 2026-03-20
 
 ### Added
@@ -50,5 +66,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pipx support for isolated global installs.
 - MIT license.
 
+[0.3.0]: https://github.com/matthewubundi/UbundiForge/releases/tag/v0.3.0
 [0.2.0]: https://github.com/matthewubundi/UbundiForge/releases/tag/v0.2.0
 [0.1.0]: https://github.com/matthewubundi/UbundiForge/releases/tag/v0.1.0

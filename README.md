@@ -9,6 +9,13 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/matthewubundi/UbundiForge/actions/workflows/ci.yml"><img src="https://github.com/matthewubundi/UbundiForge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
+  <a href="https://github.com/matthewubundi/UbundiForge/releases/latest"><img src="https://img.shields.io/github/v/release/matthewubundi/UbundiForge" alt="Latest release"></a>
+  <a href="https://github.com/matthewubundi/UbundiForge/blob/main/LICENSE"><img src="https://img.shields.io/github/license/matthewubundi/UbundiForge" alt="License"></a>
+  <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
+</p>
+
+<p align="center">
   <a href="#installation">Installation</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="#quick-start">Quick Start</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="#supported-stacks">Stacks</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="docs/README.md">Docs</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="CHANGELOG.md">Changelog</a>
 </p>
 
