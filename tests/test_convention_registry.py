@@ -274,3 +274,27 @@ stack_overrides:
 
     with pytest.raises(ConventionValidationError, match="stacks/python-api/services.md"):
         build_registry(sample_tree)
+
+
+def test_build_registry_rejects_manifest_missing_language_source(
+    sample_tree: Path,
+) -> None:
+    _write(
+        sample_tree / "manifests" / "bundles.yaml",
+        """
+default:
+  label: global
+  files:
+    - global/shared.md
+stack_overrides:
+  fastapi:
+    label: fastapi
+    files:
+      - stacks/python-api/services.md
+      - stacks/fastapi/overview.md
+      - stacks/fastapi/structure.md
+""".strip(),
+    )
+
+    with pytest.raises(ConventionValidationError, match="languages/python/style.md"):
+        build_registry(sample_tree)

@@ -298,12 +298,19 @@ def _validate_bundle_manifests(registry: ConventionRegistry) -> None:
             manifest_name=f"stack {stack_id}",
             manifest=stack_override,
         )
-        required_stack_ids = _collect_manifest_required_source_ids(registry, record)
+        required_stack_ids = list(_collect_manifest_required_source_ids(registry, record))
+        if record.language:
+            language_record = registry.language(record.language)
+            required_stack_ids.extend(
+                _collect_manifest_required_source_ids(registry, language_record)
+            )
         combined_manifest_ids = set(
             _ordered_unique([*default_manifest_ids, *override_manifest_ids])
         )
         missing_stack_ids = [
-            source_id for source_id in required_stack_ids if source_id not in combined_manifest_ids
+            source_id
+            for source_id in _ordered_unique(required_stack_ids)
+            if source_id not in combined_manifest_ids
         ]
         if missing_stack_ids:
             raise ConventionValidationError(
