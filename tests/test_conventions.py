@@ -1,6 +1,27 @@
 """Tests for convention loading and validation."""
 
-from ubundiforge.conventions import MIN_CONVENTIONS_LENGTH, load_conventions
+from ubundiforge.conventions import (
+    MIN_CONVENTIONS_LENGTH,
+    load_conventions,
+    resolve_bundled_conventions_dir,
+)
+
+
+def test_resolve_bundled_conventions_dir_prefers_package_dir(tmp_path):
+    package_dir = tmp_path / "package" / "conventions"
+    repo_dir = tmp_path / "repo" / "conventions"
+    package_dir.mkdir(parents=True)
+    repo_dir.mkdir(parents=True)
+
+    assert resolve_bundled_conventions_dir(package_dir, repo_dir) == package_dir
+
+
+def test_resolve_bundled_conventions_dir_falls_back_to_repo_dir(tmp_path):
+    package_dir = tmp_path / "package" / "conventions"
+    repo_dir = tmp_path / "repo" / "conventions"
+    repo_dir.mkdir(parents=True)
+
+    assert resolve_bundled_conventions_dir(package_dir, repo_dir) == repo_dir
 
 
 def test_empty_conventions_warns(tmp_path, monkeypatch):
@@ -8,6 +29,10 @@ def test_empty_conventions_warns(tmp_path, monkeypatch):
     conv_path.write_text("")
     monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", conv_path)
     monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path)
+    monkeypatch.setattr(
+        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH",
+        tmp_path / ".forge" / "conventions.md",
+    )
 
     content, warnings = load_conventions()
     assert content == ""
@@ -19,6 +44,10 @@ def test_short_conventions_warns(tmp_path, monkeypatch):
     conv_path.write_text("short")
     monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", conv_path)
     monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path)
+    monkeypatch.setattr(
+        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH",
+        tmp_path / ".forge" / "conventions.md",
+    )
 
     content, warnings = load_conventions()
     assert len(content.strip()) < MIN_CONVENTIONS_LENGTH
@@ -30,6 +59,10 @@ def test_valid_conventions_no_warnings(tmp_path, monkeypatch):
     conv_path.write_text("x" * 100)
     monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", conv_path)
     monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path)
+    monkeypatch.setattr(
+        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH",
+        tmp_path / ".forge" / "conventions.md",
+    )
 
     content, warnings = load_conventions()
     assert len(content) == 100
@@ -40,6 +73,10 @@ def test_missing_conventions_creates_default(tmp_path, monkeypatch):
     conv_path = tmp_path / "conventions.md"
     monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", conv_path)
     monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path)
+    monkeypatch.setattr(
+        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH",
+        tmp_path / ".forge" / "conventions.md",
+    )
 
     assert not conv_path.exists()
     content, warnings = load_conventions()
@@ -80,3 +117,20 @@ def test_load_conventions_stack_prefers_local_override(tmp_path, monkeypatch):
 
     assert content == "Local rules always win."
     assert any("local conventions" in w.lower() for w in warnings)
+
+
+def test_load_conventions_stack_ignores_placeholder_local_override(tmp_path, monkeypatch):
+    root = tmp_path / "conventions"
+    (root / "global").mkdir(parents=True)
+    (root / "global" / "shared.md").write_text("Use strict typing in bundled content.")
+    local = tmp_path / ".forge" / "conventions.md"
+    local.parent.mkdir(parents=True)
+    local.write_text("TODO: add conventions")
+
+    monkeypatch.setattr("ubundiforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
+    monkeypatch.setattr("ubundiforge.conventions.LOCAL_CONVENTIONS_PATH", local)
+
+    content, warnings = load_conventions(stack="fastapi")
+
+    assert "bundled content" in content
+    assert any("placeholder" in w.lower() for w in warnings)

@@ -5,13 +5,29 @@ from pathlib import Path
 
 import yaml
 
-_PACKAGE_CONVENTIONS_DIR = Path(__file__).resolve().with_name("conventions")
-_REPO_CONVENTIONS_DIR = Path(__file__).resolve().parents[2] / "conventions"
-BUNDLED_CONVENTIONS_DIR = (
-    _PACKAGE_CONVENTIONS_DIR
-    if _PACKAGE_CONVENTIONS_DIR.exists()
-    else _REPO_CONVENTIONS_DIR
+_PLACEHOLDER_LOCAL_MARKERS = (
+    "todo",
+    "tbd",
+    "placeholder",
+    "your conventions here",
+    "add conventions",
+    "replace me",
+    "coming soon",
 )
+
+
+def resolve_bundled_conventions_dir(
+    package_conventions_dir: Path | None = None,
+    repo_conventions_dir: Path | None = None,
+) -> Path:
+    """Return the bundled conventions directory for package or repo execution."""
+
+    package_dir = package_conventions_dir or Path(__file__).resolve().with_name("conventions")
+    repo_dir = repo_conventions_dir or Path(__file__).resolve().parents[2] / "conventions"
+    return package_dir if package_dir.exists() else repo_dir
+
+
+BUNDLED_CONVENTIONS_DIR = resolve_bundled_conventions_dir()
 
 FORGE_DIR = Path.home() / ".forge"
 CONVENTIONS_PATH = FORGE_DIR / "conventions.md"
@@ -172,18 +188,40 @@ def _load_conventions_file(path: Path) -> tuple[str, list[str]]:
     return content, warnings
 
 
+def _looks_placeholder_local_conventions(content: str) -> bool:
+    stripped = content.strip().lower()
+    if not stripped:
+        return True
+    return any(marker in stripped for marker in _PLACEHOLDER_LOCAL_MARKERS)
+
+
+def _load_local_conventions(path: Path) -> tuple[str, list[str]]:
+    content, warnings = _load_conventions_file(path)
+    warnings.insert(0, f"Using local conventions from {path}")
+    return content, warnings
+
+
 def load_conventions(stack: str | None = None) -> tuple[str, list[str]]:
     """Load conventions, preferring the bundled tree for stack-aware requests."""
 
     if LOCAL_CONVENTIONS_PATH.exists():
-        content, warnings = _load_conventions_file(LOCAL_CONVENTIONS_PATH)
-        warnings.insert(0, f"Using local conventions from {LOCAL_CONVENTIONS_PATH}")
-        return content, warnings
+        local_content = LOCAL_CONVENTIONS_PATH.read_text()
+        if stack is None or not _looks_placeholder_local_conventions(local_content):
+            return _load_local_conventions(LOCAL_CONVENTIONS_PATH)
 
     if stack is not None:
         bundle = compile_bundle(build_registry(), stack=stack)
         if bundle.prompt_block:
-            return bundle.prompt_block, bundle.warnings
+            warnings = list(bundle.warnings)
+            if LOCAL_CONVENTIONS_PATH.exists():
+                warnings.insert(
+                    0,
+                    (
+                        "Ignoring placeholder local conventions from "
+                        f"{LOCAL_CONVENTIONS_PATH}; using bundled stack conventions."
+                    ),
+                )
+            return bundle.prompt_block, warnings
 
     warnings: list[str] = []
 
