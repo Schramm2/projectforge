@@ -11,6 +11,7 @@ import typer
 from rich.text import Text
 
 from ubundiforge import __version__
+from ubundiforge.card import inject_badge_into_readme, write_card
 from ubundiforge.checks import CheckResult, detect_stack, generate_fix, run_checks
 from ubundiforge.config import (
     SUPPORTED_BACKENDS,
@@ -1336,6 +1337,17 @@ def main(
         verify_report=verify_report,
         elapsed=elapsed,
     )
+
+    scaffold_date = datetime.now(UTC).strftime("%Y-%m-%d")
+    backends_used = sorted({b for _, b in phase_backends})
+    write_card(
+        project_dir,
+        name=answers["name"],
+        stack=answers["stack"],
+        backends=backends_used,
+        date=scaffold_date,
+    )
+    inject_badge_into_readme(project_dir)
 
     if not git_ok:
         console.print(
