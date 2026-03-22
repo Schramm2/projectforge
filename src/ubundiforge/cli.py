@@ -109,6 +109,14 @@ app.add_typer(admin_app, name="admin")
 console = create_console()
 
 _PROJECT_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+_TOP_LEVEL_CONVENTION_HISTORY_TARGETS = {
+    "conventions",
+    "global",
+    "languages",
+    "stacks",
+    "prompts",
+    "manifests",
+}
 _BACKEND_LOGIN_COMMANDS = {
     "claude": "claude auth login",
     "codex": "codex login",
@@ -403,7 +411,11 @@ def _admin_history_target(value: str) -> str:
     cleaned = value.strip().strip("/")
     if not cleaned:
         raise ConventionValidationError("A stack id or conventions path is required for history.")
-    if "/" in cleaned or cleaned.endswith(".md"):
+    if (
+        "/" in cleaned
+        or cleaned.endswith(".md")
+        or cleaned in _TOP_LEVEL_CONVENTION_HISTORY_TARGETS
+    ):
         return cleaned
     return f"stacks/{cleaned}"
 

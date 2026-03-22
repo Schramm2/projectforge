@@ -691,6 +691,28 @@ def test_admin_conventions_history_degrades_gracefully(monkeypatch) -> None:
     assert "Git history is unavailable." in result.stdout
 
 
+def test_admin_conventions_history_allows_top_level_scope_targets(monkeypatch) -> None:
+    from ubundiforge.convention_history import GitHistoryResult
+
+    seen_targets: list[str] = []
+
+    def _fake_load_history(root, target):
+        seen_targets.append(target)
+        return GitHistoryResult(
+            target=target,
+            available=True,
+            entries=("abc123 Update global conventions",),
+        )
+
+    monkeypatch.setattr("ubundiforge.cli.load_history", _fake_load_history)
+
+    result = runner.invoke(app, ["admin", "conventions", "--history", "global"])
+
+    assert result.exit_code == 0
+    assert seen_targets == ["global"]
+    assert "abc123 Update global conventions" in result.stdout
+
+
 def test_admin_conventions_open_prints_repo_markdown_path() -> None:
     result = runner.invoke(app, ["admin", "conventions", "--open", "global/shared.md"])
 
