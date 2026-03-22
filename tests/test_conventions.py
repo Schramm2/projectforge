@@ -1,7 +1,9 @@
 """Tests for convention loading and validation."""
 
+from ubundiforge.convention_models import CompiledBundle
 from ubundiforge.conventions import (
     MIN_CONVENTIONS_LENGTH,
+    load_bundled_conventions,
     load_conventions,
     resolve_bundled_conventions_dir,
 )
@@ -139,3 +141,33 @@ def test_load_conventions_stack_ignores_placeholder_local_override(tmp_path, mon
         == f"Ignoring placeholder local conventions from {local}; using bundled stack conventions."
     )
     assert any("placeholder" in w.lower() for w in warnings)
+
+
+def test_load_bundled_conventions_skips_legacy_local_and_user_files(tmp_path, monkeypatch):
+    local = tmp_path / ".forge" / "conventions.md"
+    local.parent.mkdir(parents=True)
+    local.write_text("Local rules should not be used here.")
+    user_path = tmp_path / "user-conventions.md"
+
+    monkeypatch.setattr("ubundiforge.conventions.LOCAL_CONVENTIONS_PATH", local)
+    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", user_path)
+    monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path / "forge-home")
+    monkeypatch.setattr(
+        "ubundiforge.conventions.build_registry",
+        lambda root=None: "registry",
+    )
+    monkeypatch.setattr(
+        "ubundiforge.conventions.compile_bundle",
+        lambda registry, stack=None: CompiledBundle(
+            bundle_id=stack or "default",
+            prompt_block=f"Compiled bundle for {stack}",
+            sources=(),
+            warnings=("bundle warning",),
+        ),
+    )
+
+    content, warnings = load_bundled_conventions("fastapi")
+
+    assert content == "Compiled bundle for fastapi"
+    assert warnings == ["bundle warning"]
+    assert not user_path.exists()

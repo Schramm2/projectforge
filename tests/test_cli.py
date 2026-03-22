@@ -437,12 +437,19 @@ def test_replay_without_snapshot_loads_compiled_conventions_for_manifest_stack(
 
     seen_stacks: list[str | None] = []
 
-    def _fake_load_conventions(stack=None):
+    def _fake_load_bundled_conventions(stack=None):
         seen_stacks.append(stack)
         return (f"compiled conventions for {stack}", [])
 
     monkeypatch.chdir(project_dir)
-    monkeypatch.setattr("ubundiforge.cli.load_conventions", _fake_load_conventions)
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_bundled_conventions",
+        _fake_load_bundled_conventions,
+    )
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_conventions",
+        lambda stack=None: (_ for _ in ()).throw(AssertionError("should use bundled replay path")),
+    )
     monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
 
     result = runner.invoke(app, ["replay", "--dry-run"])

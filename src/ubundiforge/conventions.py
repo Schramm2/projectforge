@@ -86,6 +86,13 @@ def compile_bundle(registry, stack: str | None = None) -> CompiledBundle:
     return _compile_bundle(registry, stack=stack)
 
 
+def load_bundled_conventions(stack: str | None = None) -> tuple[str, list[str]]:
+    """Load compiled bundled conventions without consulting legacy local/user files."""
+
+    bundle = compile_bundle(build_registry(), stack=stack)
+    return bundle.prompt_block, list(bundle.warnings)
+
+
 def _load_conventions_file(path: Path) -> tuple[str, list[str]]:
     warnings: list[str] = []
     content = path.read_text()
@@ -132,9 +139,9 @@ def load_conventions(stack: str | None = None) -> tuple[str, list[str]]:
             return _load_local_conventions(LOCAL_CONVENTIONS_PATH)
 
     if stack is not None:
-        bundle = compile_bundle(build_registry(), stack=stack)
-        if bundle.prompt_block:
-            warnings = list(bundle.warnings)
+        bundle_text, bundle_warnings = load_bundled_conventions(stack)
+        if bundle_text:
+            warnings = list(bundle_warnings)
             if LOCAL_CONVENTIONS_PATH.exists():
                 warnings.insert(
                     0,
@@ -143,7 +150,7 @@ def load_conventions(stack: str | None = None) -> tuple[str, list[str]]:
                         f"{LOCAL_CONVENTIONS_PATH}; using bundled stack conventions."
                     ),
                 )
-            return bundle.prompt_block, warnings
+            return bundle_text, warnings
 
     warnings: list[str] = []
 

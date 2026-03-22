@@ -19,7 +19,11 @@ from ubundiforge.config import (
     check_backend_installed,
     get_backend_statuses,
 )
-from ubundiforge.conventions import load_claude_md_template, load_conventions
+from ubundiforge.conventions import (
+    load_bundled_conventions,
+    load_claude_md_template,
+    load_conventions,
+)
 from ubundiforge.dashboard import render_dashboard
 from ubundiforge.design_templates import (
     DESIGN_TEMPLATE_OPTIONS,
@@ -668,7 +672,7 @@ def replay(
         conventions = snapshot_path.read_text()
     else:
         replay_stack = stack or None
-        conventions, conv_warnings = load_conventions(stack=replay_stack)
+        conventions, conv_warnings = load_bundled_conventions(stack=replay_stack)
         for warning in conv_warnings:
             console.print(f"[yellow]{warning}[/yellow]")
         console.print(
