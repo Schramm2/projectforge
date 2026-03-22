@@ -1,14 +1,23 @@
-"""Orchestrator — filesystem snapshotting and context accumulation (partial, Task 7).
-
-Task 8 will extend this module with plan/execute/reconcile/report logic.
-"""
+"""Orchestrator — plan/execute/reconcile/report for multi-agent scaffolding."""
 
 from __future__ import annotations
 
+import logging
 import os
+import subprocess
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from ubundiforge.protocol import AgentTask
+from ubundiforge.adapters import get_adapter
+from ubundiforge.protocol import (
+    AgentResult,
+    AgentTask,
+    DecompositionPlan,
+    ProgressEvent,
+)
+
+log = logging.getLogger(__name__)
 
 CONTEXT_CAP = 12_000  # characters
 
@@ -156,3 +165,274 @@ def accumulate_context(existing: str, new_summary: str) -> str:
 
     # Hard truncate as a last resort (should rarely trigger)
     return combined[:CONTEXT_CAP]
+
+
+# ---------------------------------------------------------------------------
+# Plan / Execute / Reconcile / Report  (Task 8)
+# ---------------------------------------------------------------------------
+
+_PLANNING_TIMEOUT = 300  # seconds
+
+
+def _make_single_task_plan(
+    brief: str,
+    phase: str,
+    backend: str,
+) -> DecompositionPlan:
+    """Fallback: wrap the entire brief in one task."""
+    task = AgentTask(
+        id="sole-task",
+        description=brief,
+        file_territory=[],
+        context="",
+        dependencies=[],
+        phase=phase,
+        backend=backend,
+    )
+    return DecompositionPlan(
+        tasks=[task],
+        execution_order=[[task.id]],
+        rationale="Single-task fallback — planning was skipped or failed.",
+    )
+
+
+def _get_plan(
+    adapter,
+    brief: str,
+    phase: str,
+    stack: str,
+    backend: str,
+    project_dir: Path,
+    model: str | None = None,
+) -> DecompositionPlan:
+    """Ask the adapter CLI for a decomposition plan.
+
+    On failure or un-parseable output, retries once with a
+    "respond with JSON only" suffix.  Falls back to a single-task plan.
+    """
+    planning_prompt = adapter.build_planning_prompt(brief, phase, stack)
+    cmd = adapter.build_cmd(planning_prompt, model=model)
+
+    for attempt in range(2):
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=_PLANNING_TIMEOUT,
+                cwd=str(project_dir),
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+            log.warning("Planning subprocess error (attempt %d): %s", attempt + 1, exc)
+            continue
+
+        if result.returncode != 0:
+            log.warning(
+                "Planning call returned %d (attempt %d)", result.returncode, attempt + 1
+            )
+            # Retry with JSON-only suffix
+            if attempt == 0:
+                cmd = adapter.build_cmd(
+                    planning_prompt + "\n\nRespond with JSON only.", model=model
+                )
+            continue
+
+        plan = adapter.parse_plan(result.stdout, phase=phase, backend=backend)
+        if plan is not None:
+            return plan
+
+        log.warning("Could not parse plan from output (attempt %d)", attempt + 1)
+        if attempt == 0:
+            cmd = adapter.build_cmd(
+                planning_prompt + "\n\nRespond with JSON only.", model=model
+            )
+
+    log.warning("Planning failed after retries — falling back to single task.")
+    return _make_single_task_plan(brief, phase, backend)
+
+
+def _execute_task_graph(
+    plan: DecompositionPlan,
+    adapter,
+    project_dir: Path,
+    on_progress: Callable[[ProgressEvent], None],
+) -> list[AgentResult]:
+    """Walk execution_order groups, executing tasks via *adapter*.
+
+    - Groups with a single task: snapshot per task (accurate attribution).
+    - Groups with multiple tasks: one snapshot before the group, one diff
+      after all complete. Each task gets the combined diff (known limitation).
+    - Tasks whose dependencies failed are skipped.
+    """
+    task_map: dict[str, AgentTask] = {t.id: t for t in plan.tasks}
+    results: list[AgentResult] = []
+    failed_ids: set[str] = set()
+    accumulated_context = ""
+
+    for group in plan.execution_order:
+        # Filter to valid task IDs only
+        group_ids = [tid for tid in group if tid in task_map]
+        if not group_ids:
+            continue
+
+        # Inject accumulated context into each task
+        for tid in group_ids:
+            task_map[tid].context = accumulated_context
+
+        is_parallel = len(group_ids) > 1
+
+        if is_parallel:
+            # --- parallel group: one snapshot for the whole group ---
+            before = snapshot_directory(project_dir)
+
+            def _run_task(tid: str) -> AgentResult:
+                task = task_map[tid]
+                # Check dependencies
+                if any(dep in failed_ids for dep in task.dependencies):
+                    return AgentResult(
+                        task_id=tid,
+                        files_created=[],
+                        files_modified=[],
+                        summary="Skipped: dependency failed",
+                        success=False,
+                        duration=0.0,
+                        returncode=-1,
+                    )
+                return adapter.execute(task, project_dir, on_progress)
+
+            with ThreadPoolExecutor(max_workers=len(group_ids)) as pool:
+                group_results = list(pool.map(_run_task, group_ids))
+
+            # Diff once for the whole group
+            after = snapshot_directory(project_dir)
+            created, modified = diff_snapshots(before, after)
+
+            # Build ONE combined summary for the group
+            group_summaries: list[str] = []
+            for res in group_results:
+                res.files_created = created
+                res.files_modified = modified
+                if not res.success:
+                    failed_ids.add(res.task_id)
+                group_summaries.append(
+                    build_context_summary(
+                        task_map[res.task_id], created, modified, project_dir
+                    )
+                )
+            combined_summary = "\n\n".join(group_summaries)
+            accumulated_context = accumulate_context(accumulated_context, combined_summary)
+            results.extend(group_results)
+
+        else:
+            # --- sequential (single-task) group: snapshot per task ---
+            for tid in group_ids:
+                task = task_map[tid]
+
+                # Check dependencies
+                if any(dep in failed_ids for dep in task.dependencies):
+                    skip_result = AgentResult(
+                        task_id=tid,
+                        files_created=[],
+                        files_modified=[],
+                        summary="Skipped: dependency failed",
+                        success=False,
+                        duration=0.0,
+                        returncode=-1,
+                    )
+                    results.append(skip_result)
+                    failed_ids.add(tid)
+                    continue
+
+                before = snapshot_directory(project_dir)
+                result = adapter.execute(task, project_dir, on_progress)
+                after = snapshot_directory(project_dir)
+                created, modified = diff_snapshots(before, after)
+
+                result.files_created = created
+                result.files_modified = modified
+
+                if not result.success:
+                    failed_ids.add(tid)
+
+                summary = build_context_summary(task, created, modified, project_dir)
+                accumulated_context = accumulate_context(accumulated_context, summary)
+                results.append(result)
+
+    return results
+
+
+def _reconcile(
+    adapter,
+    project_dir: Path,
+    model: str | None = None,
+) -> int:
+    """Lightweight cleanup CLI call after all tasks have finished."""
+    prompt = (
+        "Review the project directory for any conflicts, duplicated code, "
+        "or inconsistencies introduced by parallel agents. Fix them."
+    )
+    cmd = adapter.build_cmd(prompt, model=model)
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=_PLANNING_TIMEOUT,
+            cwd=str(project_dir),
+        )
+        return result.returncode
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+        log.warning("Reconciliation failed: %s", exc)
+        return 1
+
+
+def run_phase_orchestrated(
+    phase: str,
+    backend: str,
+    prompt: str,
+    project_dir: Path,
+    stack: str,
+    conventions: str = "",
+    model: str | None = None,
+    verbose: bool = False,
+    phase_context: str | None = None,
+) -> int:
+    """Main entry point for orchestrated phase execution.
+
+    Returns 0 if all tasks succeeded, 1 if any failed.
+    """
+    adapter = get_adapter(backend, conventions)
+    plan = _get_plan(adapter, prompt, phase, stack, backend, project_dir, model)
+
+    if verbose and len(plan.tasks) > 1:
+        log.info(
+            "Decomposition plan: %d tasks, %d groups — %s",
+            len(plan.tasks),
+            len(plan.execution_order),
+            plan.rationale,
+        )
+
+    def _noop_progress(event: ProgressEvent) -> None:
+        pass
+
+    # Single task: execute directly (skip orchestration overhead)
+    if len(plan.tasks) == 1:
+        task = plan.tasks[0]
+        if phase_context:
+            task.context = phase_context
+        result = adapter.execute(task, project_dir, _noop_progress)
+        return 0 if result.success else 1
+
+    # Multi-task: execute the full task graph
+    if phase_context:
+        for t in plan.tasks:
+            t.context = phase_context
+
+    results = _execute_task_graph(plan, adapter, project_dir, on_progress=_noop_progress)
+
+    # Reconcile (non-fatal)
+    rc = _reconcile(adapter, project_dir, model)
+    if rc != 0:
+        log.warning("Reconciliation exited with code %d (non-fatal)", rc)
+
+    return 0 if all(r.success for r in results) else 1

@@ -1,22 +1,26 @@
-"""Tests for orchestrator context accumulation and filesystem diffing (partial — Task 7)."""
+"""Tests for orchestrator context accumulation, filesystem diffing, and plan/execute/reconcile."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from ubundiforge.orchestrator import (
     CONTEXT_CAP,
+    _execute_task_graph,
+    _make_single_task_plan,
     accumulate_context,
     build_context_summary,
     diff_snapshots,
+    run_phase_orchestrated,
     snapshot_directory,
 )
-from ubundiforge.protocol import AgentTask
+from ubundiforge.protocol import AgentResult, AgentTask, DecompositionPlan
 
 
-def _make_task(description: str = "Build the thing") -> AgentTask:
+def _make_task(description: str = "Build the thing", task_id: str = "task-1") -> AgentTask:
     return AgentTask(
-        id="task-1",
+        id=task_id,
         description=description,
         file_territory=[],
         context="",
@@ -179,3 +183,160 @@ class TestAccumulateContext:
         existing = section_a + "\n\n" + section_b
         result = accumulate_context(existing, section_c)
         assert len(result) <= CONTEXT_CAP
+
+
+# ---------------------------------------------------------------------------
+# Task 8 — plan / execute / reconcile / report
+# ---------------------------------------------------------------------------
+
+
+def _ok_result(task_id: str) -> AgentResult:
+    """Helper: a successful AgentResult stub."""
+    return AgentResult(
+        task_id=task_id,
+        files_created=[],
+        files_modified=[],
+        summary="ok",
+        success=True,
+        duration=0.1,
+        returncode=0,
+    )
+
+
+def _fail_result(task_id: str) -> AgentResult:
+    """Helper: a failed AgentResult stub."""
+    return AgentResult(
+        task_id=task_id,
+        files_created=[],
+        files_modified=[],
+        summary="failed",
+        success=False,
+        duration=0.1,
+        returncode=1,
+    )
+
+
+class TestMakeSingleTaskPlan:
+    def test_creates_single_task_fallback(self) -> None:
+        plan = _make_single_task_plan(
+            brief="Build everything",
+            phase="scaffold",
+            backend="claude",
+        )
+        assert isinstance(plan, DecompositionPlan)
+        assert len(plan.tasks) == 1
+        assert plan.tasks[0].description == "Build everything"
+        assert plan.tasks[0].phase == "scaffold"
+        assert plan.tasks[0].backend == "claude"
+        assert len(plan.execution_order) == 1
+        assert plan.execution_order[0] == [plan.tasks[0].id]
+        assert "single" in plan.rationale.lower() or "fallback" in plan.rationale.lower()
+
+
+class TestExecuteTaskGraph:
+    def test_executes_sequential_tasks(self, tmp_path: Path) -> None:
+        """Two tasks in separate execution_order groups run sequentially."""
+        task_a = _make_task("Task A", task_id="a")
+        task_b = _make_task("Task B", task_id="b")
+        task_b.dependencies = ["a"]
+        plan = DecompositionPlan(
+            tasks=[task_a, task_b],
+            execution_order=[["a"], ["b"]],
+            rationale="sequential",
+        )
+
+        adapter = MagicMock()
+        adapter.execute.side_effect = lambda t, d, cb: _ok_result(t.id)
+
+        results = _execute_task_graph(plan, adapter, tmp_path, on_progress=lambda e: None)
+        assert len(results) == 2
+        assert all(r.success for r in results)
+        assert adapter.execute.call_count == 2
+
+    def test_skips_tasks_depending_on_failed(self, tmp_path: Path) -> None:
+        """If task A fails, task B (which depends on A) should be skipped."""
+        task_a = _make_task("Task A", task_id="a")
+        task_b = _make_task("Task B", task_id="b")
+        task_b.dependencies = ["a"]
+        plan = DecompositionPlan(
+            tasks=[task_a, task_b],
+            execution_order=[["a"], ["b"]],
+            rationale="sequential",
+        )
+
+        adapter = MagicMock()
+        adapter.execute.side_effect = lambda t, d, cb: _fail_result(t.id)
+
+        results = _execute_task_graph(plan, adapter, tmp_path, on_progress=lambda e: None)
+        # Task A ran and failed; task B should be skipped
+        assert len(results) == 2
+        assert not results[0].success  # a failed
+        assert not results[1].success  # b skipped
+        # Only task A should have been executed via adapter
+        assert adapter.execute.call_count == 1
+
+    def test_executes_parallel_tasks_in_group(self, tmp_path: Path) -> None:
+        """Tasks in the same execution_order group run (potentially) in parallel."""
+        task_a = _make_task("Task A", task_id="a")
+        task_b = _make_task("Task B", task_id="b")
+        plan = DecompositionPlan(
+            tasks=[task_a, task_b],
+            execution_order=[["a", "b"]],
+            rationale="parallel",
+        )
+
+        adapter = MagicMock()
+        adapter.execute.side_effect = lambda t, d, cb: _ok_result(t.id)
+
+        results = _execute_task_graph(plan, adapter, tmp_path, on_progress=lambda e: None)
+        assert len(results) == 2
+        assert all(r.success for r in results)
+        assert adapter.execute.call_count == 2
+
+    def test_skips_nonexistent_task_ids_in_execution_order(self, tmp_path: Path) -> None:
+        """If execution_order references an ID not in tasks, skip it gracefully."""
+        task_a = _make_task("Task A", task_id="a")
+        plan = DecompositionPlan(
+            tasks=[task_a],
+            execution_order=[["a", "ghost"]],
+            rationale="includes ghost",
+        )
+
+        adapter = MagicMock()
+        adapter.execute.side_effect = lambda t, d, cb: _ok_result(t.id)
+
+        results = _execute_task_graph(plan, adapter, tmp_path, on_progress=lambda e: None)
+        # Only task A should execute; ghost should be silently skipped
+        assert len(results) == 1
+        assert results[0].task_id == "a"
+        assert adapter.execute.call_count == 1
+
+
+class TestRunPhaseOrchestrated:
+    @patch("ubundiforge.orchestrator.get_adapter")
+    def test_falls_back_on_bad_plan(self, mock_get_adapter, tmp_path: Path) -> None:
+        """When planning fails, falls back to single-task plan and executes it."""
+        adapter = MagicMock()
+        mock_get_adapter.return_value = adapter
+
+        # build_cmd returns a command, subprocess.run will be mocked to fail planning
+        adapter.build_cmd.return_value = ["echo", "fake"]
+        adapter.build_planning_prompt.return_value = "plan prompt"
+        adapter.parse_plan.return_value = None  # parse failure
+        adapter.execute.return_value = _ok_result("sole-task")
+
+        with patch("ubundiforge.orchestrator.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=1, stdout="garbage", stderr=""
+            )
+            rc = run_phase_orchestrated(
+                phase="scaffold",
+                backend="claude",
+                prompt="Build everything",
+                project_dir=tmp_path,
+                stack="fastapi",
+            )
+
+        assert rc == 0
+        # Should have executed the single fallback task
+        assert adapter.execute.call_count == 1
