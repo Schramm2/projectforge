@@ -2,6 +2,7 @@
 
 import re
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -23,6 +24,7 @@ from ubundiforge.design_templates import (
     design_template_supported_for_stack,
     load_design_template,
 )
+from ubundiforge.evolutions import build_evolve_prompt, get_capabilities, get_capability
 from ubundiforge.logo import print_logo
 from ubundiforge.media_assets import (
     MEDIA_DIR,
@@ -395,6 +397,132 @@ def stats() -> None:
         quality_entries=quality_entries,
     )
     render_stats(console, stats_data)
+
+
+@app.command()
+def evolve(
+    capability: Annotated[
+        str | None,
+        typer.Argument(help="Capability to add (e.g., auth, websockets, stripe)."),
+    ] = None,
+    use: Annotated[
+        str | None,
+        typer.Option("--use", help="Override AI routing."),
+    ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option("--model", "-m", help="Model to pass to the AI CLI."),
+    ] = None,
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", help="Show detailed execution info."),
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Print the prompt without executing."),
+    ] = False,
+) -> None:
+    """Add a capability to an existing Forge project."""
+    import json
+
+    project_dir = Path.cwd()
+    manifest_path = project_dir / ".forge" / "scaffold.json"
+
+    if not manifest_path.exists():
+        console.print(
+            status_line(
+                "No .forge/scaffold.json found. Run this inside a Forge project.",
+                accent="amber",
+            )
+        )
+        raise typer.Exit(1)
+
+    dna = json.loads(manifest_path.read_text())
+    stack = dna.get("stack", "")
+
+    from ubundiforge.logo import print_logo
+
+    print_logo(console)
+    console.print(header_panel(__version__))
+    console.print(
+        status_line(f"Project: {dna.get('name', project_dir.name)} ({stack})", accent="violet")
+    )
+
+    caps = get_capabilities(stack)
+    if not caps:
+        console.print(
+            status_line(
+                f"No evolution capabilities defined for stack '{stack}'.",
+                accent="amber",
+            )
+        )
+        raise typer.Exit(1)
+
+    # Select capability
+    if capability:
+        cap = get_capability(stack, capability)
+        if not cap:
+            valid = ", ".join(c["name"] for c in caps)
+            console.print(
+                status_line(
+                    f"Unknown capability '{capability}'. Choose from: {valid}",
+                    accent="amber",
+                )
+            )
+            raise typer.Exit(1)
+    else:
+        choices = [
+            questionary.Choice(f"{c['name']} — {c['description']}", value=c["name"]) for c in caps
+        ]
+        selected = prompt_select("What would you like to add?", choices=choices).ask()
+        if selected is None:
+            raise typer.Exit(0)
+        cap = get_capability(stack, selected)
+
+    prompt = build_evolve_prompt(project_dir, cap)
+
+    if dry_run:
+        console.print(prompt)
+        raise typer.Exit(0)
+
+    # Route through standard backend routing (or --use override)
+    from ubundiforge.config import check_backend_installed
+
+    if use:
+        backend = use
+        if not check_backend_installed(backend):
+            console.print(status_line(f"{backend} is not installed.", accent="amber"))
+            raise typer.Exit(1)
+    else:
+        phase_plan = pick_phase_backends(stack, override=None)
+        backend = phase_plan[0][1] if phase_plan else "claude"
+
+    console.print(status_line(f"Adding {cap['name']} via {backend}...", accent="violet"))
+
+    returncode = run_ai(
+        backend, prompt, project_dir, model=model, verbose=verbose, label=f"Evolve: {cap['name']}"
+    )
+
+    if returncode == 0:
+        evolutions = dna.get("evolutions", [])
+        evolutions.append(
+            {
+                "capability": cap["name"],
+                "backend": backend,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
+        dna["evolutions"] = evolutions
+        manifest_path.write_text(json.dumps(dna, indent=2) + "\n")
+        console.print(status_line(f"Successfully added {cap['name']}", accent="aqua"))
+    else:
+        console.print(
+            status_line(
+                f"Evolution failed (exit {returncode}). Try --verbose for details.",
+                accent="amber",
+            )
+        )
+        raise typer.Exit(returncode)
 
 
 @app.callback(invoke_without_command=True)
