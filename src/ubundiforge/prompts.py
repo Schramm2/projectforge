@@ -88,9 +88,7 @@ def _normalize_answers_for_stack(answers: dict) -> None:
         return
 
     filtered_actions = [
-        action
-        for action in ci.get("actions", [])
-        if action in set(ci_action_ids_for_stack(stack))
+        action for action in ci.get("actions", []) if action in set(ci_action_ids_for_stack(stack))
     ]
     answers["ci"] = {
         "include": True,

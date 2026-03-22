@@ -1,6 +1,7 @@
 """UbundiForge CLI — entry point."""
 
 import re
+import time
 from pathlib import Path
 from typing import Annotated
 
@@ -15,6 +16,7 @@ from ubundiforge.config import (
     get_backend_statuses,
 )
 from ubundiforge.conventions import load_claude_md_template, load_conventions
+from ubundiforge.dashboard import render_dashboard
 from ubundiforge.design_templates import (
     DESIGN_TEMPLATE_OPTIONS,
     design_template_ids_for_stack,
@@ -58,19 +60,19 @@ from ubundiforge.scaffold_options import (
 )
 from ubundiforge.setup import load_forge_config, needs_setup, run_setup
 from ubundiforge.ui import (
+    BACKEND_ACCENTS,
     bullet,
-    command_text,
     create_console,
     grouped_lines,
     header_panel,
+    make_file_tree,
     make_panel,
     make_step_panel,
     muted,
-    path_text,
     status_line,
     subtle,
 )
-from ubundiforge.verify import print_report, verify_scaffold
+from ubundiforge.verify import verify_scaffold
 
 app = typer.Typer()
 console = create_console()
@@ -181,56 +183,6 @@ def _render_loaded_context(
     console.print(make_panel(grouped_lines(lines), title="Scaffold Context", accent="aqua"))
 
 
-def _render_completion(project_dir: Path, *, git_ok: bool) -> None:
-    """Render the final completion state."""
-    if git_ok:
-        lines = grouped_lines(
-            [
-                subtle("Project created at"),
-                path_text(project_dir),
-            ]
-        )
-        console.print(make_panel(lines, title="Scaffold Complete", accent="aqua"))
-        return
-
-    lines = grouped_lines(
-        [
-            subtle("Project created, but git initialization failed."),
-            path_text(project_dir),
-            muted('Run git init && git add -A && git commit -m "Initial commit" manually.'),
-        ]
-    )
-    console.print(make_panel(lines, title="Scaffold Complete", accent="amber"))
-
-
-def _render_next_steps(answers: dict, project_dir: Path, *, open_editor: bool) -> None:
-    """Render the next-step commands."""
-    lines: list[Text] = [command_text(f"cd {project_dir}")]
-
-    from ubundiforge.stacks import STACK_META
-
-    meta = STACK_META.get(answers["stack"])
-    if meta and meta.env_hints:
-        lines.append(subtle("Copy .env.example to .env.local and fill in your secrets."))
-    if meta and meta.dev_commands:
-        run_cmd = meta.dev_commands.get("run") or meta.dev_commands.get("dev")
-        if run_cmd:
-            lines.append(command_text(run_cmd))
-        test_cmd = meta.dev_commands.get("test")
-        if test_cmd:
-            lines.append(command_text(test_cmd))
-    if not open_editor:
-        lines.append(muted(f"Open your editor manually from {project_dir}."))
-
-    console.print(
-        make_panel(
-            grouped_lines(lines),
-            title="Next Steps",
-            accent="plum",
-        )
-    )
-
-
 def _backend_help_line(backend: str, status: BackendStatus) -> Text:
     """Return a user-facing readiness line for a backend."""
     if status.ready is False:
@@ -264,29 +216,6 @@ def _render_phase_failure(backend: str, label: str, returncode: int) -> None:
         muted("You can also force a different backend with --use if another one is ready."),
     ]
     console.print(make_panel(grouped_lines(lines), title="Execution", accent="amber"))
-
-
-def _render_verification_guidance(project_dir: Path) -> None:
-    """Render concrete next steps after verification failures."""
-    console.print()
-    console.print(
-        make_panel(
-            grouped_lines(
-                [
-                    subtle("Some verification checks failed."),
-                    subtle("The scaffold was still created successfully."),
-                    subtle(
-                        "Inspect the failing checks above, then rerun the relevant "
-                        "commands in:"
-                    ),
-                    path_text(project_dir),
-                    command_text(f"cd {project_dir}"),
-                ]
-            ),
-            title="Verification",
-            accent="amber",
-        )
-    )
 
 
 def _validate_project_name_for_collision(name: str) -> bool | str:
@@ -422,10 +351,12 @@ def _prompt_post_setup_next_step() -> str:
     choices = []
     if has_usable:
         choices.append(questionary.Choice("Create a project now", value="create"))
-    choices.extend([
-        questionary.Choice("Review setup again", value="setup"),
-        questionary.Choice("Exit for now", value="exit"),
-    ])
+    choices.extend(
+        [
+            questionary.Choice("Review setup again", value="setup"),
+            questionary.Choice("Exit for now", value="exit"),
+        ]
+    )
 
     action = prompt_select(
         "What would you like to do next?",
@@ -768,9 +699,7 @@ def main(
             _render_backend_readiness_notice(
                 backend_statuses,
                 required_backends={
-                    backend
-                    for backend, status in backend_statuses.items()
-                    if status.installed
+                    backend for backend, status in backend_statuses.items() if status.installed
                 },
             )
             raise typer.Exit(1)
@@ -967,6 +896,20 @@ def main(
         for warning in copy_result.warnings:
             console.print(f"[yellow]{warning}[/yellow]")
 
+    scaffold_start = time.monotonic()
+
+    # Build phase context for the timeline display
+    phase_context: list[dict] = []
+    for phase, backend in phase_backends:
+        phase_context.append(
+            {
+                "label": PHASE_LABELS.get(phase, phase),
+                "status": "pending",
+                "elapsed": 0.0,
+                "accent": BACKEND_ACCENTS.get(backend, "violet"),
+            }
+        )
+
     # --- Execute phases: serial first, parallel middle, serial last ---
     total_phases = len(phase_backends)
     step = 1
@@ -980,6 +923,9 @@ def main(
         )
         phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
         effective_model = model or backend_models.get(backend)
+        phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
+        phase_context[phase_idx]["status"] = "active"
+        phase_start = time.monotonic()
         returncode = run_ai(
             backend,
             phase_prompt,
@@ -987,10 +933,15 @@ def main(
             model=effective_model,
             verbose=verbose,
             label=label,
+            phase_context=phase_context,
         )
+        phase_context[phase_idx]["status"] = "completed"
+        phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
         if returncode != 0:
             _render_phase_failure(backend, label, returncode)
             raise typer.Exit(returncode)
+        console.print()
+        console.print(make_file_tree(project_dir))
         step += 1
 
     # Step 2: Run middle phases (parallel if multiple, serial if single)
@@ -1026,6 +977,8 @@ def main(
                 if returncode != 0:
                     _render_phase_failure("parallel backend", label, returncode)
                     raise typer.Exit(returncode)
+            console.print()
+            console.print(make_file_tree(project_dir))
             step += len(parallel_middle)
         else:
             for phase, backend in parallel_middle:
@@ -1038,6 +991,9 @@ def main(
                 )
                 phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
                 effective_model = model or backend_models.get(backend)
+                phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
+                phase_context[phase_idx]["status"] = "active"
+                phase_start = time.monotonic()
                 returncode = run_ai(
                     backend,
                     phase_prompt,
@@ -1045,10 +1001,15 @@ def main(
                     model=effective_model,
                     verbose=verbose,
                     label=label,
+                    phase_context=phase_context,
                 )
+                phase_context[phase_idx]["status"] = "completed"
+                phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
                 if returncode != 0:
                     _render_phase_failure(backend, label, returncode)
                     raise typer.Exit(returncode)
+                console.print()
+                console.print(make_file_tree(project_dir))
                 step += 1
 
     # Step 3: Run verify (serial)
@@ -1060,6 +1021,9 @@ def main(
         )
         phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
         effective_model = model or backend_models.get(backend)
+        phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
+        phase_context[phase_idx]["status"] = "active"
+        phase_start = time.monotonic()
         returncode = run_ai(
             backend,
             phase_prompt,
@@ -1067,13 +1031,18 @@ def main(
             model=effective_model,
             verbose=verbose,
             label=label,
+            phase_context=phase_context,
         )
+        phase_context[phase_idx]["status"] = "completed"
+        phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
         if returncode != 0:
             _render_phase_failure(backend, label, returncode)
             raise typer.Exit(returncode)
+        console.print()
+        console.print(make_file_tree(project_dir))
         step += 1
 
-    # Post-scaffold: manifest, log, git init, verify, hooks, and open editor
+    # Post-scaffold: manifest, log, git init, verify, hooks, dashboard
     write_scaffold_manifest(
         answers,
         phase_backends,
@@ -1085,19 +1054,27 @@ def main(
 
     git_ok = ensure_git_init(project_dir)
 
+    verify_report = None
     if verify:
-        report = verify_scaffold(answers["stack"], project_dir, verbose=verbose)
-        print_report(report, console)
-        if not report.all_passed:
-            _render_verification_guidance(project_dir)
+        verify_report = verify_scaffold(answers["stack"], project_dir, verbose=verbose)
 
     run_post_scaffold_hook(project_dir, answers)
     append_scaffold_log(answers, phase_backends, project_dir)
 
-    console.print()
-    _render_completion(project_dir, git_ok=git_ok)
-    console.print()
-    _render_next_steps(answers, project_dir, open_editor=open_editor)
+    elapsed = time.monotonic() - scaffold_start
+    render_dashboard(
+        console=console,
+        answers=answers,
+        phase_backends=phase_backends,
+        project_dir=project_dir,
+        verify_report=verify_report,
+        elapsed=elapsed,
+    )
+
+    if not git_ok:
+        console.print(
+            muted('Run git init && git add -A && git commit -m "Initial commit" manually.')
+        )
 
     if open_editor:
         preferred = forge_config.get("preferred_editor", "")

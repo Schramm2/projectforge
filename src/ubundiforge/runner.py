@@ -16,11 +16,13 @@ from rich.live import Live
 from rich.text import Text
 
 from ubundiforge.ui import (
+    BACKEND_ACCENTS,
     badge,
     create_console,
     grouped_lines,
     make_loader_panel,
     make_panel,
+    make_phase_timeline,
     make_table,
     muted,
     status_line,
@@ -37,11 +39,35 @@ _PULSE_STYLES = {
     "violet": ("#5F4A87", "#A16EFA", "#D3BCFF", "#A16EFA"),
     "plum": ("#7B4A79", "#D768D2", "#F0B6ED", "#D768D2"),
 }
-_BACKEND_ACCENTS = {
-    "claude": "violet",
-    "gemini": "amber",
-    "codex": "aqua",
-}
+
+
+class ActivityTracker:
+    """Accumulates scaffold activity summaries for the activity feed."""
+
+    def __init__(self, max_visible: int = 6):
+        self.steps: list[dict] = []
+        self.current: str = ""
+        self._max_visible = max_visible
+
+    def update(self, summary: str) -> None:
+        """Record a new activity summary. Deduplicates consecutive identical summaries."""
+        if self.current == summary:
+            return
+        # Mark previous step as completed
+        if self.steps:
+            self.steps[-1]["completed"] = True
+        self.steps.append(
+            {
+                "summary": summary,
+                "completed": False,
+                "timestamp": time.monotonic(),
+            }
+        )
+        self.current = summary
+
+    def visible_steps(self) -> list[dict]:
+        """Return the most recent steps up to max_visible."""
+        return self.steps[-self._max_visible :]
 
 
 def _build_cmd(backend: str, prompt: str, model: str | None = None) -> list[str]:
@@ -71,7 +97,7 @@ _PHASE_TIMEOUT = 1800  # 30 minutes per phase
 
 def _phase_accent(backend: str) -> str:
     """Return the accent color that best matches a backend."""
-    return _BACKEND_ACCENTS.get(backend, "violet")
+    return BACKEND_ACCENTS.get(backend, "violet")
 
 
 def _initial_phase_summary(label: str, backend: str) -> str:
@@ -223,6 +249,7 @@ def run_ai(
     model: str | None = None,
     verbose: bool = False,
     label: str = "",
+    phase_context: list[dict] | None = None,
 ) -> int:
     """Execute the AI CLI with the assembled prompt.
 
@@ -265,13 +292,14 @@ def run_ai(
 
     start = time.monotonic()
     accent = _phase_accent(backend)
-    summary = _initial_phase_summary(display_label, backend)
+    tracker = ActivityTracker()
+    tracker.update(_initial_phase_summary(display_label, backend))
     last_line = ""
     lock = threading.Lock()
 
     def _stream_stdout(pipe: io.BufferedReader, live: Live) -> None:
         """Read stdout line-by-line and update the polished loader state."""
-        nonlocal summary, last_line
+        nonlocal last_line
         try:
             for raw_line in iter(pipe.readline, b""):
                 line = raw_line.decode("utf-8", errors="replace").rstrip("\n")
@@ -281,7 +309,9 @@ def run_ai(
                         continue
                     with lock:
                         last_line = clean
-                        summary = _progress_summary_for_line(clean, summary)
+                        new_summary = _summarize_output_line(clean)
+                        if new_summary and new_summary != tracker.current:
+                            tracker.update(new_summary)
                     if verbose:
                         live.console.print(line)
         except ValueError:
@@ -323,19 +353,24 @@ def run_ai(
                     )
                     return 1
                 with lock:
-                    current_summary = summary
-                    current_detail = last_line if last_line != current_summary else None
-                live.update(
-                    make_loader_panel(
-                        display_label,
-                        current_summary,
-                        elapsed=elapsed,
-                        spinner_frame=_spinner_frame(elapsed),
-                        spinner_style=_spinner_style(accent, elapsed),
-                        accent=accent,
-                        detail=current_detail,
-                    )
+                    current_activities = tracker.visible_steps()
+                    current_detail = last_line if last_line != tracker.current else None
+                loader = make_loader_panel(
+                    display_label,
+                    tracker.current,
+                    elapsed=elapsed,
+                    spinner_frame=_spinner_frame(elapsed),
+                    spinner_style=_spinner_style(accent, elapsed),
+                    accent=accent,
+                    detail=current_detail,
+                    activities=current_activities,
                 )
+                if phase_context:
+                    from rich.console import Group as RichGroup
+
+                    live.update(RichGroup(make_phase_timeline(phase_context), Text(), loader))
+                else:
+                    live.update(loader)
                 time.sleep(0.2)
 
             reader.join(timeout=5)
@@ -568,9 +603,7 @@ def ensure_git_init(project_dir: Path) -> bool:
     git_dir = project_dir / ".git"
 
     try:
-        git_check = subprocess.run(
-            ["git", "--version"], capture_output=True, text=True
-        )
+        git_check = subprocess.run(["git", "--version"], capture_output=True, text=True)
     except FileNotFoundError:
         console.print(
             status_line("git is not installed. Install git to enable repo setup.", accent="amber")
