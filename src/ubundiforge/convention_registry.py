@@ -164,8 +164,18 @@ def _discover_records(
         records[record_id] = record
 
         if record.kind == "stacks":
+            if metadata_id in stack_record_ids:
+                raise ConventionValidationError(
+                    f"Duplicate stack id {metadata_id} found in "
+                    f"{stack_record_ids[metadata_id]} and {record_id}."
+                )
             stack_record_ids[metadata_id] = record_id
         elif record.kind == "languages":
+            if metadata_id in language_record_ids:
+                raise ConventionValidationError(
+                    f"Duplicate language id {metadata_id} found in "
+                    f"{language_record_ids[metadata_id]} and {record_id}."
+                )
             language_record_ids[metadata_id] = record_id
 
     return records, sources, stack_record_ids, language_record_ids
@@ -178,6 +188,25 @@ def _validate_references(registry: ConventionRegistry) -> None:
                 raise ConventionValidationError(
                     f"Convention record {record.record_id} inherits unknown record {inherited_id}."
                 )
+
+
+def _validate_inheritance_cycles(registry: ConventionRegistry) -> None:
+    visited: set[str] = set()
+
+    def visit(record_id: str, active: tuple[str, ...] = ()) -> None:
+        if record_id in active:
+            cycle = " -> ".join((*active, record_id))
+            raise ConventionValidationError(f"Convention inheritance cycle detected: {cycle}")
+        if record_id in visited:
+            return
+
+        record = registry.record(record_id)
+        for inherited_id in record.inherits:
+            visit(inherited_id, (*active, record_id))
+        visited.add(record_id)
+
+    for record_id in registry.record_ids():
+        visit(record_id)
 
 
 def _collect_manifest_required_source_ids(
@@ -335,5 +364,6 @@ def build_registry(root: Path | None = None) -> ConventionRegistry:
         language_record_ids=language_record_ids,
     )
     _validate_references(registry)
+    _validate_inheritance_cycles(registry)
     _validate_bundle_manifests(registry)
     return registry

@@ -77,33 +77,6 @@ markdown_files:
     )
 
     _write(
-        root / "stacks" / "broken-base" / "metadata.yaml",
-        """
-id: broken-base
-label: Broken base
-inherits:
-  - stacks/broken-stack
-markdown_files:
-  - base.md
-""".strip(),
-    )
-    _write(root / "stacks" / "broken-base" / "base.md", "# Base\n\nBroken base.")
-
-    _write(
-        root / "stacks" / "broken-stack" / "metadata.yaml",
-        """
-id: broken-stack
-label: Broken stack
-language: python
-inherits:
-  - stacks/broken-base
-markdown_files:
-  - overview.md
-""".strip(),
-    )
-    _write(root / "stacks" / "broken-stack" / "overview.md", "# Broken\n\nBroken stack.")
-
-    _write(
         root / "manifests" / "bundles.yaml",
         """
 default:
@@ -118,19 +91,12 @@ stack_overrides:
       - stacks/python-api/services.md
       - stacks/fastapi/overview.md
       - stacks/fastapi/structure.md
-  broken-stack:
-    label: broken-stack
-    files:
-      - languages/python/style.md
-      - stacks/broken-base/base.md
-      - stacks/broken-stack/overview.md
 """.strip(),
     )
     _write(
         root / "manifests" / "browse-labels.yaml",
         """
 fastapi: FastAPI
-broken-stack: Broken stack
 """.strip(),
     )
 
@@ -144,16 +110,12 @@ def test_build_registry_discovers_normalized_records_and_sources(sample_tree: Pa
     assert registry.record_ids() == (
         "global",
         "languages/python",
-        "stacks/broken-base",
-        "stacks/broken-stack",
         "stacks/fastapi",
         "stacks/python-api",
     )
     assert registry.source_ids() == (
         "global/shared",
         "languages/python/style",
-        "stacks/broken-base/base",
-        "stacks/broken-stack/overview",
         "stacks/fastapi/overview",
         "stacks/fastapi/structure",
         "stacks/python-api/services",
@@ -210,6 +172,47 @@ markdown_files:
         build_registry(root)
 
 
+def test_build_registry_rejects_inheritance_cycles(tmp_path: Path) -> None:
+    root = tmp_path / "conventions"
+    _write(
+        root / "global" / "metadata.yaml",
+        """
+id: global
+label: Global
+markdown_files:
+  - shared.md
+""".strip(),
+    )
+    _write(root / "global" / "shared.md", "# Shared")
+    _write(
+        root / "stacks" / "broken-base" / "metadata.yaml",
+        """
+id: broken-base
+label: Broken base
+inherits:
+  - stacks/broken-stack
+markdown_files:
+  - base.md
+""".strip(),
+    )
+    _write(root / "stacks" / "broken-base" / "base.md", "# Base")
+    _write(
+        root / "stacks" / "broken-stack" / "metadata.yaml",
+        """
+id: broken-stack
+label: Broken stack
+inherits:
+  - stacks/broken-base
+markdown_files:
+  - overview.md
+""".strip(),
+    )
+    _write(root / "stacks" / "broken-stack" / "overview.md", "# Broken")
+
+    with pytest.raises(ConventionValidationError, match="cycle"):
+        build_registry(root)
+
+
 def test_build_registry_rejects_duplicate_markdown_file_entries_within_record(
     tmp_path: Path,
 ) -> None:
@@ -227,6 +230,80 @@ markdown_files:
     _write(root / "global" / "shared.md", "# Shared")
 
     with pytest.raises(ConventionValidationError, match="shared.md"):
+        build_registry(root)
+
+
+def test_build_registry_rejects_duplicate_stack_ids(tmp_path: Path) -> None:
+    root = tmp_path / "conventions"
+    _write(
+        root / "global" / "metadata.yaml",
+        """
+id: global
+label: Global
+markdown_files:
+  - shared.md
+""".strip(),
+    )
+    _write(root / "global" / "shared.md", "# Shared")
+    _write(
+        root / "stacks" / "fastapi-one" / "metadata.yaml",
+        """
+id: fastapi
+label: FastAPI One
+markdown_files:
+  - overview.md
+""".strip(),
+    )
+    _write(root / "stacks" / "fastapi-one" / "overview.md", "# One")
+    _write(
+        root / "stacks" / "fastapi-two" / "metadata.yaml",
+        """
+id: fastapi
+label: FastAPI Two
+markdown_files:
+  - overview.md
+""".strip(),
+    )
+    _write(root / "stacks" / "fastapi-two" / "overview.md", "# Two")
+
+    with pytest.raises(ConventionValidationError, match="Duplicate stack id"):
+        build_registry(root)
+
+
+def test_build_registry_rejects_duplicate_language_ids(tmp_path: Path) -> None:
+    root = tmp_path / "conventions"
+    _write(
+        root / "global" / "metadata.yaml",
+        """
+id: global
+label: Global
+markdown_files:
+  - shared.md
+""".strip(),
+    )
+    _write(root / "global" / "shared.md", "# Shared")
+    _write(
+        root / "languages" / "python-one" / "metadata.yaml",
+        """
+id: python
+label: Python One
+markdown_files:
+  - style.md
+""".strip(),
+    )
+    _write(root / "languages" / "python-one" / "style.md", "# One")
+    _write(
+        root / "languages" / "python-two" / "metadata.yaml",
+        """
+id: python
+label: Python Two
+markdown_files:
+  - style.md
+""".strip(),
+    )
+    _write(root / "languages" / "python-two" / "style.md", "# Two")
+
+    with pytest.raises(ConventionValidationError, match="Duplicate language id"):
         build_registry(root)
 
 
@@ -298,3 +375,13 @@ stack_overrides:
 
     with pytest.raises(ConventionValidationError, match="languages/python/style.md"):
         build_registry(sample_tree)
+
+
+def test_build_registry_smoke_checks_real_bundled_tree() -> None:
+    root = Path(__file__).resolve().parents[1] / "conventions"
+
+    registry = build_registry(root)
+
+    assert registry.root == root.resolve()
+    assert registry.stack("fastapi").language == "python"
+    assert "global/shared" in registry.source_ids()

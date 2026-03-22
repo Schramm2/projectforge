@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 from ubundiforge.convention_compiler import compile_bundle
-from ubundiforge.convention_models import ConventionValidationError
 from ubundiforge.convention_registry import build_registry
 
 
@@ -78,33 +77,6 @@ markdown_files:
     )
 
     _write(
-        root / "stacks" / "broken-base" / "metadata.yaml",
-        """
-id: broken-base
-label: Broken base
-inherits:
-  - stacks/broken-stack
-markdown_files:
-  - base.md
-""".strip(),
-    )
-    _write(root / "stacks" / "broken-base" / "base.md", "# Base\n\nBroken base.")
-
-    _write(
-        root / "stacks" / "broken-stack" / "metadata.yaml",
-        """
-id: broken-stack
-label: Broken stack
-language: python
-inherits:
-  - stacks/broken-base
-markdown_files:
-  - overview.md
-""".strip(),
-    )
-    _write(root / "stacks" / "broken-stack" / "overview.md", "# Broken\n\nBroken stack.")
-
-    _write(
         root / "manifests" / "bundles.yaml",
         """
 default:
@@ -119,19 +91,12 @@ stack_overrides:
       - stacks/python-api/services.md
       - stacks/fastapi/overview.md
       - stacks/fastapi/structure.md
-  broken-stack:
-    label: broken-stack
-    files:
-      - languages/python/style.md
-      - stacks/broken-base/base.md
-      - stacks/broken-stack/overview.md
 """.strip(),
     )
     _write(
         root / "manifests" / "browse-labels.yaml",
         """
 fastapi: FastAPI
-broken-stack: Broken stack
 """.strip(),
     )
 
@@ -154,15 +119,6 @@ def test_compile_bundle_merges_layers_in_deterministic_order(sample_tree: Path) 
     assert bundle.bundle_id == "fastapi"
     assert bundle.sources == expected_sources
     assert bundle.prompt_block == expected_prompt_block
-
-
-def test_compile_bundle_rejects_inheritance_cycles(sample_tree: Path) -> None:
-    registry = build_registry(sample_tree)
-
-    with pytest.raises(ConventionValidationError):
-        compile_bundle(registry, stack="broken-stack")
-
-
 def test_compile_bundle_dedupes_cross_layer_overlaps_deterministically(
     tmp_path: Path,
 ) -> None:

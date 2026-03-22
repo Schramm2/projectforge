@@ -13,14 +13,19 @@ stack_overrides:
   fastapi:
     label: fastapi
     files:
+      - global/cross-recipe-python.md
+      - global/cross-recipe-docker.md
       - stacks/fastapi/overview.md
   fastapi-ai:
     label: fastapi-ai
     files:
+      - global/cross-recipe-python.md
+      - global/cross-recipe-docker.md
       - stacks/fastapi-ai/overview.md
   nextjs:
     label: nextjs
     files:
+      - global/cross-recipe-typescript.md
       - stacks/nextjs/overview.md
   both:
     label: both
@@ -29,12 +34,17 @@ stack_overrides:
   python-cli:
     label: python-cli
     files:
+      - global/cross-recipe-python.md
+      - global/cross-recipe-docker.md
       - stacks/python-cli/overview.md
   ts-package:
     label: ts-package
     files:
+      - global/cross-recipe-typescript.md
       - stacks/ts-package/overview.md
   python-worker:
     label: python-worker
     files:
+      - global/cross-recipe-python.md
+      - global/cross-recipe-docker.md
       - stacks/python-worker/overview.md
