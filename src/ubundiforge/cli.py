@@ -185,7 +185,7 @@ def _render_loaded_context(
             if configured_model:
                 lines.append(subtle(f"{backend} model: {configured_model}"))
 
-    lines.append(subtle(f"Conventions: {len(conventions)} chars from ~/.forge/conventions.md"))
+    lines.append(subtle(f"Conventions: {len(conventions)} chars loaded"))
     if claude_md_loaded:
         lines.append(subtle("CLAUDE.md starter loaded"))
     if design_template_label:
@@ -662,15 +662,23 @@ def replay(
     console.print(header_panel(__version__))
     console.print(status_line(f"Replaying: {name} ({stack})", accent="violet"))
 
-    # Load conventions snapshot or current conventions
+    # Load conventions snapshot or current bundled conventions for the stack
     snapshot_path = project_dir / ".forge" / "conventions-snapshot.md"
     if snapshot_path.exists():
         conventions = snapshot_path.read_text()
     else:
-        conventions, _ = load_conventions()
+        replay_stack = stack or None
+        conventions, conv_warnings = load_conventions(stack=replay_stack)
+        for warning in conv_warnings:
+            console.print(f"[yellow]{warning}[/yellow]")
         console.print(
             status_line(
-                "No conventions snapshot found. Using current conventions.",
+                (
+                    f"No conventions snapshot found. Using current bundled conventions "
+                    f"for stack '{stack}'."
+                    if stack
+                    else "No conventions snapshot found. Using current conventions."
+                ),
                 accent="amber",
             )
         )
@@ -1170,7 +1178,7 @@ def main(
     backend_models: dict[str, str] = forge_config.get("backend_models", {})
 
     # Load conventions and CLAUDE.md template
-    conventions, conv_warnings = load_conventions()
+    conventions, conv_warnings = load_conventions(stack=answers["stack"])
     for warning in conv_warnings:
         console.print(f"[yellow]{warning}[/yellow]")
 

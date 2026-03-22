@@ -238,3 +238,24 @@ def test_phase_prompt_verify_only_uses_codex_guidance_for_codex_backend():
     assert "<verification_loop>" in prompt
     assert "Keep progress updates brief and task-focused." in prompt
     assert "Ensure the project runs without real API keys or .env.local." in prompt
+
+
+def test_phase_prompt_preserves_compiled_bundle_conventions_block():
+    compiled_bundle = """# Bundled Conventions
+
+## Global
+- Use strict typing.
+
+## Next.js
+- Prefer App Router."""
+
+    prompt = build_phase_prompt(
+        ["architecture"],
+        ["architecture", "frontend", "tests"],
+        _BASE_ANSWERS,
+        compiled_bundle,
+    )
+
+    assert "<conventions>" in prompt
+    assert compiled_bundle in prompt
+    assert "</conventions>" in prompt

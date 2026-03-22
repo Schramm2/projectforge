@@ -188,7 +188,7 @@ def build_prompt(
     Args:
         answers: Dict with keys: name, stack, description, docker, auth_provider,
             services, ci, extra.
-        conventions: Contents of the conventions.md file.
+        conventions: Compiled conventions prompt block text.
         claude_md_template: Optional CLAUDE.md scaffold template content.
 
     Returns:
@@ -1755,7 +1755,7 @@ def build_phase_prompt(
         phases: The phases in this group.
         all_phases: All phases for this stack.
         answers: User answers dict.
-        conventions: Conventions text.
+        conventions: Compiled conventions prompt block text.
         backend: The backend that will execute this prompt.
         claude_md_template: Optional CLAUDE.md template.
     """

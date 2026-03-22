@@ -14,7 +14,7 @@ from ubundiforge.config import (
     BackendStatus,
     get_backend_statuses,
 )
-from ubundiforge.conventions import CONVENTIONS_PATH, DEFAULT_CONVENTIONS, FORGE_DIR
+from ubundiforge.conventions import BUNDLED_CONVENTIONS_DIR, CONVENTIONS_PATH, FORGE_DIR
 from ubundiforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
 from ubundiforge.ui import (
     badge,
@@ -605,34 +605,30 @@ def run_setup(console: Console) -> dict:
     # --- Step 8: Conventions & media ---
     console.print(make_step_panel(8, 8, "Conventions & media", accent="aqua"))
 
+    console.print(
+        make_panel(
+            grouped_lines(
+                [
+                    "Forge now compiles bundled conventions for each scaffolded stack.",
+                    subtle(f"Bundled source tree: {BUNDLED_CONVENTIONS_DIR}"),
+                    muted(
+                        "Repo admins can inspect or customize bundled sources with "
+                        "forge admin conventions."
+                    ),
+                ]
+            ),
+            title="Conventions",
+            accent="aqua",
+        )
+    )
     if CONVENTIONS_PATH.exists():
-        console.print(status_line(f"Found conventions at {CONVENTIONS_PATH}", accent="aqua"))
-    else:
         console.print(
-            make_panel(
-                grouped_lines(
-                    [
-                        "Forge uses a conventions file to inject your team's standards into every "
-                        "scaffold.",
-                        subtle("A default one will be created for you."),
-                    ]
+            status_line(
+                (
+                    f"Legacy user conventions file detected at {CONVENTIONS_PATH}. "
+                    "Forge no longer creates this file during setup."
                 ),
-                title="Conventions",
-                accent="aqua",
-            )
-        )
-        FORGE_DIR.mkdir(parents=True, exist_ok=True)
-        CONVENTIONS_PATH.write_text(DEFAULT_CONVENTIONS)
-        console.print(
-            status_line(
-                f"Created default conventions at {CONVENTIONS_PATH}",
-                accent="aqua",
-            )
-        )
-        console.print(
-            status_line(
-                "Edit this file anytime to customize your project standards.",
-                accent="aqua",
+                accent="amber",
             )
         )
 

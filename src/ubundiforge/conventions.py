@@ -1,4 +1,4 @@
-"""Loads convention sources from the bundled tree and legacy ~/.forge/ files."""
+"""Loads compiled convention prompt blocks from bundled sources and legacy fallbacks."""
 
 import re
 from pathlib import Path
@@ -124,7 +124,7 @@ def _load_local_conventions(path: Path) -> tuple[str, list[str]]:
 
 
 def load_conventions(stack: str | None = None) -> tuple[str, list[str]]:
-    """Load conventions, preferring the bundled tree for stack-aware requests."""
+    """Load conventions, preferring compiled bundled prompt blocks for stack-aware requests."""
 
     if LOCAL_CONVENTIONS_PATH.exists():
         local_content = LOCAL_CONVENTIONS_PATH.read_text()
