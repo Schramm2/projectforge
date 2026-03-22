@@ -1,4 +1,4 @@
-"""Loads compiled convention prompt blocks from bundled sources and legacy fallbacks."""
+"""Loads bundled convention bundles plus narrow legacy compatibility fallbacks."""
 
 import re
 from pathlib import Path
@@ -43,7 +43,7 @@ MIN_CONVENTIONS_LENGTH = 50
 
 LOCAL_CONVENTIONS_PATH = Path.cwd() / ".forge" / "conventions.md"
 
-_DEFAULT_CONVENTIONS_PARTS = [
+_LEGACY_DEFAULT_CONVENTION_PARTS = [
     "global/shared.md",
     "global/frontend-brand.md",
     "global/frontend-communication.md",
@@ -72,7 +72,12 @@ def _compose_text(root: Path, relative_paths: list[str]) -> str:
     return "# Ubundi Project Conventions\n\nFollow the bundled conventions."
 
 
-DEFAULT_CONVENTIONS = _compose_text(BUNDLED_CONVENTIONS_DIR, _DEFAULT_CONVENTIONS_PARTS)
+LEGACY_DEFAULT_CONVENTIONS = _compose_text(
+    BUNDLED_CONVENTIONS_DIR,
+    _LEGACY_DEFAULT_CONVENTION_PARTS,
+)
+# Backward-compatible alias for legacy callers and tests that still reference the old name.
+DEFAULT_CONVENTIONS = LEGACY_DEFAULT_CONVENTIONS
 
 def build_registry(root: Path | None = None):
     """Build the conventions registry for the bundled or provided tree."""
@@ -131,7 +136,7 @@ def _load_local_conventions(path: Path) -> tuple[str, list[str]]:
 
 
 def load_conventions(stack: str | None = None) -> tuple[str, list[str]]:
-    """Load conventions, preferring compiled bundled prompt blocks for stack-aware requests."""
+    """Load bundled conventions first and use legacy files only as a compatibility fallback."""
 
     if LOCAL_CONVENTIONS_PATH.exists():
         local_content = LOCAL_CONVENTIONS_PATH.read_text()
@@ -156,8 +161,8 @@ def load_conventions(stack: str | None = None) -> tuple[str, list[str]]:
     source = CONVENTIONS_PATH
     if not source.exists():
         FORGE_DIR.mkdir(parents=True, exist_ok=True)
-        source.write_text(DEFAULT_CONVENTIONS)
-        warnings.append("Created default conventions at ~/.forge/conventions.md")
+        source.write_text(LEGACY_DEFAULT_CONVENTIONS)
+        warnings.append("Created legacy compatibility conventions at ~/.forge/conventions.md")
 
     content, source_warnings = _load_conventions_file(source)
     warnings.extend(source_warnings)

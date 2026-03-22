@@ -19,6 +19,7 @@ def test_runtime_formula_resources_resolve_recursive_runtime_dependencies():
         "mdurl",
         "prompt-toolkit",
         "pygments",
+        "pyyaml",
         "questionary",
         "rich",
         "shellingham",

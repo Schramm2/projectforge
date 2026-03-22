@@ -14,7 +14,8 @@ This document covers the data that flows into `build_phase_prompt()` and how For
 flowchart TD
     subgraph Inputs["Prompt inputs"]
         Answers["Answers payload<br/>name, stack, description,<br/>docker, services, auth, CI,<br/>demo mode, extra"]
-        Conventions["Loaded conventions text<br/>local or ~/.forge"]
+        ConventionsTree["Bundled conventions tree<br/>global, language, stack,<br/>prompt manifests"]
+        ConventionBundle["Compiled convention bundle<br/>stack-aware prompt block"]
         ClaudeTemplate["CLAUDE.md template<br/>if available"]
         DesignTemplate["Loaded design template content<br/>plus selected label"]
         MediaManifest["Media asset manifest<br/>with target directory and files"]
@@ -42,7 +43,8 @@ flowchart TD
     end
 
     Answers --> Builder
-    Conventions --> Builder
+    ConventionsTree --> ConventionBundle
+    ConventionBundle --> Builder
     ClaudeTemplate --> Builder
     DesignTemplate --> Builder
     MediaManifest --> Builder
@@ -66,7 +68,7 @@ flowchart LR
     DemoMode["Demo mode guidance"] --> Prompt
     DesignGuide["Design template block"] --> Prompt
     MediaFiles["Media manifest block"] --> Prompt
-    ConventionsBlock["Conventions block"] --> Prompt
+    ConventionsBlock["Compiled conventions block"] --> Prompt
     ExtraInstructions["User extra instructions"] --> Prompt
     ClaudeStarter["CLAUDE.md starter guidance"] --> Prompt
     PhaseInstructions["Phase-specific instructions"] --> Prompt
@@ -75,5 +77,7 @@ flowchart LR
 
 ## Notes
 
+- Forge now compiles conventions from the bundled `conventions/` tree before prompt assembly, and `forge admin conventions` previews the same compiled bundle that the prompt builder consumes.
+- Legacy `.forge/conventions.md` and `~/.forge/conventions.md` files remain compatibility overrides, not the primary maintainer source of truth.
 - Secret scanning happens before execution, but after answers are collected and before prompts are handed to an AI CLI.
 - Model selection is resolved outside the prompt builder and passed to the backend CLI command separately.

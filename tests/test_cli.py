@@ -656,6 +656,7 @@ def test_run_setup_does_not_create_legacy_conventions_file(monkeypatch, tmp_path
     assert not conventions_path.exists()
     assert "bundled conventions" in output.lower()
     assert "bundled source tree" in output.lower()
+    assert "forge admin conventions" in output
 
 
 def test_admin_conventions_validate_passes() -> None:
