@@ -108,14 +108,15 @@ def test_load_conventions_stack_prefers_local_override(tmp_path, monkeypatch):
     (root / "global" / "shared.md").write_text("Use strict typing in bundled content.")
     local = tmp_path / ".forge" / "conventions.md"
     local.parent.mkdir(parents=True)
-    local.write_text("Local rules always win.")
+    local.write_text("Local rules always win, even when we mention TODO items in prose.")
 
     monkeypatch.setattr("ubundiforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
     monkeypatch.setattr("ubundiforge.conventions.LOCAL_CONVENTIONS_PATH", local)
 
     content, warnings = load_conventions(stack="fastapi")
 
-    assert content == "Local rules always win."
+    assert content == "Local rules always win, even when we mention TODO items in prose."
+    assert warnings[0] == f"Using local conventions from {local}"
     assert any("local conventions" in w.lower() for w in warnings)
 
 
@@ -133,4 +134,8 @@ def test_load_conventions_stack_ignores_placeholder_local_override(tmp_path, mon
     content, warnings = load_conventions(stack="fastapi")
 
     assert "bundled content" in content
+    assert (
+        warnings[0]
+        == f"Ignoring placeholder local conventions from {local}; using bundled stack conventions."
+    )
     assert any("placeholder" in w.lower() for w in warnings)

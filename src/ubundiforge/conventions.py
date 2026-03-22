@@ -1,11 +1,12 @@
 """Loads convention sources from the bundled tree and legacy ~/.forge/ files."""
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
 
-_PLACEHOLDER_LOCAL_MARKERS = (
+_PLACEHOLDER_LOCAL_EXACT_LINES = {
     "todo",
     "tbd",
     "placeholder",
@@ -13,6 +14,10 @@ _PLACEHOLDER_LOCAL_MARKERS = (
     "add conventions",
     "replace me",
     "coming soon",
+}
+
+_PLACEHOLDER_TODO_LINE_RE = re.compile(
+    r"^todo(?:\s*[:\-–—]\s*(?:add|write|fill in|replace|define|document|fix)\b.*)?$"
 )
 
 
@@ -189,10 +194,22 @@ def _load_conventions_file(path: Path) -> tuple[str, list[str]]:
 
 
 def _looks_placeholder_local_conventions(content: str) -> bool:
-    stripped = content.strip().lower()
-    if not stripped:
+    lines = [
+        line.lstrip("#>*- ").strip().lower()
+        for line in content.splitlines()
+        if line.strip()
+    ]
+    if not lines:
         return True
-    return any(marker in stripped for marker in _PLACEHOLDER_LOCAL_MARKERS)
+
+    for line in lines:
+        if line in _PLACEHOLDER_LOCAL_EXACT_LINES:
+            continue
+        if _PLACEHOLDER_TODO_LINE_RE.match(line):
+            continue
+        return False
+
+    return True
 
 
 def _load_local_conventions(path: Path) -> tuple[str, list[str]]:
