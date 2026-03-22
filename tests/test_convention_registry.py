@@ -108,11 +108,22 @@ markdown_files:
         """
 default:
   label: global
+  files:
+    - global/shared.md
 stack_overrides:
   fastapi:
     label: fastapi
+    files:
+      - languages/python/style.md
+      - stacks/python-api/services.md
+      - stacks/fastapi/overview.md
+      - stacks/fastapi/structure.md
   broken-stack:
     label: broken-stack
+    files:
+      - languages/python/style.md
+      - stacks/broken-base/base.md
+      - stacks/broken-stack/overview.md
 """.strip(),
     )
     _write(
@@ -199,7 +210,9 @@ markdown_files:
         build_registry(root)
 
 
-def test_build_registry_rejects_duplicate_markdown_file_entries(tmp_path: Path) -> None:
+def test_build_registry_rejects_duplicate_markdown_file_entries_within_record(
+    tmp_path: Path,
+) -> None:
     root = tmp_path / "conventions"
     _write(
         root / "global" / "metadata.yaml",
@@ -215,3 +228,49 @@ markdown_files:
 
     with pytest.raises(ConventionValidationError, match="shared.md"):
         build_registry(root)
+
+
+def test_build_registry_rejects_manifest_missing_default_source(sample_tree: Path) -> None:
+    _write(
+        sample_tree / "manifests" / "bundles.yaml",
+        """
+default:
+  label: global
+  files: []
+stack_overrides:
+  fastapi:
+    label: fastapi
+    files:
+      - languages/python/style.md
+      - stacks/python-api/services.md
+      - stacks/fastapi/overview.md
+      - stacks/fastapi/structure.md
+""".strip(),
+    )
+
+    with pytest.raises(ConventionValidationError, match="global/shared.md"):
+        build_registry(sample_tree)
+
+
+def test_build_registry_rejects_manifest_missing_inherited_stack_source(
+    sample_tree: Path,
+) -> None:
+    _write(
+        sample_tree / "manifests" / "bundles.yaml",
+        """
+default:
+  label: global
+  files:
+    - global/shared.md
+stack_overrides:
+  fastapi:
+    label: fastapi
+    files:
+      - languages/python/style.md
+      - stacks/fastapi/overview.md
+      - stacks/fastapi/structure.md
+""".strip(),
+    )
+
+    with pytest.raises(ConventionValidationError, match="stacks/python-api/services.md"):
+        build_registry(sample_tree)

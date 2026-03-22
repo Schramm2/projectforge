@@ -84,6 +84,8 @@ def compile_bundle(registry: ConventionRegistry, stack: str | None = None) -> Co
     seen_source_ids: set[str] = set()
     for record in records:
         for source_id in _resolve_sources_for_record(registry, record):
+            # Cross-layer overlaps are intentional in the bundled tree. Keep the first
+            # occurrence from the highest-priority layer and drop later repeats.
             if source_id in seen_source_ids:
                 continue
             seen_source_ids.add(source_id)

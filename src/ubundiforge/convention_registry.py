@@ -48,6 +48,17 @@ def _metadata_kind(record_id: str) -> str:
     return record_id.split("/", 1)[0]
 
 
+def _ordered_unique(values: list[str] | tuple[str, ...]) -> tuple[str, ...]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        ordered.append(value)
+    return tuple(ordered)
+
+
 def _discover_all_markdown_sources(root: Path) -> dict[str, ConventionSource]:
     sources: dict[str, ConventionSource] = {}
     for path in sorted(root.rglob("*.md")):
@@ -169,6 +180,65 @@ def _validate_references(registry: ConventionRegistry) -> None:
                 )
 
 
+def _collect_manifest_required_source_ids(
+    registry: ConventionRegistry,
+    record: ConventionRecord,
+    *,
+    active: tuple[str, ...] = (),
+) -> tuple[str, ...]:
+    if record.record_id in active:
+        return ()
+
+    source_ids: list[str] = []
+    for inherited_id in record.inherits:
+        inherited_record = registry.record(inherited_id)
+        source_ids.extend(
+            _collect_manifest_required_source_ids(
+                registry,
+                inherited_record,
+                active=(*active, record.record_id),
+            )
+        )
+    source_ids.extend(record.source_ids)
+    return _ordered_unique(source_ids)
+
+
+def _manifest_source_ids(
+    registry: ConventionRegistry,
+    *,
+    manifest_name: str,
+    manifest: dict[str, object],
+) -> tuple[str, ...]:
+    files = manifest.get("files")
+    if not isinstance(files, list):
+        raise ConventionValidationError(
+            f"Bundle manifest {manifest_name} must define files as a list."
+        )
+
+    source_ids: list[str] = []
+    seen: set[str] = set()
+    for file_path in files:
+        if not isinstance(file_path, str) or not file_path.strip():
+            raise ConventionValidationError(
+                f"Bundle manifest {manifest_name} has an invalid file entry."
+            )
+
+        source_id = file_path.strip().removesuffix(".md")
+        if source_id not in registry.sources:
+            raise ConventionValidationError(
+                f"Bundle manifest {manifest_name} references unknown source {file_path}."
+            )
+        if source_id in seen:
+            raise ConventionValidationError(
+                f"Bundle manifest {manifest_name} includes {file_path} more than once."
+            )
+
+        seen.add(source_id)
+        source_ids.append(source_id)
+
+    return tuple(source_ids)
+
+
 def _validate_bundle_manifests(registry: ConventionRegistry) -> None:
     bundle_definitions = registry.bundle_definitions
     if not bundle_definitions:
@@ -177,11 +247,40 @@ def _validate_bundle_manifests(registry: ConventionRegistry) -> None:
     if "default" in bundle_definitions and registry.global_record() is None:
         raise ConventionValidationError("Bundle manifests require a global convention layer.")
 
+    default_manifest_ids: tuple[str, ...] = ()
+    default_bundle = bundle_definitions.get("default")
+    if default_bundle is not None:
+        if not isinstance(default_bundle, dict):
+            raise ConventionValidationError("Bundle manifest default must be a mapping.")
+        default_manifest_ids = _manifest_source_ids(
+            registry,
+            manifest_name="default",
+            manifest=default_bundle,
+        )
+        global_record = registry.global_record()
+        if global_record is not None:
+            required_default_ids = _collect_manifest_required_source_ids(registry, global_record)
+            missing_default_ids = [
+                source_id
+                for source_id in required_default_ids
+                if source_id not in default_manifest_ids
+            ]
+            if missing_default_ids:
+                raise ConventionValidationError(
+                    "Bundle manifest default is missing required source "
+                    f"{missing_default_ids[0]}.md."
+                )
+
     stack_overrides = bundle_definitions.get("stack_overrides") or {}
     if not isinstance(stack_overrides, dict):
         raise ConventionValidationError("Bundle manifests define invalid stack_overrides metadata.")
 
-    for stack_id in stack_overrides:
+    for stack_id, stack_override in stack_overrides.items():
+        if not isinstance(stack_override, dict):
+            raise ConventionValidationError(
+                f"Bundle manifest for stack {stack_id} must be a mapping."
+            )
+
         stack_record = registry.stack_record_ids.get(stack_id)
         if stack_record is None:
             raise ConventionValidationError(
@@ -192,6 +291,24 @@ def _validate_bundle_manifests(registry: ConventionRegistry) -> None:
         if record.language and record.language not in registry.language_record_ids:
             raise ConventionValidationError(
                 f"Bundle manifests require a language layer for stack {stack_id}."
+            )
+
+        override_manifest_ids = _manifest_source_ids(
+            registry,
+            manifest_name=f"stack {stack_id}",
+            manifest=stack_override,
+        )
+        required_stack_ids = _collect_manifest_required_source_ids(registry, record)
+        combined_manifest_ids = set(
+            _ordered_unique([*default_manifest_ids, *override_manifest_ids])
+        )
+        missing_stack_ids = [
+            source_id for source_id in required_stack_ids if source_id not in combined_manifest_ids
+        ]
+        if missing_stack_ids:
+            raise ConventionValidationError(
+                f"Bundle manifest for stack {stack_id} is missing required source "
+                f"{missing_stack_ids[0]}.md."
             )
 
 
