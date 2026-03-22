@@ -44,6 +44,35 @@ _BACKEND_ACCENTS = {
 }
 
 
+class ActivityTracker:
+    """Accumulates scaffold activity summaries for the activity feed."""
+
+    def __init__(self, max_visible: int = 6):
+        self.steps: list[dict] = []
+        self.current: str = ""
+        self._max_visible = max_visible
+
+    def update(self, summary: str) -> None:
+        """Record a new activity summary. Deduplicates consecutive identical summaries."""
+        if self.current == summary:
+            return
+        # Mark previous step as completed
+        if self.steps:
+            self.steps[-1]["completed"] = True
+        self.steps.append(
+            {
+                "summary": summary,
+                "completed": False,
+                "timestamp": time.monotonic(),
+            }
+        )
+        self.current = summary
+
+    def visible_steps(self) -> list[dict]:
+        """Return the most recent steps up to max_visible."""
+        return self.steps[-self._max_visible :]
+
+
 def _build_cmd(backend: str, prompt: str, model: str | None = None) -> list[str]:
     """Build the subprocess command for the given backend."""
     if backend == "claude":
@@ -568,9 +597,7 @@ def ensure_git_init(project_dir: Path) -> bool:
     git_dir = project_dir / ".git"
 
     try:
-        git_check = subprocess.run(
-            ["git", "--version"], capture_output=True, text=True
-        )
+        git_check = subprocess.run(["git", "--version"], capture_output=True, text=True)
     except FileNotFoundError:
         console.print(
             status_line("git is not installed. Install git to enable repo setup.", accent="amber")

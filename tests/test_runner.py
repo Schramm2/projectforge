@@ -4,6 +4,7 @@ import stat
 from pathlib import Path
 
 from ubundiforge.runner import (
+    ActivityTracker,
     _build_cmd,
     _initial_phase_summary,
     _progress_summary_for_line,
@@ -190,3 +191,46 @@ def test_post_scaffold_hook_passes_env_vars(tmp_path, monkeypatch):
         project_dir, {"name": "env-project", "stack": "fastapi", "demo_mode": True}
     )
     assert env_dump.read_text().strip() == "fastapi:1"
+
+
+def test_activity_tracker_add_new_summary():
+    tracker = ActivityTracker()
+    tracker.update("Reviewing the scaffold brief")
+    assert len(tracker.steps) == 1
+    assert tracker.steps[0]["summary"] == "Reviewing the scaffold brief"
+    assert tracker.current == "Reviewing the scaffold brief"
+
+
+def test_activity_tracker_deduplicates_consecutive():
+    tracker = ActivityTracker()
+    tracker.update("Writing and refining project files")
+    tracker.update("Writing and refining project files")
+    assert len(tracker.steps) == 1
+
+
+def test_activity_tracker_adds_different_summary():
+    tracker = ActivityTracker()
+    tracker.update("Reviewing the scaffold brief")
+    tracker.update("Writing and refining project files")
+    assert len(tracker.steps) == 2
+    assert tracker.steps[0]["summary"] == "Reviewing the scaffold brief"
+    assert tracker.steps[1]["summary"] == "Writing and refining project files"
+    assert tracker.current == "Writing and refining project files"
+
+
+def test_activity_tracker_max_visible():
+    tracker = ActivityTracker(max_visible=3)
+    for i in range(5):
+        tracker.update(f"Step {i}")
+    visible = tracker.visible_steps()
+    assert len(visible) == 3
+    assert visible[0]["summary"] == "Step 2"
+    assert visible[-1]["summary"] == "Step 4"
+
+
+def test_activity_tracker_marks_completed():
+    tracker = ActivityTracker()
+    tracker.update("Step one")
+    tracker.update("Step two")
+    assert tracker.steps[0]["completed"] is True
+    assert tracker.steps[1]["completed"] is False
