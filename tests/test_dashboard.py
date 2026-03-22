@@ -1,8 +1,12 @@
 """Tests for the post-scaffold dashboard."""
 
+from io import StringIO
 from pathlib import Path
 
-from ubundiforge.dashboard import collect_project_stats
+from rich.console import Console
+
+from ubundiforge.dashboard import collect_project_stats, render_dashboard
+from ubundiforge.verify import CheckResult, VerifyReport
 
 
 def test_collect_stats_empty_dir(tmp_path: Path):
@@ -40,3 +44,40 @@ def test_collect_stats_counts_node_deps(tmp_path: Path):
     (tmp_path / "package.json").write_text(pkg)
     stats = collect_project_stats(tmp_path)
     assert stats["dep_count"] == 3
+
+
+def test_render_dashboard_produces_output(tmp_path: Path):
+    """Dashboard renders without error and produces output."""
+    (tmp_path / "main.py").write_text("x = 1\n")
+    answers = {"name": "pulse", "stack": "fastapi", "description": "health API"}
+    phase_backends = [("architecture", "claude"), ("tests", "codex"), ("verify", "claude")]
+    report = VerifyReport(
+        checks=[
+            CheckResult(name="lint", passed=True),
+            CheckResult(name="test", passed=True),
+        ]
+    )
+    console = Console(file=StringIO(), width=80)
+    render_dashboard(
+        console=console,
+        answers=answers,
+        phase_backends=phase_backends,
+        project_dir=tmp_path,
+        verify_report=report,
+        elapsed=158.0,
+    )
+
+
+def test_render_dashboard_without_verify(tmp_path: Path):
+    """Dashboard renders when verify was skipped (no report)."""
+    answers = {"name": "pulse", "stack": "fastapi", "description": "health API"}
+    phase_backends = [("architecture", "claude")]
+    console = Console(file=StringIO(), width=80)
+    render_dashboard(
+        console=console,
+        answers=answers,
+        phase_backends=phase_backends,
+        project_dir=tmp_path,
+        verify_report=None,
+        elapsed=90.0,
+    )
