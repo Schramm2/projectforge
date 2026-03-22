@@ -74,3 +74,43 @@ def read_quality_signals() -> list[dict]:
                 logger.warning("Skipping malformed line in quality.jsonl")
                 warned = True
     return entries
+
+
+_MIN_DATA_POINTS = 8
+_EMA_ALPHA = 0.2
+
+
+def compute_backend_scores(
+    signals: list[dict],
+    *,
+    stack: str,
+    phase: str,
+) -> dict[str, float]:
+    """Compute weighted success scores per backend using exponential moving average.
+
+    Returns:
+        Dict mapping backend name to a score between 0.0 and 1.0.
+        Empty dict if insufficient data (<8 points per backend).
+    """
+    by_backend: dict[str, list[dict]] = {}
+    for s in signals:
+        if s.get("stack") == stack and s.get("phase") == phase:
+            backend = s.get("backend", "")
+            by_backend.setdefault(backend, []).append(s)
+
+    scores: dict[str, float] = {}
+    for backend, entries in by_backend.items():
+        if len(entries) < _MIN_DATA_POINTS:
+            continue
+        ema = 0.0
+        initialized = False
+        for entry in entries:
+            success = sum(1 for k in SIGNAL_KEYS if entry.get(k, False)) / len(SIGNAL_KEYS)
+            if not initialized:
+                ema = success
+                initialized = True
+            else:
+                ema = _EMA_ALPHA * success + (1 - _EMA_ALPHA) * ema
+        scores[backend] = ema
+
+    return scores

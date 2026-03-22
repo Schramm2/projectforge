@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from ubundiforge.quality import append_quality_signal, read_quality_signals
+from ubundiforge.quality import append_quality_signal, compute_backend_scores, read_quality_signals
 from ubundiforge.verify import CheckResult, VerifyReport
 
 
@@ -78,3 +78,96 @@ def test_read_quality_signals_skips_malformed(tmp_path: Path, monkeypatch):
     assert len(signals) == 2
     assert signals[0]["stack"] == "fastapi"
     assert signals[1]["stack"] == "nextjs"
+
+
+def test_compute_scores_insufficient_data():
+    """Returns empty dict when fewer than 8 data points exist."""
+    signals = [
+        {
+            "stack": "fastapi",
+            "backend": "claude",
+            "phase": "architecture",
+            "lint_clean": True,
+            "tests_passed": True,
+            "typecheck_clean": True,
+            "health_ok": True,
+            "built": True,
+        }
+    ] * 5
+    scores = compute_backend_scores(signals, stack="fastapi", phase="architecture")
+    assert scores == {}
+
+
+def test_compute_scores_with_enough_data():
+    """Returns scores when 8+ data points exist."""
+    signals = [
+        {
+            "stack": "fastapi",
+            "backend": "claude",
+            "phase": "architecture",
+            "lint_clean": True,
+            "tests_passed": True,
+            "typecheck_clean": True,
+            "health_ok": True,
+            "built": True,
+        }
+    ] * 10
+    scores = compute_backend_scores(signals, stack="fastapi", phase="architecture")
+    assert "claude" in scores
+    assert 0.0 <= scores["claude"] <= 1.0
+
+
+def test_compute_scores_filters_by_stack_and_phase():
+    """Only considers signals matching the given stack and phase."""
+    signals = [
+        {
+            "stack": "fastapi",
+            "backend": "claude",
+            "phase": "architecture",
+            "lint_clean": True,
+            "tests_passed": True,
+            "typecheck_clean": True,
+            "health_ok": True,
+            "built": True,
+        },
+    ] * 10 + [
+        {
+            "stack": "nextjs",
+            "backend": "claude",
+            "phase": "architecture",
+            "lint_clean": False,
+            "tests_passed": False,
+            "typecheck_clean": False,
+            "health_ok": False,
+            "built": False,
+        },
+    ] * 10
+    scores = compute_backend_scores(signals, stack="fastapi", phase="architecture")
+    assert scores["claude"] > 0.9
+
+
+def test_compute_scores_multiple_backends():
+    """Returns separate scores for different backends."""
+    good = {
+        "stack": "fastapi",
+        "backend": "claude",
+        "phase": "tests",
+        "lint_clean": True,
+        "tests_passed": True,
+        "typecheck_clean": True,
+        "health_ok": True,
+        "built": True,
+    }
+    bad = {
+        "stack": "fastapi",
+        "backend": "codex",
+        "phase": "tests",
+        "lint_clean": True,
+        "tests_passed": False,
+        "typecheck_clean": True,
+        "health_ok": False,
+        "built": True,
+    }
+    signals = [good] * 10 + [bad] * 10
+    scores = compute_backend_scores(signals, stack="fastapi", phase="tests")
+    assert scores["claude"] > scores["codex"]
