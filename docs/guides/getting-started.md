@@ -58,15 +58,23 @@ After setup completes on first run, Forge gives you a short handoff instead of i
 4. Add a short description of what the project does.
 5. Accept the remaining defaults or customize auth, CI, Docker, design template, and media options.
 6. Review your choices. Forge shows a summary screen where you can edit basics, design/media, integrations, or demo mode before generation starts.
-7. Watch it build. You will see live progress as Forge routes your brief to the AI backend, which generates the project in phases.
+7. Watch it build. During execution you will see:
+   - A **phase timeline** showing which phases are completed, active, and pending
+   - An **activity feed** with checkmarks scrolling through what the AI is doing
+   - A **file tree** rendered between phases showing what was created
+8. When all phases finish, Forge shows a **post-scaffold dashboard** with health check results, file/line counts, and next steps.
 
 When complete, Forge will:
 - Initialize a git repository in the new project directory.
-- Write a `.forge/scaffold.json` manifest for provenance.
-- Run verification checks if enabled.
+- Write a `.forge/scaffold.json` manifest and conventions snapshot for provenance.
+- Generate a `.forge/card.svg` project card and inject a badge into the README.
+- Run verification checks if enabled (lint, typecheck, tests, build, health).
+- Play a completion sound if enabled (`"sound": true` in `~/.forge/config.json`).
 - Open the project in your editor (if configured).
 
 If the target directory already exists, Forge will offer safer choices instead of only asking to overwrite it. You can rename the project, overwrite the directory, or cancel.
+
+After 3+ scaffolds, Forge learns your preferences and offers to pre-fill dominant choices ("Your usual setup: ...") with a single confirm prompt.
 
 ## Non-interactive mode
 
@@ -87,6 +95,21 @@ Use `--use` if you want to force a single backend for the entire scaffold:
 ```bash
 forge --use codex --name my-api --stack fastapi --description "REST API" --dry-run
 ```
+
+## Beyond scaffolding
+
+Once you have projects, Forge keeps working:
+
+```bash
+forge stats              # See your scaffold history and backend performance
+forge check              # Audit any project against Ubundi conventions
+forge check --fix        # Auto-generate missing CLAUDE.md, .env.example, agent_docs/
+forge evolve auth        # Add authentication to an existing Forge project
+forge evolve stripe      # Add Stripe billing
+forge replay --diff      # Reproduce a past scaffold and compare against current state
+```
+
+Run these from inside a Forge-scaffolded project (one that has `.forge/scaffold.json`).
 
 ## What's next
 
