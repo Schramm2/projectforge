@@ -3,7 +3,6 @@
 import io
 import os
 import platform
-import re
 import shutil
 import subprocess
 import threading
@@ -15,6 +14,15 @@ from pathlib import Path
 from rich.live import Live
 from rich.text import Text
 
+from ubundiforge.subprocess_utils import (
+    PHASE_TIMEOUT,
+    format_activity,
+    progress_summary_for_line,
+    sanitize_progress_line,
+    spinner_frame,
+    spinner_style,
+    summarize_output_line,
+)
 from ubundiforge.ui import (
     BACKEND_ACCENTS,
     badge,
@@ -30,15 +38,6 @@ from ubundiforge.ui import (
 )
 
 console = create_console()
-
-_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
-_SPINNER_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
-_PULSE_STYLES = {
-    "aqua": ("#4D6A84", "#75DCE6", "#C6CEE6", "#75DCE6"),
-    "amber": ("#77603A", "#F3BB58", "#F7D99C", "#F3BB58"),
-    "violet": ("#5F4A87", "#A16EFA", "#D3BCFF", "#A16EFA"),
-    "plum": ("#7B4A79", "#D768D2", "#F0B6ED", "#D768D2"),
-}
 
 
 class ActivityTracker:
@@ -92,9 +91,6 @@ def _build_cmd(backend: str, prompt: str, model: str | None = None) -> list[str]
     return cmd
 
 
-_PHASE_TIMEOUT = 1800  # 30 minutes per phase
-
-
 def _phase_accent(backend: str) -> str:
     """Return the accent color that best matches a backend."""
     return BACKEND_ACCENTS.get(backend, "violet")
@@ -112,134 +108,6 @@ def _initial_phase_summary(label: str, backend: str) -> str:
     if "verify" in lowered:
         return "Checking the scaffold and smoothing rough edges"
     return f"Working through the scaffold with {backend}"
-
-
-def _sanitize_progress_line(line: str) -> str:
-    """Normalize backend output into compact text suitable for a loader."""
-    clean = _ANSI_RE.sub("", line).strip()
-    clean = re.sub(r"\s+", " ", clean)
-    return clean[:120]
-
-
-def _is_noisy_progress_line(line: str) -> bool:
-    """Filter out raw lines that are too noisy to show directly in the loader."""
-    if not line:
-        return True
-    noisy_prefixes = (
-        "$",
-        ">",
-        "```",
-        "diff --git",
-        "@@",
-        "+++",
-        "---",
-        "{",
-        "[{",
-    )
-    if line.startswith(noisy_prefixes):
-        return True
-    if line.count("/") > 6:
-        return True
-    return False
-
-
-def _summarize_output_line(line: str) -> str | None:
-    """Translate backend output into a clean user-facing progress summary."""
-    lowered = line.lower()
-
-    keyword_groups = (
-        (
-            ("inspect", "review", "analy", "read ", "scan", "explor", "understand"),
-            "Reviewing the scaffold brief",
-        ),
-        (("plan", "approach", "strategy", "outline"), "Planning the next set of changes"),
-        (("lint", "eslint", "ruff", "prettier"), "Running lint checks"),
-        (("typecheck", "tsc", "mypy", "pyright"), "Running type checks"),
-        (("test", "pytest", "vitest", "jest", "playwright", "cypress"), "Running tests and checks"),
-        (
-            (
-                "install",
-                "dependencies",
-                "dependency",
-                "npm ",
-                "pnpm ",
-                "bun ",
-                "pip ",
-                "uv sync",
-                "poetry ",
-            ),
-            "Installing project dependencies",
-        ),
-        (
-            (
-                "create",
-                "created",
-                "patch",
-                "write",
-                "writing",
-                "update",
-                "updating",
-                "edited",
-                "edit ",
-                "apply_patch",
-                "scaffold",
-            ),
-            "Writing and refining project files",
-        ),
-        (("schema", "migration", "database", "sql"), "Preparing the data layer"),
-        (("build", "compile", "bundle", "transpil"), "Building the project"),
-        (
-            (
-                "localhost",
-                "listening",
-                "dev server",
-                "starting server",
-                "ready on",
-                "running dev",
-                "vite",
-            ),
-            "Starting the app locally",
-        ),
-        (("git init", "git add", "git commit", ".git"), "Finalizing the repository"),
-        (
-            ("error", "failed", "traceback", "exception", "cannot", "unable to", "fixing"),
-            "Working through an issue in the scaffold",
-        ),
-        (("done", "complete", "completed", "finished", "success"), "Wrapping up this phase"),
-    )
-
-    for tokens, summary in keyword_groups:
-        if any(token in lowered for token in tokens):
-            return summary
-    return None
-
-
-def _progress_summary_for_line(line: str, current: str) -> str:
-    """Pick the best loader summary for a new backend output line."""
-    summary = _summarize_output_line(line)
-    if summary:
-        return summary
-    if not _is_noisy_progress_line(line):
-        return line
-    return current
-
-
-def _spinner_frame(elapsed: float) -> str:
-    """Return the current spinner frame."""
-    return _SPINNER_FRAMES[int(elapsed * 10) % len(_SPINNER_FRAMES)]
-
-
-def _spinner_style(accent: str, elapsed: float) -> str:
-    """Return a pulsing spinner color to mimic a subtle fade animation."""
-    palette = _PULSE_STYLES.get(accent, _PULSE_STYLES["violet"])
-    return palette[int(elapsed * 6) % len(palette)]
-
-
-def _format_activity(text: str, limit: int = 54) -> str:
-    """Clamp activity text so loader surfaces stay compact."""
-    if len(text) <= limit:
-        return text
-    return f"{text[: limit - 1].rstrip()}…"
 
 
 def run_ai(
@@ -304,12 +172,12 @@ def run_ai(
             for raw_line in iter(pipe.readline, b""):
                 line = raw_line.decode("utf-8", errors="replace").rstrip("\n")
                 if line:
-                    clean = _sanitize_progress_line(line)
+                    clean = sanitize_progress_line(line)
                     if not clean:
                         continue
                     with lock:
                         last_line = clean
-                        new_summary = _summarize_output_line(clean)
+                        new_summary = summarize_output_line(clean)
                         if new_summary and new_summary != tracker.current:
                             tracker.update(new_summary)
                     if verbose:
@@ -331,7 +199,7 @@ def run_ai(
 
             while proc.poll() is None:
                 elapsed = time.monotonic() - start
-                if elapsed > _PHASE_TIMEOUT:
+                if elapsed > PHASE_TIMEOUT:
                     proc.kill()
                     proc.wait()
                     reader.join(timeout=5)
@@ -359,8 +227,8 @@ def run_ai(
                     display_label,
                     tracker.current,
                     elapsed=elapsed,
-                    spinner_frame=_spinner_frame(elapsed),
-                    spinner_style=_spinner_style(accent, elapsed),
+                    spinner_frame=spinner_frame(elapsed),
+                    spinner_style=spinner_style(accent, elapsed),
                     accent=accent,
                     detail=current_detail,
                     activities=current_activities,
@@ -390,7 +258,7 @@ def run_ai(
             )
         ]
         if last_line:
-            failure_lines.append(muted(_format_activity(last_line, limit=110)))
+            failure_lines.append(muted(format_activity(last_line, limit=110)))
         console.print(make_panel(grouped_lines(failure_lines), title="Execution", accent="plum"))
 
     if verbose:
@@ -468,7 +336,7 @@ def run_ai_parallel(
                 icon,
                 t.label,
                 t.backend,
-                subtle(_format_activity(t.summary)),
+                subtle(format_activity(t.summary)),
                 subtle(status),
             )
         return table
@@ -478,13 +346,13 @@ def run_ai_parallel(
             for raw_line in iter(pipe.readline, b""):
                 line = raw_line.decode("utf-8", errors="replace").rstrip("\n")
                 if line:
-                    clean = _sanitize_progress_line(line)
+                    clean = sanitize_progress_line(line)
                     if not clean:
                         continue
                     with lock:
                         trackers[label].lines.append(clean)
                         trackers[label].last_line = clean
-                        trackers[label].summary = _progress_summary_for_line(
+                        trackers[label].summary = progress_summary_for_line(
                             clean, trackers[label].summary
                         )
         except ValueError:
@@ -529,7 +397,7 @@ def run_ai_parallel(
 
         while proc.poll() is None:
             elapsed = time.monotonic() - start
-            if elapsed > _PHASE_TIMEOUT:
+            if elapsed > PHASE_TIMEOUT:
                 proc.kill()
                 proc.wait()
                 reader.join(timeout=5)

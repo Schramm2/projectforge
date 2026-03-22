@@ -7,10 +7,10 @@ from ubundiforge.runner import (
     ActivityTracker,
     _build_cmd,
     _initial_phase_summary,
-    _progress_summary_for_line,
     reset_project_dir,
     run_post_scaffold_hook,
 )
+from ubundiforge.subprocess_utils import progress_summary_for_line as _progress_summary_for_line
 
 
 def test_claude_cmd_basic():
