@@ -2,7 +2,7 @@
 
 Live roadmap for expanding Forge into a production-grade Ubundi project scaffolder. Organized by theme, not strict priority.
 
-Items marked with [DONE] are implemented in this repository as of `0.3.0`. Planned items are intentionally aspirational; example commands below describe direction, not guaranteed current CLI flags.
+Items marked with [DONE] are implemented in this repository as of `0.4.0`. Planned items are intentionally aspirational; example commands below describe direction, not guaranteed current CLI flags.
 
 ---
 
@@ -111,6 +111,7 @@ Items marked with [DONE] are implemented in this repository as of `0.3.0`. Plann
 - **Diff review**: Show a tree of created files with line counts before the AI starts writing, let the user approve.
 - **Retry with feedback**: If the scaffold is bad, `forge retry "the auth setup is wrong, use Clerk not NextAuth"` re-runs with the original prompt plus correction.
 - [DONE] **Multi-pass scaffolding**: Scaffold phases (architecture, frontend, tests, verify) run sequentially, each reviewing and building on the previous phase's output. The verify phase acts as a final QA pass.
+- [DONE] **Multi-agent orchestration**: `--agents` decomposes each phase into 2-6 focused subagent tasks with dependency-aware parallel execution, live activity feed, and automatic reconciliation. Selectable interactively via the "Execution mode" prompt.
 
 ---
 
@@ -183,7 +184,7 @@ Items marked with [DONE] are implemented in this repository as of `0.3.0`. Plann
 - [DONE] **Snapshot tests**: Store expected prompt outputs and diff against them on changes.
 - [DONE] **CI pipeline**: GitHub Actions running Ruff, the full pytest suite, package builds, and a `forge --dry-run` smoke check on pushes and PRs.
 - [DONE] **Mock backends**: Test the full flow without requiring actual AI CLIs installed.
-- [DONE] **201 tests**: Comprehensive test coverage across all modules — dashboard, activity feed, phase timeline, file tree, quality memory, preferences, analytics, evolutions, checks, card, sound, and scaffold log.
+- [DONE] **408 tests**: Comprehensive test coverage across all modules — dashboard, activity feed, phase timeline, file tree, quality memory, preferences, analytics, evolutions, checks, card, sound, scaffold log, protocol, subprocess utilities, adapters, and orchestration.
 
 ---
 
@@ -208,12 +209,14 @@ Steps to ship:
 
 ---
 
-## CLI Commands Summary (v0.3.0)
+## CLI Commands Summary (v0.4.0)
 
 | Command | Description |
 |---------|-------------|
 | `forge` | Interactive scaffold flow (default) |
+| `forge --agents` | Scaffold with multi-agent orchestration |
 | `forge stats` | Scaffold analytics dashboard |
 | `forge evolve [capability]` | Add capabilities to existing projects |
 | `forge check` | Convention drift detection |
 | `forge replay` | Reproduce past scaffolds |
+| `forge conventions` | Manage bundled convention bundles |

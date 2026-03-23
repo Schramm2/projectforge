@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-03-23
+
+### Added
+
+- **Multi-agent orchestration**: `--agents` flag (or interactive "Execution mode" prompt) decomposes each scaffold phase into 2-6 focused subagent tasks that run in parallel, with dependency-aware scheduling and automatic reconciliation between phases.
+- **Execution mode prompt**: Interactive questionnaire now asks users to choose between "Multi-agent" and "Standard" execution, shown in the review panel and editable before scaffolding.
+- **Subagent activity feed**: Live progress display showing per-task status transitions, task descriptions, and timing during multi-agent execution.
+- **Subagent results panel**: Post-phase summary showing completed/failed task counts with individual task timing.
+- **Protocol layer**: `protocol.py` defines the ForgeAgent contract, AgentTask, AgentResult, DecompositionPlan, and ProgressEvent data structures for orchestration.
+- **Backend adapters**: Claude Code, Gemini CLI, and Codex each have a dedicated adapter that handles prompt construction, planning prompt assembly, plan parsing, and command building.
+- **Subprocess utilities module**: Extracted reusable output processing (ANSI stripping, noise filtering, semantic summarization, spinner rendering) from `runner.py` into `subprocess_utils.py` for shared use by adapters.
+- **Per-subagent quality signals**: Quality tracking now records signals per subagent task, not just per phase.
+- **Bundled conventions system**: Convention registry, compiler, and admin command (`forge conventions`) for managing structured convention bundles with language-specific sources.
+
+### Changed
+
+- Verbose output now defaults to on for the main `forge` command (`--quiet` to suppress); `evolve` and `replay` retain the previous default.
+- `--agents/--no-agents` is now a tri-state flag so explicit `--no-agents` is not overridden by config.json settings.
+- Plan validation rejects decomposition plans where `execution_order` doesn't cover all task IDs, preventing silent task drops from malformed LLM output.
+- Dry-run planning (`--dry-run --agents`) uses a temporary directory when the project directory doesn't exist yet, producing a real decomposition preview instead of always falling back to single-task.
+- Subagent prompts now include the full phase brief so individual tasks have complete context (CI config, design templates, auth details, etc.) alongside their specific assignment.
+
+### Fixed
+
+- Activity feed labels now show human-readable task descriptions instead of raw task IDs.
+- Subagent summary replaced plain text output with a structured Rich panel.
+
 ## [0.3.0] - 2026-03-22
 
 ### Added
@@ -66,6 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pipx support for isolated global installs.
 - MIT license.
 
+[0.4.0]: https://github.com/matthewubundi/UbundiForge/releases/tag/v0.4.0
 [0.3.0]: https://github.com/matthewubundi/UbundiForge/releases/tag/v0.3.0
 [0.2.0]: https://github.com/matthewubundi/UbundiForge/releases/tag/v0.2.0
 [0.1.0]: https://github.com/matthewubundi/UbundiForge/releases/tag/v0.1.0

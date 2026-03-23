@@ -39,6 +39,7 @@ htmlcov/
 
 # Generated scaffold outputs
 projects/
+saas-dashboard/
 
 # User media collections (images, fonts, etc.)
 media/
