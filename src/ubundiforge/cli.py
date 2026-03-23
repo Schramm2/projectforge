@@ -1132,12 +1132,12 @@ def main(
         typer.Option("--setup", help="Run the setup wizard."),
     ] = False,
     agents: Annotated[
-        bool,
+        bool | None,
         typer.Option(
             "--agents/--no-agents",
             help="Enable multi-agent orchestration (higher quality, slower).",
         ),
-    ] = False,
+    ] = None,
     verbose: Annotated[
         bool,
         typer.Option("--verbose/--quiet", help="Show detailed execution info."),
@@ -1204,7 +1204,7 @@ def main(
             raise typer.Exit()
 
     forge_config = load_forge_config()
-    if not agents:
+    if agents is None:
         agents = forge_config.get("agents", False)
     backend_statuses = get_backend_statuses() if not prompt_only else {}
 
@@ -1535,14 +1535,18 @@ def main(
                 console.print(prompt)
 
         if dry_run and agents:
+            import tempfile
+
             from ubundiforge.adapters import get_adapter
             from ubundiforge.orchestrator import _get_plan, _render_decomposition_plan
 
+            # Use a temp dir for planning when project_dir doesn't exist yet
+            plan_cwd = project_dir if project_dir.exists() else Path(tempfile.mkdtemp())
             for phase, backend, prompt in phase_prompts:
                 adapter = get_adapter(backend, conventions)
                 effective_model = model or backend_models.get(backend)
                 plan = _get_plan(
-                    adapter, prompt, phase, answers["stack"], backend, project_dir, effective_model
+                    adapter, prompt, phase, answers["stack"], backend, plan_cwd, effective_model
                 )
                 _render_decomposition_plan(plan)
 

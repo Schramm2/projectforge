@@ -375,7 +375,7 @@ def _ask_execution_mode(answers: dict) -> None:
         "Execution mode",
         choices=[
             questionary.Choice(
-                "Multi-agent (recommended): dispatches parallel subagents per phase for higher quality",
+                "Multi-agent (recommended): parallel subagents per phase, higher quality",
                 value="agents",
             ),
             questionary.Choice(

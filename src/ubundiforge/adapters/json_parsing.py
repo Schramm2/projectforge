@@ -123,6 +123,15 @@ def validate_plan_schema(data: dict) -> bool:
         if not _TASK_KEYS.issubset(task.keys()):
             return False
 
+    # Every task ID must appear exactly once in execution_order
+    exec_order = data.get("execution_order")
+    if not isinstance(exec_order, list):
+        return False
+    scheduled_ids = [tid for group in exec_order for tid in group]
+    task_ids = {t["id"] for t in tasks}
+    if set(scheduled_ids) != task_ids:
+        return False
+
     return True
 
 
