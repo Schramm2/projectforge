@@ -259,7 +259,11 @@ def _get_plan(
                 continue
 
             if result.returncode != 0:
-                log.warning("Planning call returned %d (attempt %d)", result.returncode, attempt + 1)
+                log.warning(
+                    "Planning call returned %d (attempt %d)",
+                    result.returncode,
+                    attempt + 1,
+                )
                 continue
 
             parsed = adapter.parse_plan(result.stdout, phase=phase, backend=backend)
@@ -475,7 +479,8 @@ def _reconcile(
     if rc == 0:
         _console.print(ui.status_line(f"Reconciliation complete ({elapsed:.0f}s)", accent="aqua"))
     else:
-        _console.print(ui.status_line(f"Reconciliation had issues ({elapsed:.0f}s) — non-fatal", accent="amber"))
+        msg = f"Reconciliation had issues ({elapsed:.0f}s) — non-fatal"
+        _console.print(ui.status_line(msg, accent="amber"))
     return rc
 
 
