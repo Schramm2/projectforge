@@ -3,8 +3,8 @@ class Ubundiforge < Formula
 
   desc "Scaffold Ubundi-style projects with AI coding tools and shared conventions"
   homepage "https://github.com/matthewubundi/UbundiForge"
-  url "https://github.com/matthewubundi/UbundiForge/archive/refs/tags/v0.3.0.tar.gz"
-  sha256 "cc471b06eb0c99290d0abf30c36d60e800e68b40f7cb062579ff110ede174aef"
+  url "https://github.com/matthewubundi/UbundiForge/archive/refs/tags/v0.4.0.tar.gz"
+  sha256 "26eb6d6d6f3caa68fabf59f0dc5c2766b5371bce74438ddc6a4beed7ab1ec88b"
   license "MIT"
   head "https://github.com/matthewubundi/UbundiForge.git", branch: "main"
 
@@ -40,6 +40,11 @@ class Ubundiforge < Formula
   resource "pygments" do
     url "https://files.pythonhosted.org/packages/b0/77/a5b8c569bf593b0140bde72ea885a803b82086995367bf2037de0159d924/pygments-2.19.2.tar.gz"
     sha256 "636cb2477cec7f8952536970bc533bc43743542f70392ae026374600add5b887"
+  end
+
+  resource "pyyaml" do
+    url "https://files.pythonhosted.org/packages/05/8e/961c0007c59b8dd7729d542c61a4d537767a59645b82a0b521206e1e25c2/pyyaml-6.0.3.tar.gz"
+    sha256 "d76623373421df22fb4cf8817020cbb7ef15c725b9d5e45f17e189bfc384190f"
   end
 
   resource "questionary" do
