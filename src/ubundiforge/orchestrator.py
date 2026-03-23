@@ -543,7 +543,7 @@ def run_phase_orchestrated(
     stack: str,
     conventions: str = "",
     model: str | None = None,
-    verbose: bool = False,
+    verbose: bool = True,
     phase_context: str | None = None,
 ) -> tuple[int, dict]:
     """Main entry point for orchestrated phase execution.
@@ -553,6 +553,7 @@ def run_phase_orchestrated(
     ``planned``, ``completed``, ``failed``.
     """
     adapter = get_adapter(backend, conventions)
+    adapter.phase_brief = prompt
     plan = _get_plan(adapter, prompt, phase, stack, backend, project_dir, model)
 
     if len(plan.tasks) > 1:

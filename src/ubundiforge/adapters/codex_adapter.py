@@ -59,6 +59,9 @@ class CodexAdapter(CLIAdapterBase):
         if task.context:
             parts += [f"Context: {task.context}"]
 
+        if self.phase_brief:
+            parts += [f"Full phase brief (for reference — focus on your task above):\n{self.phase_brief}"]
+
         parts += [
             "Rules: Only modify your files. Follow conventions. Don't overwrite previous work.",
         ]

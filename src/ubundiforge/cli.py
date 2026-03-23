@@ -250,7 +250,7 @@ def _render_phase_failure(backend: str, label: str, returncode: int) -> None:
     """Render helpful follow-up guidance when a scaffold phase fails."""
     lines: list[Text] = [
         subtle(f"{label} failed with {backend} (exit {returncode})."),
-        subtle("Re-run with --verbose for full subprocess output."),
+        subtle("Re-run with --quiet to suppress subprocess output."),
         subtle("Use --dry-run to inspect the assembled prompt before trying again."),
         muted("You can also force a different backend with --use if another one is ready."),
     ]
@@ -1140,8 +1140,8 @@ def main(
     ] = False,
     verbose: Annotated[
         bool,
-        typer.Option("--verbose", help="Show detailed execution info."),
-    ] = False,
+        typer.Option("--verbose/--quiet", help="Show detailed execution info."),
+    ] = True,
     open_editor: Annotated[
         bool,
         typer.Option("--open/--no-open", help="Open project in editor after scaffolding."),
@@ -1326,6 +1326,9 @@ def main(
         answers = collect_answers(
             docker_available=forge_config.get("docker_available", True),
         )
+        # Interactive flow: answers dict includes execution mode choice
+        if answers.get("agents"):
+            agents = True
 
     # --- Multi-backend phase routing ---
     available_backends = (

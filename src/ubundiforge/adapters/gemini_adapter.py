@@ -56,6 +56,13 @@ class GeminiAdapter(CLIAdapterBase):
                 f"Context from completed work: {task.context}",
             ]
 
+        if self.phase_brief:
+            parts += [
+                "",
+                "Full phase brief (for reference — focus on your assignment above):",
+                self.phase_brief,
+            ]
+
         parts += [
             "",
             "Rules:",

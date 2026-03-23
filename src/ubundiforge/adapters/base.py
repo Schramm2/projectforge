@@ -25,6 +25,7 @@ class CLIAdapterBase:
 
     def __init__(self, conventions: str = "") -> None:
         self.conventions = conventions
+        self.phase_brief: str = ""  # Full phase prompt — set by orchestrator
 
     # ------------------------------------------------------------------
     # ForgeAgent.execute

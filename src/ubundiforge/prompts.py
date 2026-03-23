@@ -367,6 +367,29 @@ def _ask_demo_mode(answers: dict) -> None:
     answers["demo_mode"] = demo_mode
 
 
+def _ask_execution_mode(answers: dict) -> None:
+    """Collect or edit execution mode preference."""
+    current = answers.get("agents", False)
+    default_value = "agents" if current else "standard"
+    mode = prompt_select(
+        "Execution mode",
+        choices=[
+            questionary.Choice(
+                "Multi-agent (recommended): dispatches parallel subagents per phase for higher quality",
+                value="agents",
+            ),
+            questionary.Choice(
+                "Standard: single sequential execution, faster but less thorough",
+                value="standard",
+            ),
+        ],
+        default=default_value,
+    ).ask()
+    if mode is None:
+        raise SystemExit(0)
+    answers["agents"] = mode == "agents"
+
+
 def _ci_summary(ci: dict) -> str:
     """Return a compact summary of the selected CI configuration."""
     if not ci.get("include"):
@@ -408,6 +431,7 @@ def _review_answers(answers: dict) -> str:
                     subtle(f"Services: {services}"),
                     subtle(f"CI: {_ci_summary(answers.get('ci', {}))}"),
                     subtle(f"Demo mode: {'Yes' if answers.get('demo_mode') else 'No'}"),
+                    subtle(f"Execution: {'Multi-agent' if answers.get('agents') else 'Standard'}"),
                     muted(f"Extra instructions: {extra_summary or 'None'}"),
                 ]
             ),
@@ -424,6 +448,7 @@ def _review_answers(answers: dict) -> str:
             questionary.Choice("Edit design and media", value="appearance"),
             questionary.Choice("Edit auth, services, CI, and extras", value="integrations"),
             questionary.Choice("Edit demo mode", value="demo"),
+            questionary.Choice("Edit execution mode", value="execution"),
             questionary.Choice("Cancel", value="cancel"),
         ],
         default="scaffold",
@@ -450,6 +475,7 @@ def collect_answers(docker_available: bool = True) -> dict:
         "ci": {"include": False, "mode": None, "actions": []},
         "extra": "",
         "demo_mode": True,
+        "agents": False,
     }
 
     _ask_project_basics(answers, docker_available=docker_available)
@@ -498,10 +524,12 @@ def collect_answers(docker_available: bool = True) -> dict:
             _ask_design_and_media(answers)
             _ask_customizations(answers)
             _ask_demo_mode(answers)
+            _ask_execution_mode(answers)
     else:
         _ask_design_and_media(answers)
         _ask_customizations(answers)
         _ask_demo_mode(answers)
+        _ask_execution_mode(answers)
 
     while True:
         action = _review_answers(answers)
@@ -518,5 +546,8 @@ def collect_answers(docker_available: bool = True) -> dict:
             continue
         if action == "demo":
             _ask_demo_mode(answers)
+            continue
+        if action == "execution":
+            _ask_execution_mode(answers)
             continue
         raise SystemExit(0)
