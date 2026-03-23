@@ -83,6 +83,7 @@ def render_dashboard(
     project_dir: Path,
     verify_report: VerifyReport | None,
     elapsed: float,
+    agent_stats: dict | None = None,
 ) -> None:
     """Render the post-scaffold project report card."""
     name = answers.get("name", "project")
@@ -148,6 +149,19 @@ def render_dashboard(
         summary.append(" deps", style=TEXT_MUTED)
     console.print(summary)
     console.print()
+
+    # --- Agent tasks (only when orchestrated agents were used) ---
+    if agent_stats is not None:
+        console.print(muted("  AGENT TASKS"))
+        agent_line = Text("  ")
+        agent_line.append(str(agent_stats.get("planned", 0)), style=f"bold {ACCENTS['amber']}")
+        agent_line.append(" planned  ", style=TEXT_MUTED)
+        agent_line.append(str(agent_stats.get("completed", 0)), style=f"bold {ACCENTS['aqua']}")
+        agent_line.append(" completed  ", style=TEXT_MUTED)
+        agent_line.append(str(agent_stats.get("failed", 0)), style=f"bold {ACCENTS['plum']}")
+        agent_line.append(" failed", style=TEXT_MUTED)
+        console.print(agent_line)
+        console.print()
 
     # --- Next steps ---
     from ubundiforge.stacks import STACK_META

@@ -190,8 +190,7 @@ def render_bundle_preview(registry: ConventionRegistry, stack: str | None) -> Re
         excerpt = ["(empty bundle)"]
 
     excerpt_lines = [
-        Text(line, style="bold") if index == 0 else line
-        for index, line in enumerate(excerpt)
+        Text(line, style="bold") if index == 0 else line for index, line in enumerate(excerpt)
     ]
     preview_panel = make_panel(
         grouped_lines(excerpt_lines),

@@ -250,7 +250,7 @@ def _render_phase_failure(backend: str, label: str, returncode: int) -> None:
     """Render helpful follow-up guidance when a scaffold phase fails."""
     lines: list[Text] = [
         subtle(f"{label} failed with {backend} (exit {returncode})."),
-        subtle("Re-run with --verbose for full subprocess output."),
+        subtle("Re-run with --quiet to suppress subprocess output."),
         subtle("Use --dry-run to inspect the assembled prompt before trying again."),
         muted("You can also force a different backend with --use if another one is ready."),
     ]
@@ -875,9 +875,7 @@ def replay(
                 try:
                     conventions, conv_warnings = load_bundled_conventions()
                 except ConventionValidationError as fallback_exc:
-                    console.print(
-                        status_line(f"Conventions error: {fallback_exc}", accent="amber")
-                    )
+                    console.print(status_line(f"Conventions error: {fallback_exc}", accent="amber"))
                     raise typer.Exit(1) from fallback_exc
             else:
                 console.print(status_line(f"Conventions error: {exc}", accent="amber"))
@@ -1133,10 +1131,17 @@ def main(
         bool,
         typer.Option("--setup", help="Run the setup wizard."),
     ] = False,
+    agents: Annotated[
+        bool | None,
+        typer.Option(
+            "--agents/--no-agents",
+            help="Enable multi-agent orchestration (higher quality, slower).",
+        ),
+    ] = None,
     verbose: Annotated[
         bool,
-        typer.Option("--verbose", help="Show detailed execution info."),
-    ] = False,
+        typer.Option("--verbose/--quiet", help="Show detailed execution info."),
+    ] = True,
     open_editor: Annotated[
         bool,
         typer.Option("--open/--no-open", help="Open project in editor after scaffolding."),
@@ -1199,6 +1204,8 @@ def main(
             raise typer.Exit()
 
     forge_config = load_forge_config()
+    if agents is None:
+        agents = forge_config.get("agents", False)
     backend_statuses = get_backend_statuses() if not prompt_only else {}
 
     if use and use not in SUPPORTED_BACKENDS:
@@ -1319,6 +1326,9 @@ def main(
         answers = collect_answers(
             docker_available=forge_config.get("docker_available", True),
         )
+        # Interactive flow: answers dict includes execution mode choice
+        if answers.get("agents"):
+            agents = True
 
     # --- Multi-backend phase routing ---
     available_backends = (
@@ -1524,6 +1534,22 @@ def main(
                     )
                 console.print(prompt)
 
+        if dry_run and agents:
+            import tempfile
+
+            from ubundiforge.adapters import get_adapter
+            from ubundiforge.orchestrator import _get_plan, _render_decomposition_plan
+
+            # Use a temp dir for planning when project_dir doesn't exist yet
+            plan_cwd = project_dir if project_dir.exists() else Path(tempfile.mkdtemp())
+            for phase, backend, prompt in phase_prompts:
+                adapter = get_adapter(backend, conventions)
+                effective_model = model or backend_models.get(backend)
+                plan = _get_plan(
+                    adapter, prompt, phase, answers["stack"], backend, plan_cwd, effective_model
+                )
+                _render_decomposition_plan(plan)
+
         if export:
             export_path = Path(export)
             parts = []
@@ -1585,6 +1611,10 @@ def main(
             }
         )
 
+    # Accumulated agent task stats across all orchestrated phases (agents mode only)
+    _agent_stats: dict = {"planned": 0, "completed": 0, "failed": 0}
+    _any_orchestrated = False
+
     # --- Execute phases: serial first, parallel middle, serial last ---
     total_phases = len(phase_backends)
     step = 1
@@ -1601,15 +1631,32 @@ def main(
         phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
         phase_context[phase_idx]["status"] = "active"
         phase_start = time.monotonic()
-        returncode = run_ai(
-            backend,
-            phase_prompt,
-            project_dir,
-            model=effective_model,
-            verbose=verbose,
-            label=label,
-            phase_context=phase_context,
-        )
+        if agents:
+            from ubundiforge.orchestrator import run_phase_orchestrated
+
+            returncode, _phase_stats = run_phase_orchestrated(
+                phase=phase,
+                backend=backend,
+                prompt=phase_prompt,
+                project_dir=project_dir,
+                stack=answers["stack"],
+                conventions=conventions,
+                model=effective_model,
+                verbose=verbose,
+            )
+            _any_orchestrated = True
+            for key in ("planned", "completed", "failed"):
+                _agent_stats[key] += _phase_stats.get(key, 0)
+        else:
+            returncode = run_ai(
+                backend,
+                phase_prompt,
+                project_dir,
+                model=effective_model,
+                verbose=verbose,
+                label=label,
+                phase_context=phase_context,
+            )
         phase_context[phase_idx]["status"] = "completed"
         phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
         if returncode != 0:
@@ -1621,7 +1668,45 @@ def main(
 
     # Step 2: Run middle phases (parallel if multiple, serial if single)
     if parallel_middle:
-        if can_parallel:
+        if agents:
+            # Orchestrator handles its own internal parallelism — run sequentially here
+            from ubundiforge.orchestrator import run_phase_orchestrated
+
+            for phase, backend in parallel_middle:
+                label = PHASE_LABELS.get(phase, phase)
+                console.print()
+                console.print(
+                    make_step_panel(
+                        step, total_phases, label, detail=f"backend: {backend}", accent="violet"
+                    )
+                )
+                phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
+                effective_model = model or backend_models.get(backend)
+                phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
+                phase_context[phase_idx]["status"] = "active"
+                phase_start = time.monotonic()
+                returncode, _phase_stats = run_phase_orchestrated(
+                    phase=phase,
+                    backend=backend,
+                    prompt=phase_prompt,
+                    project_dir=project_dir,
+                    stack=answers["stack"],
+                    conventions=conventions,
+                    model=effective_model,
+                    verbose=verbose,
+                )
+                _any_orchestrated = True
+                for key in ("planned", "completed", "failed"):
+                    _agent_stats[key] += _phase_stats.get(key, 0)
+                phase_context[phase_idx]["status"] = "completed"
+                phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
+                if returncode != 0:
+                    _render_phase_failure(backend, label, returncode)
+                    raise typer.Exit(returncode)
+                console.print()
+                console.print(make_file_tree(project_dir))
+                step += 1
+        elif can_parallel:
             labels = " + ".join(f"{PHASE_LABELS.get(p, p)} ({b})" for p, b in parallel_middle)
             console.print()
             console.print(
@@ -1699,15 +1784,32 @@ def main(
         phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
         phase_context[phase_idx]["status"] = "active"
         phase_start = time.monotonic()
-        returncode = run_ai(
-            backend,
-            phase_prompt,
-            project_dir,
-            model=effective_model,
-            verbose=verbose,
-            label=label,
-            phase_context=phase_context,
-        )
+        if agents:
+            from ubundiforge.orchestrator import run_phase_orchestrated
+
+            returncode, _phase_stats = run_phase_orchestrated(
+                phase=phase,
+                backend=backend,
+                prompt=phase_prompt,
+                project_dir=project_dir,
+                stack=answers["stack"],
+                conventions=conventions,
+                model=effective_model,
+                verbose=verbose,
+            )
+            _any_orchestrated = True
+            for key in ("planned", "completed", "failed"):
+                _agent_stats[key] += _phase_stats.get(key, 0)
+        else:
+            returncode = run_ai(
+                backend,
+                phase_prompt,
+                project_dir,
+                model=effective_model,
+                verbose=verbose,
+                label=label,
+                phase_context=phase_context,
+            )
         phase_context[phase_idx]["status"] = "completed"
         phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
         if returncode != 0:
@@ -1751,6 +1853,7 @@ def main(
         project_dir=project_dir,
         verify_report=verify_report,
         elapsed=elapsed,
+        agent_stats=_agent_stats if _any_orchestrated else None,
     )
 
     scaffold_date = datetime.now(UTC).strftime("%Y-%m-%d")

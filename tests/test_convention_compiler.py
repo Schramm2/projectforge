@@ -119,6 +119,8 @@ def test_compile_bundle_merges_layers_in_deterministic_order(sample_tree: Path) 
     assert bundle.bundle_id == "fastapi"
     assert bundle.sources == expected_sources
     assert bundle.prompt_block == expected_prompt_block
+
+
 def test_compile_bundle_dedupes_cross_layer_overlaps_deterministically(
     tmp_path: Path,
 ) -> None:
