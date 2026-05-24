@@ -16,6 +16,7 @@ Current product truth lives in `guides/`, `maintainers/`, and the code under `sr
 - [maintainers/admin-playbook.md](maintainers/admin-playbook.md) — repo maintenance, stack changes, and release flow
 - [maintainers/adding-a-stack.md](maintainers/adding-a-stack.md) — concrete implementation checklist for new stacks
 - [maintainers/homebrew-release.md](maintainers/homebrew-release.md) — formula and tap release notes
+- [maintainers/public-release-checklist.md](maintainers/public-release-checklist.md) — final public identity and privacy checklist
 - [maintainers/roadmap.md](maintainers/roadmap.md) — product roadmap and future work
 
 ## Reference

@@ -1179,7 +1179,7 @@ def main(
     )
 
     if version:
-        console.print(f"ubundiforge {__version__}")
+        console.print(f"projectforge {__version__}")
         raise typer.Exit()
 
     print_logo(console)
