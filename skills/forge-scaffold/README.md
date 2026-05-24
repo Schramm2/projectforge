@@ -1,12 +1,12 @@
 # Forge Scaffolding Assistant - Usage Guide
 
-Portable skill for AI agents that need to use Forge professionally. Updated for v0.3.0.
+Portable skill for AI agents that need to use Forge professionally. Updated for v0.4.0.
 
 ## Requirements
 
 - Access to this repository
 - Python 3.12+
-- `brew install ubundiforge` (Homebrew) or `uv sync --dev` (repo-local)
+- `brew install projectforge` (Homebrew) or `uv sync --dev` (repo-local)
 - At least one installed AI backend CLI:
   - `claude`
   - `gemini`
@@ -31,8 +31,8 @@ At minimum, the agent should read:
 **Homebrew (recommended):**
 
 ```bash
-brew tap matthewubundi/tap
-brew install ubundiforge
+brew tap your-org/tap
+brew install projectforge
 forge --version
 ```
 
@@ -95,7 +95,7 @@ This detects installed backends, lets you choose default models, and writes Forg
 ## Troubleshooting
 
 **`forge` command not found**
-- Install via Homebrew: `brew tap matthewubundi/tap && brew install ubundiforge`
+- Install via Homebrew: `brew tap your-org/tap && brew install projectforge`
 - Or use repo-local: `uv sync --dev && ./forge --version`
 
 **Forge says no AI backend is installed**
@@ -123,4 +123,4 @@ This detects installed backends, lets you choose default models, and writes Forg
 
 ## Privacy & Support
 
-**Data processing:** Forge sends the scaffold brief and related context to the chosen AI CLI. Quality signals and preferences are stored locally under `~/.forge/`. **User controls:** Inspect prompts with `--dry-run` or `--export`, keep `--demo` enabled for secret-free startup, and review `.forge/scaffold.json` for provenance. **Support:** Repository: UbundiForge.
+**Data processing:** Forge sends the scaffold brief and related context to the chosen AI CLI. Quality signals and preferences are stored locally under `~/.forge/`. **User controls:** Inspect prompts with `--dry-run` or `--export`, keep `--demo` enabled for secret-free startup, and review `.forge/scaffold.json` for provenance. **Support:** Repository: ProjectForge.

@@ -18,7 +18,7 @@ class StackMeta:
 
 # Cross-recipe defaults injected into every prompt
 CROSS_RECIPE_DEFAULTS = """\
-CROSS-PROJECT STANDARDS (apply to all Ubundi projects):
+CROSS-PROJECT STANDARDS (apply to all projects):
 
 Python projects:
 - pyproject.toml with hatchling build system

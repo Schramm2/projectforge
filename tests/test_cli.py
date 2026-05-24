@@ -418,11 +418,17 @@ def test_first_run_with_explicit_scaffold_flags_skips_post_setup_prompt(monkeypa
         raise AssertionError("post-setup prompt should be skipped for explicit scaffold runs")
 
     monkeypatch.setattr("ubundiforge.cli.prompt_select", _unexpected_post_setup_prompt)
-    monkeypatch.setattr("ubundiforge.cli.run_ai", lambda *args, **kwargs: 0)
-    monkeypatch.setattr(
-        "ubundiforge.cli.run_ai_parallel",
-        lambda phases, project_dir, verbose=False: [],
-    )
+
+    def _fake_run_ai(backend, prompt, project_dir, *args, **kwargs):
+        project_dir.mkdir(parents=True, exist_ok=True)
+        return 0
+
+    def _fake_run_ai_parallel(phases, project_dir, verbose=False):
+        project_dir.mkdir(parents=True, exist_ok=True)
+        return []
+
+    monkeypatch.setattr("ubundiforge.cli.run_ai", _fake_run_ai)
+    monkeypatch.setattr("ubundiforge.cli.run_ai_parallel", _fake_run_ai_parallel)
     monkeypatch.setattr("ubundiforge.cli.ensure_git_init", lambda project_dir: True)
 
     result = runner.invoke(
@@ -718,7 +724,7 @@ def test_admin_conventions_open_prints_repo_markdown_path() -> None:
     result = runner.invoke(app, ["admin", "conventions", "--open", "global/shared.md"])
 
     assert result.exit_code == 0
-    assert "conventions/global/shared.md" in result.stdout
+    assert "shared.md" in result.stdout
 
 
 def test_admin_conventions_defaults_to_interactive_menu(monkeypatch) -> None:

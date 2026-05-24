@@ -8,13 +8,13 @@ from pathlib import Path
 
 from ubundiforge import __version__
 
-FORMULA_NAME = "ubundiforge"
-DEFAULT_HOMEPAGE = "https://github.com/matthewubundi/UbundiForge"
-DEFAULT_REPOSITORY = "https://github.com/matthewubundi/UbundiForge"
+FORMULA_NAME = "projectforge"
+DEFAULT_HOMEPAGE = "https://github.com/your-org/projectforge"
+DEFAULT_REPOSITORY = "https://github.com/your-org/projectforge"
 DEFAULT_SOURCE_URL = f"{DEFAULT_REPOSITORY}/archive/refs/tags/v{__version__}.tar.gz"
 DEFAULT_SOURCE_SHA256 = "REPLACE_WITH_RELEASE_TARBALL_SHA256"
 DEFAULT_PYTHON_FORMULA = "python@3.13"
-PROJECT_DESCRIPTION = "Scaffold Ubundi-style projects with AI coding tools and shared conventions"
+PROJECT_DESCRIPTION = "Scaffold projects with AI coding tools and shared conventions"
 
 
 @dataclass(frozen=True)
@@ -105,7 +105,7 @@ def render_homebrew_formula(
         for resource in resources
     )
 
-    return f'''class Ubundiforge < Formula
+    return f'''class Projectforge < Formula
   include Language::Python::Virtualenv
 
   desc "{PROJECT_DESCRIPTION}"

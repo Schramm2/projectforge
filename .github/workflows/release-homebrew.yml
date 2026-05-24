@@ -29,7 +29,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO || 'matthewubundi/homebrew-tap' }}
+      TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO || 'your-org/homebrew-forge' }}
       TAP_BRANCH: ${{ vars.HOMEBREW_TAP_BRANCH || 'main' }}
 
     steps:
@@ -140,7 +140,7 @@ jobs:
           repository: ${{ env.TAP_REPO }}
           ref: ${{ env.TAP_BRANCH }}
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          path: homebrew-tap
+          path: tap-checkout
 
       - name: Run tests
         if: steps.mode.outputs.run_checks == 'true'
@@ -187,8 +187,8 @@ jobs:
         id: checksum
         run: |
           source_url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${{ steps.meta.outputs.tag }}.tar.gz"
-          curl -fsSL "$source_url" -o /tmp/ubundiforge-release.tar.gz
-          source_sha256="$(sha256sum /tmp/ubundiforge-release.tar.gz | awk '{print $1}')"
+          curl -fsSL "$source_url" -o /tmp/projectforge-release.tar.gz
+          source_sha256="$(sha256sum /tmp/projectforge-release.tar.gz | awk '{print $1}')"
           echo "source_url=$source_url" >> "$GITHUB_OUTPUT"
           echo "source_sha256=$source_sha256" >> "$GITHUB_OUTPUT"
 
@@ -196,6 +196,7 @@ jobs:
         if: steps.mode.outputs.sync_formula == 'true'
         run: |
           uv run python scripts/generate_homebrew_formula.py \
+            --output Formula/projectforge.rb \
             --source-url "${{ steps.checksum.outputs.source_url }}" \
             --source-sha256 "${{ steps.checksum.outputs.source_sha256 }}"
 
@@ -204,7 +205,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Formula/ubundiforge.rb
+          git add Formula/projectforge.rb
           if git diff --cached --quiet; then
             echo "Formula already up to date in main repo."
             exit 0
@@ -215,16 +216,16 @@ jobs:
       - name: Sync formula into Homebrew tap
         if: steps.mode.outputs.sync_formula == 'true'
         run: |
-          mkdir -p homebrew-tap/Formula
-          cp Formula/ubundiforge.rb homebrew-tap/Formula/ubundiforge.rb
+          mkdir -p tap-checkout/Formula
+          cp Formula/projectforge.rb tap-checkout/Formula/projectforge.rb
 
       - name: Commit and push Homebrew tap update
         if: steps.mode.outputs.sync_formula == 'true'
         run: |
-          cd homebrew-tap
+          cd tap-checkout
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Formula/ubundiforge.rb
+          git add Formula/projectforge.rb
           if git diff --cached --quiet; then
             echo "Homebrew tap already up to date."
             exit 0

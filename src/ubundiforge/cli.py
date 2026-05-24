@@ -1,4 +1,4 @@
-"""UbundiForge CLI — entry point."""
+"""ProjectForge CLI — entry point."""
 
 import re
 import time
@@ -730,7 +730,7 @@ def check(
         typer.Option("--export", help="Export the report to a markdown file."),
     ] = None,
 ) -> None:
-    """Audit a project against Ubundi conventions."""
+    """Audit a project against organization conventions."""
     project_dir = Path.cwd()
     stack = detect_stack(project_dir)
 
@@ -1155,7 +1155,7 @@ def main(
         typer.Option("--export", help="Export assembled prompt to a file."),
     ] = None,
 ) -> None:
-    """UbundiForge — Ubundi Project Scaffolder. Scaffold projects with AI + your conventions."""
+    """ProjectForge — Project Scaffolder. Scaffold projects with AI + organization conventions."""
     if ctx.invoked_subcommand is not None:
         return
 

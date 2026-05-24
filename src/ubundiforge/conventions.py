@@ -68,7 +68,7 @@ def _compose_text(root: Path, relative_paths: list[str]) -> str:
     content = "\n\n".join(part for part in parts if part)
     if content:
         return content
-    return "# Ubundi Project Conventions\n\nFollow the bundled conventions."
+    return "# Default Project Conventions\n\nFollow the bundled conventions."
 
 
 LEGACY_DEFAULT_CONVENTIONS = _compose_text(

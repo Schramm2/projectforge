@@ -1,7 +1,7 @@
 ## Brand & Styling (Frontend Projects)
 
 - Use Tailwind CSS for all styling
-- Ubundi brand palette:
+- Default design theme palette:
   - Backgrounds: dark blue-grey (#1A2332 to #2A3444)
   - Accents: cyan-teal (#0FA5A5, #0CC5C5)
   - Text: white on dark backgrounds

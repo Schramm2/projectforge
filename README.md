@@ -1,31 +1,24 @@
-<p align="center">
-  <img src="assets/hero-banner.png" alt="UbundiForge" width="100%">
-</p>
+# ProjectForge
 
-<h1 align="center">UbundiForge</h1>
+**AI-powered project scaffolding with your team's conventions baked in.**
 
-<p align="center">
-  <strong>AI-powered project scaffolding with your team's conventions baked in.</strong>
-</p>
-
-<p align="center">
-  <a href="https://github.com/matthewubundi/UbundiForge/actions/workflows/ci.yml"><img src="https://github.com/matthewubundi/UbundiForge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
-  <a href="https://github.com/matthewubundi/UbundiForge/releases/latest"><img src="https://img.shields.io/github/v/release/matthewubundi/UbundiForge" alt="Latest release"></a>
-  <a href="https://github.com/matthewubundi/UbundiForge/blob/main/LICENSE"><img src="https://img.shields.io/github/license/matthewubundi/UbundiForge" alt="License"></a>
-  <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
-</p>
-
-<p align="center">
-  <a href="#installation">Installation</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="#quick-start">Quick Start</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="#supported-stacks">Stacks</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="docs/README.md">Docs</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="CHANGELOG.md">Changelog</a>
-</p>
+[![CI status](https://github.com/your-org/projectforge/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/your-org/projectforge/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/your-org/projectforge)](https://github.com/your-org/projectforge/releases/latest)
+[![License](https://img.shields.io/license/your-org/projectforge)](https://github.com/your-org/projectforge/blob/main/LICENSE)
+![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB)
 
 ---
 
-UbundiForge is a CLI that collects a few project details, picks the best AI backend, assembles a structured prompt with your conventions, and hands off generation to **Claude Code**, **Gemini CLI**, or **Codex**. You get a production-ready project directory in minutes instead of hours.
+ProjectForge is a CLI that collects project details, picks the best AI backend, assembles a structured prompt with your team's conventions, and routes generation through installed AI coding CLIs. You get a production-ready project directory in minutes instead of hours.
 
-<p align="center">
-  <img src="assets/product-showcase.png" alt="UbundiForge product showcase" width="100%">
-</p>
+ProjectForge helps you:
+- Collect project requirements interactively,
+- Inject team and workspace conventions,
+- Route generation through installed AI coding CLIs like **Claude Code**, **Gemini CLI**, or **Codex**,
+- Inspect assembled prompts via dry runs,
+- Audit project structures with convention drift detection,
+- Maintain local preferences and logs under `~/.forge`,
+- Scaffold demo apps without requiring real credentials or secrets.
 
 ## Features
 
@@ -41,7 +34,7 @@ UbundiForge is a CLI that collects a few project details, picks the best AI back
 - **Scaffold replay** -- `forge replay --diff` reproduces past scaffolds and detects drift
 - **Secret scanning** -- checks user input for leaked credentials before passing to AI
 - **Post-scaffold automation** -- manifest, git init, verification, hooks, Forge card, editor launch
-- **Design templates** -- selectable brand guides for frontend-capable scaffolds
+- **Design templates** -- selectable visual style guides for frontend-capable scaffolds
 - **Shell completion** -- tab completion for all flags and options
 
 ## Supported Stacks
@@ -71,15 +64,15 @@ See [docs/guides/stacks.md](docs/guides/stacks.md) for detailed structure, libra
 ### Homebrew (macOS)
 
 ```bash
-brew tap matthewubundi/tap
-brew install ubundiforge
+brew tap your-org/tap
+brew install projectforge
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/matthewubundi/UbundiForge.git
-cd UbundiForge
+git clone https://github.com/your-org/projectforge.git
+cd projectforge
 uv sync --dev
 ```
 
@@ -99,15 +92,7 @@ forge
 
 Forge walks you through the scaffold interactively, then shows a review screen before anything is generated.
 
-<p align="center">
-  <img src="assets/forge-interactive.png" alt="Forge interactive questionnaire and review screen" width="100%">
-</p>
-
 Once confirmed, Forge routes each phase to the best available backend and runs them with a live progress display.
-
-<p align="center">
-  <img src="assets/forge-execution.png" alt="Forge multi-phase execution and verification" width="100%">
-</p>
 
 ### Non-interactive mode
 
@@ -137,27 +122,6 @@ forge --use gemini --model flash
 On first run, Forge launches a setup wizard that checks backend readiness, editor preference, git setup, Docker availability, and project-directory defaults, then saves your preferences to `~/.forge/config.json`.
 
 After setup, Forge gives you a clean handoff -- create a project now, review setup again, or exit and come back later.
-
-<details>
-<summary>Testing a pristine first-run wizard</summary>
-
-Temporarily move `~/.forge` out of the way instead of changing `HOME`:
-
-```bash
-mv ~/.forge ~/.forge.backup-$(date +%Y%m%d-%H%M%S)
-forge
-```
-
-After testing, restore your original config:
-
-```bash
-rm -rf ~/.forge
-mv ~/.forge.backup-YYYYMMDD-HHMMSS ~/.forge
-```
-
-Using `HOME="$(mktemp -d)"` can hide authentication files used by AI CLIs, causing scaffolding to fail even when the CLIs are installed.
-
-</details>
 
 ## Configuration
 
@@ -229,7 +193,7 @@ Or if using Claude Code with a CLAUDE.md, reference it:
 For project scaffolding, read skills/forge-scaffold/SKILL.md
 ```
 
-The agent gets full context on all five commands, all seven stacks, smart defaults, quality routing, and the complete scaffold lifecycle -- so it can turn a rough product brief into a high-quality Forge run without guessing.
+The agent gets full context on all commands, all stacks, smart defaults, quality routing, and the complete scaffold lifecycle -- so it can turn a rough product brief into a high-quality Forge run without guessing.
 
 ## CLI Reference
 
@@ -287,7 +251,7 @@ Forge learns from every scaffold you run:
 
 ## Convention Auditing
 
-Run `forge check` in any project to audit it against Ubundi conventions:
+Run `forge check` in any project to audit it against team conventions:
 
 ```bash
 forge check              # pass/warn/fail scorecard
@@ -333,10 +297,6 @@ Replay uses `.forge/scaffold.json` and `.forge/conventions-snapshot.md` (saved a
 
 ## How It Works
 
-<p align="center">
-  <img src="assets/forge-flow.png" alt="UbundiForge scaffolding flow" width="100%">
-</p>
-
 1. **Setup** -- First-run wizard detects backends, checks readiness, saves defaults.
 2. **Collect** -- Interactive flow or CLI flags gather project details. Smart defaults pre-fill repeat choices.
 3. **Review** -- Edit selections before generation starts.
@@ -349,7 +309,7 @@ Replay uses `.forge/scaffold.json` and `.forge/conventions-snapshot.md` (saved a
 
 | Guide | Description |
 |-------|-------------|
-| [Docs Home](docs/README.md) | Map of user, maintainer, internal, and reference docs |
+| [Docs Home](docs/README.md) | Map of user, maintainer, and reference docs |
 | [Getting Started](docs/guides/getting-started.md) | Installation, first run, first scaffold |
 | [Configuration](docs/guides/configuration.md) | Config files, conventions, hooks, media assets |
 | [Stacks](docs/guides/stacks.md) | Detailed reference for every supported stack |

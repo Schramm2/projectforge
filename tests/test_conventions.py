@@ -83,7 +83,7 @@ def test_missing_conventions_creates_default(tmp_path, monkeypatch):
     assert not conv_path.exists()
     content, warnings = load_conventions()
     assert conv_path.exists()
-    assert "Ubundi" in content
+    assert "Default" in content
     assert any("created" in w.lower() for w in warnings)
 
 

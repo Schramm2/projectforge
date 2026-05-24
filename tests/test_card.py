@@ -9,7 +9,7 @@ from ubundiforge.card import generate_badge_svg, generate_card_svg, inject_badge
 def test_generate_badge_svg():
     svg = generate_badge_svg()
     assert svg.startswith("<svg")
-    assert "UbundiForge" in svg
+    assert "ProjectForge" in svg
     assert "</svg>" in svg
 
 
@@ -28,7 +28,7 @@ def test_inject_badge_into_readme(tmp_path: Path):
     readme.write_text("# My Project\n\nSome description.\n")
     inject_badge_into_readme(tmp_path)
     content = readme.read_text()
-    assert "UbundiForge" in content
+    assert "ProjectForge" in content
     assert "# My Project" in content  # heading preserved
 
 
@@ -43,4 +43,4 @@ def test_inject_badge_idempotent(tmp_path: Path):
     inject_badge_into_readme(tmp_path)
     inject_badge_into_readme(tmp_path)
     content = readme.read_text()
-    assert content.count("UbundiForge") == 1  # not duplicated
+    assert content.count("ProjectForge") == 1  # not duplicated

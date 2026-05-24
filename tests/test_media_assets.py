@@ -118,8 +118,8 @@ def test_copy_assets_skips_oversized_files(tmp_path: Path) -> None:
 def test_list_collections_finds_subdirectories(tmp_path: Path, monkeypatch: object) -> None:
     monkeypatch.setattr("ubundiforge.media_assets.MEDIA_DIR", tmp_path)
 
-    _create_file(tmp_path / "ubundi" / "logo.svg", b"<svg/>")
-    _create_file(tmp_path / "ubundi" / "hero.png", b"png")
+    _create_file(tmp_path / "default_assets" / "logo.svg", b"<svg/>")
+    _create_file(tmp_path / "default_assets" / "hero.png", b"png")
     _create_file(tmp_path / "client-x" / "banner.jpg", b"jpg")
     # Hidden dir should be skipped
     _create_file(tmp_path / ".hidden" / "secret.png", b"png")
@@ -128,10 +128,10 @@ def test_list_collections_finds_subdirectories(tmp_path: Path, monkeypatch: obje
 
     collections = list_collections()
     names = {c.name for c in collections}
-    assert names == {"ubundi", "client-x"}
+    assert names == {"default_assets", "client-x"}
 
-    ubundi = next(c for c in collections if c.name == "ubundi")
-    assert ubundi.file_count == 2
+    default_assets = next(c for c in collections if c.name == "default_assets")
+    assert default_assets.file_count == 2
 
 
 def test_list_collections_returns_empty_when_no_dirs(tmp_path: Path, monkeypatch: object) -> None:

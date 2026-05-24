@@ -1,15 +1,15 @@
 # Homebrew Release
 
-Forge is packaged for Homebrew under the formula name `ubundiforge`.
+Forge is packaged for Homebrew under the formula name `projectforge`.
 
 Why not `forge`?
 
 - Homebrew already has formulae that occupy the `forge` naming space.
-- The package name can be `ubundiforge` while the installed executable remains `forge`.
+- The package name can be `projectforge` while the installed executable remains `forge`.
 
 ## Repo Layout
 
-- Formula source: `Formula/ubundiforge.rb`
+- Formula source: `Formula/projectforge.rb`
 - Formula generator: `scripts/generate_homebrew_formula.py`
 - Runtime dependency source of truth: `uv.lock`
 - Release workflow: `.github/workflows/release-homebrew.yml`
@@ -48,7 +48,7 @@ On a new version push to `main`, the workflow:
 - creates `vX.Y.Z` if the tag does not already exist
 - creates the GitHub release
 - downloads the release tarball and computes the Homebrew checksum
-- regenerates `Formula/ubundiforge.rb`
+- regenerates `Formula/projectforge.rb`
 - commits the updated formula back to this repo
 - syncs the formula into the Homebrew tap repo
 
@@ -59,7 +59,7 @@ After the workflow completes, confirm:
 - the workflow run is green in GitHub Actions
 - a new `vX.Y.Z` tag exists
 - a GitHub release was created
-- [Formula/ubundiforge.rb](/Users/matthew-schramm-ubundi/Desktop/Side%20Projects/forge/Formula/ubundiforge.rb) points at the new tag and checksum
+- [Formula/projectforge.rb](Formula/projectforge.rb) points at the new tag and checksum
 - the tap repo has the same updated formula
 
 ## Recovery Run
@@ -77,17 +77,17 @@ That mode skips tag and GitHub release creation and only re-syncs the formulas.
 
 1. Cut a Git tag that matches the package version, for example `vX.Y.Z`.
 2. Publish the source tarball where Homebrew can fetch it, typically:
-   `https://github.com/matthewubundi/UbundiForge/archive/refs/tags/vX.Y.Z.tar.gz`
+   `https://github.com/your-org/projectforge/archive/refs/tags/vX.Y.Z.tar.gz`
 3. Compute the tarball checksum:
    `curl -Ls <tarball-url> | shasum -a 256`
 4. Regenerate the formula with the real release URL and checksum:
    `uv run python scripts/generate_homebrew_formula.py --source-url <tarball-url> --source-sha256 <sha256>`
-5. Commit the updated `Formula/ubundiforge.rb`.
-6. Copy or sync that file into the Homebrew tap repository, typically `matthewubundi/homebrew-tap`.
+5. Commit the updated `Formula/projectforge.rb`.
+6. Copy or sync that file into the Homebrew tap repository, typically `your-org/homebrew-forge`.
 7. Validate in the tap:
-   `brew install --build-from-source matthewubundi/tap/ubundiforge`
+   `brew install --build-from-source your-org/tap/projectforge`
 8. Run the tap formula test:
-   `brew test matthewubundi/tap/ubundiforge`
+   `brew test your-org/tap/projectforge`
 
 ## Notes
 

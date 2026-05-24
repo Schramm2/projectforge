@@ -1,12 +1,12 @@
-class Ubundiforge < Formula
+class Projectforge < Formula
   include Language::Python::Virtualenv
 
-  desc "Scaffold Ubundi-style projects with AI coding tools and shared conventions"
-  homepage "https://github.com/matthewubundi/UbundiForge"
-  url "https://github.com/matthewubundi/UbundiForge/archive/refs/tags/v0.4.0.tar.gz"
-  sha256 "26eb6d6d6f3caa68fabf59f0dc5c2766b5371bce74438ddc6a4beed7ab1ec88b"
+  desc "Scaffold projects with AI coding tools and shared conventions"
+  homepage "https://github.com/your-org/projectforge"
+  url "https://github.com/your-org/projectforge/archive/refs/tags/v0.4.0.tar.gz"
+  sha256 "cc471b06eb0c99290d0abf30c36d60e800e68b40f7cb062579ff110ede174aef"
   license "MIT"
-  head "https://github.com/matthewubundi/UbundiForge.git", branch: "main"
+  head "https://github.com/your-org/projectforge.git", branch: "main"
 
   depends_on "python@3.13"
 

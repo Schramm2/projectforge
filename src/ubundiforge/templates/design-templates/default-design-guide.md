@@ -1,4 +1,4 @@
-# Ubundi Brand Guide
+# Default Design Guide
 
 Apply this design language to every frontend surface unless the project brief explicitly overrides it.
 
@@ -31,7 +31,7 @@ Apply this design language to every frontend surface unless the project brief ex
 
 - Use Manrope as the primary typeface.
 - Support at least Light, Regular, and Bold weights.
-- Follow the usage guidance from the brand file:
+- Follow the usage guidance in this guide:
   - Headings: semibold, title case
   - Secondary headings: medium, sentence case
   - Body copy: light or regular, sentence case

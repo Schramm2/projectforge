@@ -58,7 +58,7 @@ Auth libraries to include:
 </stack_guidance>
 
 <cross_project_standards>
-CROSS-PROJECT STANDARDS (apply to all Ubundi projects):
+CROSS-PROJECT STANDARDS (apply to all projects):
 
 Python projects:
 - pyproject.toml with hatchling build system
