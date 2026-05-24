@@ -24,7 +24,7 @@ All notable changes to the Forge Scaffolding Assistant skill will be documented 
 - Expanded Core Capabilities with quality routing and smart defaults
 - Expanded Post-Scaffold Repair Mode to include `forge check` as a follow-up step
 - Updated verification section to reference the post-scaffold dashboard
-- Replaced `pipx install .` with `brew install ubundiforge` as the recommended install
+- Replaced `pipx install .` with `brew install projectforge` as the recommended install
 - Updated README testing checklist to cover all five commands
 
 ### Removed

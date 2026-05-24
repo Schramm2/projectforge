@@ -27,11 +27,6 @@ dependencies = [
     "PyYAML>=6.0.2",
 ]
 
-[project.urls]
-Homepage = "https://github.com/your-org/projectforge"
-Repository = "https://github.com/your-org/projectforge"
-Issues = "https://github.com/your-org/projectforge/issues"
-
 [project.scripts]
 forge = "ubundiforge.__main__:main"
 

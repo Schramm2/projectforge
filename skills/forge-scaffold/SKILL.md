@@ -1,6 +1,6 @@
 ---
 name: forge-scaffold
-description: Professional Forge assistant for ProjectForge v0.3.0 — scaffolds projects, audits conventions, augments existing projects, tracks quality, and manages the full lifecycle. Uses the Forge CLI directly.
+description: Professional Forge assistant for ProjectForge v0.4.0 — scaffolds projects, audits conventions, augments existing projects, tracks quality, and manages the full lifecycle. Uses the Forge CLI directly.
 ---
 
 # Forge Scaffolding Assistant
@@ -39,7 +39,7 @@ If a real scaffold is risky or likely to fail because the environment is incompl
 
 ## CLI Commands
 
-Forge v0.3.0 has five commands:
+Forge v0.4.0 has five commands:
 
 | Command | Purpose |
 |---------|---------|
@@ -58,7 +58,7 @@ Forge v0.3.0 has five commands:
 **Homebrew install:**
 
 ```bash
-brew tap your-org/tap
+brew tap <tap-owner>/<tap>
 brew install projectforge
 forge --version
 ```
@@ -327,10 +327,10 @@ When an existing Forge project needs new capabilities:
 Choose the stack that matches the delivered artifact, not just the language mentioned:
 
 - `nextjs` for frontend-heavy apps, dashboards, and marketing-plus-app surfaces
-- `fastapi` for standard Python APIs and internal services
+- `fastapi` for standard Python APIs and service backends
 - `fastapi-ai` for retrieval, embeddings, vector search, and LLM-backed APIs
 - `both` for true Next.js plus FastAPI monorepos
-- `python-cli` for internal CLIs and terminal tools
+- `python-cli` for developer CLIs and terminal tools
 - `ts-package` for npm packages and SDKs
 - `python-worker` for scheduled jobs and background services
 

@@ -24,7 +24,7 @@ which codex
 
 **Fix by install method:**
 
-- **Homebrew:** Run `brew list projectforge` to confirm it is installed. If missing, run `brew tap your-org/tap && brew install projectforge`.
+- **Homebrew:** Run `brew list projectforge` to confirm it is installed. If missing, run `brew tap <tap-owner>/<tap> && brew install projectforge`.
 - **From source:** Either activate the virtual environment or run directly with `./forge` from the repo root.
 
 ## Setup wizard keeps running

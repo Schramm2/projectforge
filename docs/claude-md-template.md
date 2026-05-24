@@ -140,7 +140,7 @@ When behavior changes, update the docs that describe it:
 
 ## Versioning
 
-{Only include if the project is versioned/released. Remove for internal tools.}
+{Only include if the project is versioned/released. Remove for private or local-only tools.}
 
 This project follows [semver](https://semver.org/).
 

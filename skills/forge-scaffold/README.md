@@ -31,7 +31,7 @@ At minimum, the agent should read:
 **Homebrew (recommended):**
 
 ```bash
-brew tap your-org/tap
+brew tap <tap-owner>/<tap>
 brew install projectforge
 forge --version
 ```
@@ -95,7 +95,7 @@ This detects installed backends, lets you choose default models, and writes Forg
 ## Troubleshooting
 
 **`forge` command not found**
-- Install via Homebrew: `brew tap your-org/tap && brew install projectforge`
+- Install via Homebrew: `brew tap <tap-owner>/<tap> && brew install projectforge`
 - Or use repo-local: `uv sync --dev && ./forge --version`
 
 **Forge says no AI backend is installed**

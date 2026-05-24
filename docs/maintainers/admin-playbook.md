@@ -215,7 +215,7 @@ If automation is unavailable, you can still run the old manual flow.
 Example:
 
 ```bash
-curl -Ls https://github.com/your-org/projectforge/archive/refs/tags/vX.Y.Z.tar.gz | shasum -a 256
+curl -Ls <release-tarball-url> | shasum -a 256
 ```
 
 Save the resulting SHA-256 value.
@@ -227,7 +227,7 @@ Run:
 ```bash
 uv run python scripts/generate_homebrew_formula.py \
   --output Formula/projectforge.rb \
-  --source-url https://github.com/your-org/projectforge/archive/refs/tags/vX.Y.Z.tar.gz \
+  --source-url <release-tarball-url> \
   --source-sha256 <sha256>
 ```
 
@@ -241,9 +241,7 @@ Commit the regenerated formula so the main repo reflects the exact release metad
 
 #### Sync the formula into the Homebrew tap repo
 
-Copy or sync `Formula/projectforge.rb` into the tap repository, typically:
-
-- `your-org/homebrew-forge`
+Copy or sync `Formula/projectforge.rb` into the configured tap repository.
 
 The tap repo is what Homebrew users install from.
 
@@ -252,8 +250,8 @@ The tap repo is what Homebrew users install from.
 In the tap context, run:
 
 ```bash
-brew install --build-from-source your-org/tap/projectforge
-brew test your-org/tap/projectforge
+brew install --build-from-source <tap-owner>/<tap>/projectforge
+brew test <tap-owner>/<tap>/projectforge
 ```
 
 #### Push the tap update

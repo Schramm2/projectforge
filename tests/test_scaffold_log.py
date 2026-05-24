@@ -47,7 +47,7 @@ def test_write_scaffold_manifest(tmp_path):
         "name": "my-project",
         "stack": "fastapi",
         "description": "A test project",
-        "design_template": "ubundi-dark",
+        "design_template": "default-dark",
         "media_collection": "brand-a",
         "auth_provider": None,
         "demo_mode": False,
@@ -70,7 +70,7 @@ def test_write_scaffold_manifest(tmp_path):
     assert manifest["stack"] == "fastapi"
     assert manifest["backends"] == ["claude"]
     assert manifest["model_override"] == "opus"
-    assert manifest["design_template"] == "ubundi-dark"
+    assert manifest["design_template"] == "default-dark"
     assert manifest["conventions_hash"].startswith("sha256:")
     assert "forge_version" in manifest
     assert "timestamp" in manifest
