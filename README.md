@@ -73,6 +73,10 @@ cd projectforge
 uv sync --dev
 ```
 
+Maintainer note: keep `<tap-owner>/<tap>` and `<repository-url>` placeholders until the
+final public GitHub repository and Homebrew tap owner/name are chosen. Finalize those
+release URLs after the repository transfer or rename.
+
 Verify the installation:
 
 ```bash

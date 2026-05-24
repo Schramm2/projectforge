@@ -28,6 +28,10 @@ uv sync --dev
 ./forge
 ```
 
+Maintainer note: keep `<tap-owner>/<tap>` and `<repository-url>` placeholders until the
+final public GitHub repository and Homebrew tap owner/name are chosen. Finalize those
+release URLs after the repository transfer or rename.
+
 ## First run
 
 Running `forge` for the first time launches the setup wizard. It checks for:

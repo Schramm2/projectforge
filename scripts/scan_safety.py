@@ -61,8 +61,7 @@ UBUNDIFORGE_NAMESPACE_LINE = re.compile(
     r"Python import namespace remains `ubundiforge`|"
     r"Module entry point for `python -m ubundiforge`|"
     r"Tests for ubundiforge\.media_assets|"
-    r"# src/ubundiforge/card\.py|"
-    r"console\.print\(f\"ubundiforge \{__version__\}\"\)"
+    r"# src/ubundiforge/card\.py"
     r")",
     re.I,
 )
@@ -73,6 +72,12 @@ ALLOWLIST = [
         re.compile(r".*"),
         UBUNDIFORGE_NAMESPACE_LINE,
         "The Python package directory/import namespace remains for compatibility.",
+    ),
+    AllowedOccurrence(
+        "legacy package brand",
+        re.compile(r"tests/test_cli\.py"),
+        re.compile(r'assert "ubundiforge" not in result\.stdout\.lower\(\)'),
+        "Regression coverage ensures public version output does not use the legacy name.",
     ),
     AllowedOccurrence(
         "legacy company brand",

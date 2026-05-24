@@ -7,12 +7,21 @@ from types import SimpleNamespace
 from rich.console import Console
 from typer.testing import CliRunner
 
+from ubundiforge import __version__
 from ubundiforge.cli import app
 from ubundiforge.config import BackendStatus
 from ubundiforge.convention_models import ConventionValidationError
 from ubundiforge.setup import run_setup
 
 runner = CliRunner()
+
+
+def test_version_output_uses_public_project_name():
+    result = runner.invoke(app, ["--version"])
+
+    assert result.exit_code == 0
+    assert result.stdout.strip() == f"projectforge {__version__}"
+    assert "ubundiforge" not in result.stdout.lower()
 
 
 def _patch_prompt_only_dependencies(monkeypatch, *, setup_called: list[bool]) -> None:
