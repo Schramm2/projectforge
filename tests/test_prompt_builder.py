@@ -69,8 +69,8 @@ def test_build_prompt_includes_selected_design_template():
             "stack": "nextjs",
             "description": "A branded marketing site",
             "docker": False,
-            "design_template": "ubundi-brand-guide",
-            "design_template_label": "Ubundi Brand Guide",
+            "design_template": "default-design-guide",
+            "design_template_label": "Default Design Guide",
             "design_template_content": "Primary canvas: #1A2332",
             "auth_provider": None,
             "services": [],
@@ -82,7 +82,7 @@ def test_build_prompt_includes_selected_design_template():
     )
 
     assert "<design_template>" in prompt
-    assert "Template: Ubundi Brand Guide" in prompt
+    assert "Template: Default Design Guide" in prompt
     assert "Primary canvas: #1A2332" in prompt
 
 
@@ -128,8 +128,8 @@ def test_frontend_prompt_focuses_on_ui():
     prompt = build_frontend_prompt(
         {
             **_BASE_ANSWERS,
-            "design_template": "ubundi-brand-guide",
-            "design_template_label": "Ubundi Brand Guide",
+            "design_template": "default-design-guide",
+            "design_template_label": "Default Design Guide",
             "design_template_content": "Accent color: #0FA5A5",
         }
     )

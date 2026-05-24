@@ -505,7 +505,7 @@ def ensure_git_init(project_dir: Path) -> bool:
         return False
 
     result = subprocess.run(
-        ["git", "commit", "-m", "Initial commit (via UbundiForge)"],
+        ["git", "commit", "-m", "Initial commit (via ProjectForge)"],
         cwd=project_dir,
         capture_output=True,
         text=True,

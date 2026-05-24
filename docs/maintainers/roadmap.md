@@ -1,6 +1,6 @@
 # Forge Roadmap — Current Status & Next Steps
 
-Live roadmap for expanding Forge into a production-grade Ubundi project scaffolder. Organized by theme, not strict priority.
+Live roadmap for expanding Forge into a production-grade project scaffolder. Organized by theme, not strict priority.
 
 Items marked with [DONE] are implemented in this repository as of `0.4.0`. Planned items are intentionally aspirational; example commands below describe direction, not guaranteed current CLI flags.
 
@@ -38,7 +38,7 @@ Items marked with [DONE] are implemented in this repository as of `0.4.0`. Plann
 
 - **Named convention profiles**: `forge --conventions fintech-client` loads `~/.forge/conventions/fintech-client.md` instead of the default. Different clients, different standards.
 - **Convention composition**: Stack multiple convention files — a base `ubundi.md` plus a client-specific overlay.
-- [DONE] **Convention drift detection**: `forge check` audits any project against Ubundi conventions with a pass/warn/fail scorecard. Checks structure (required files/directories), tooling (Ruff config, MyPy strict, pre-commit, CI), and runtime (health endpoint, Docker non-root, HEALTHCHECK). Supports `--fix` for auto-generating missing files and `--export report.md` for sharing audits.
+- [DONE] **Convention drift detection**: `forge check` audits any project against organization conventions with a pass/warn/fail scorecard. Checks structure (required files/directories), tooling (Ruff config, MyPy strict, pre-commit, CI), and runtime (health endpoint, Docker non-root, HEALTHCHECK). Supports `--fix` for auto-generating missing files and `--export report.md` for sharing audits.
 - [DONE] **Project-local conventions**: Checks `.forge/conventions.md` in the current directory first, falls back to `~/.forge/conventions.md`.
 - [DONE] **Convention validation**: Warns if the conventions file is empty or suspiciously short.
 
@@ -65,7 +65,7 @@ Items marked with [DONE] are implemented in this repository as of `0.4.0`. Plann
 
 ## Design & Media
 
-- [DONE] **Design templates**: Bundled, global (`~/.forge/design-templates/`), and project-local design template resolution. Includes Ubundi Brand Guide template. Templates are integrated into the scaffold prompt and selectable during the interactive flow.
+- [DONE] **Design templates**: Bundled, global (`~/.forge/design-templates/`), and project-local design template resolution. Includes Default Design Guide template. Templates are integrated into the scaffold prompt and selectable during the interactive flow.
 - [DONE] **Media assets & collections**: Media asset detection and copying from repo-local `media/` collections. Supports images, fonts, and vectors across all stacks with manifest generation and prompt integration via `media_assets.py`.
 
 ---
@@ -119,7 +119,7 @@ Items marked with [DONE] are implemented in this repository as of `0.4.0`. Plann
 
 - [DONE] **Scaffold log**: Every scaffold appends a JSON-lines entry to `~/.forge/scaffold.log` — name, stack, backends, directory, demo mode, timestamp.
 - [DONE] **Scaffold analytics**: `forge stats` renders a terminal dashboard showing total scaffolds, success rate, stack distribution bar chart, per-backend/phase performance rates, and recent scaffold history. Data sourced from `scaffold.log` and `quality.jsonl`.
-- **Project registry**: Track active Ubundi projects with their locations, stacks, and status.
+- **Project registry**: Track active projects with their locations, stacks, and status.
 
 ---
 
@@ -133,9 +133,9 @@ Items marked with [DONE] are implemented in this repository as of `0.4.0`. Plann
 
 ## Governance & Guardrails
 
-- **Ubundi standard packs**: `forge --standard api-service` or `forge --standard internal-tool` applies an approved bundle of stack choices, docs, CI, Docker, observability, and naming conventions with fewer questions.
-- **Policy checks before handoff**: Validate the chosen scaffold against Ubundi rules before sending it to the AI CLI — required docs present, approved runtime versions, allowed dependency families, and required files like `.env.example`.
-- **Dependency and license allowlists**: Warn or block when a scaffold asks for packages outside an approved set, or licenses that do not meet Ubundi policy.
+- **Standard packs**: `forge --standard api-service` or `forge --standard tool` applies an approved bundle of stack choices, docs, CI, Docker, observability, and naming conventions with fewer questions.
+- **Policy checks before handoff**: Validate the chosen scaffold against organization rules before sending it to the AI CLI — required docs present, approved runtime versions, allowed dependency families, and required files like `.env.example`.
+- **Dependency and license allowlists**: Warn or block when a scaffold asks for packages outside an approved set, or licenses that do not meet organization policy.
 - [DONE] **Safer existing-directory handling**: When the target directory already exists and is non-empty, Forge lets the user rename the project, overwrite the directory, or cancel.
 
 ---
@@ -162,8 +162,8 @@ Items marked with [DONE] are implemented in this repository as of `0.4.0`. Plann
 ## Internal Platform Integration
 
 - **GitHub repo bootstrap**: `forge --create-repo` creates the repository, sets visibility, applies branch protection defaults, adds CODEOWNERS, and seeds labels or issue templates.
-- **Ubundi project naming rules**: Enforce or suggest naming conventions for repos, packages, Docker images, and service names so new projects line up with internal standards automatically.
-- **Internal service presets**: Pre-configured options for Ubundi's most common internal builds — API service, worker, CLI utility, research prototype, npm package — each with the right defaults and docs.
+- **Project naming rules**: Enforce or suggest naming conventions for repos, packages, Docker images, and service names so new projects line up with standards automatically.
+- **Service presets**: Pre-configured options for common builds — API service, worker, CLI utility, research prototype, npm package — each with the right defaults and docs.
 - **Environment bootstrap**: Generate environment-specific config scaffolds for `local`, `staging`, and `prod`, including example variable files and a clear promotion path between them.
 
 ---
@@ -193,17 +193,17 @@ Items marked with [DONE] are implemented in this repository as of `0.4.0`. Plann
 Packaging groundwork is in place; release automation and wider distribution are the next layer.
 
 The target workflow:
-1. Team member runs `brew install ubundiforge`
+1. Team member runs `brew install projectforge`
 2. Runs `forge` from any directory
 3. Setup wizard runs on first use (detects tools, configures preferences)
-4. Projects scaffold into their configured directory with Ubundi conventions baked in
+4. Projects scaffold into their configured directory with organization conventions baked in
 
 Steps to ship:
 - [DONE] **Homebrew formula**: The repo includes `Formula/ubundiforge.rb`, a formula generator, and documented Homebrew release steps.
 - [DONE] **Automated Homebrew release flow**: Pushing a new version to `main` creates the release tag, GitHub release, regenerates the Homebrew formula, and syncs the tap. See `.github/workflows/release-homebrew.yml`.
 - [DONE] **Buildable package metadata**: `pyproject.toml` is set up for versioned source/wheel builds.
 - **Publish releases to PyPI**: optional later, if Forge needs a Python package distribution channel.
-- Transfer repo from `matthewubundi/UbundiForge` to `Ubundi/ubundiforge` when ready
+- Transfer repo to a shared organization when ready
 - **Auto-update**: `forge update` pulls the latest version.
 - **Docker image**: Run Forge itself in a container with all three AI CLIs pre-installed.
 

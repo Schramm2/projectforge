@@ -78,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shared conventions loaded from `~/.forge/conventions.md` and injected into every scaffold prompt.
 - Secret detection scanning on user-provided text.
 - `CLAUDE.md` template injection into scaffolded projects.
-- Design template system for brand-consistent scaffolds (e.g., `ubundi-brand-guide`).
+- Design template system for brand-consistent scaffolds (e.g., `default-design-guide`).
 - Auth provider selection (Clerk, NextAuth.js, Supabase Auth) for frontend stacks.
 - CI workflow generation with configurable actions (lint, typecheck, unit-tests, etc.).
 - Media asset import with named collection support.
@@ -93,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pipx support for isolated global installs.
 - MIT license.
 
-[0.4.0]: https://github.com/matthewubundi/UbundiForge/releases/tag/v0.4.0
-[0.3.0]: https://github.com/matthewubundi/UbundiForge/releases/tag/v0.3.0
-[0.2.0]: https://github.com/matthewubundi/UbundiForge/releases/tag/v0.2.0
-[0.1.0]: https://github.com/matthewubundi/UbundiForge/releases/tag/v0.1.0
+[0.4.0]: https://github.com/your-org/projectforge/releases/tag/v0.4.0
+[0.3.0]: https://github.com/your-org/projectforge/releases/tag/v0.3.0
+[0.2.0]: https://github.com/your-org/projectforge/releases/tag/v0.2.0
+[0.1.0]: https://github.com/your-org/projectforge/releases/tag/v0.1.0

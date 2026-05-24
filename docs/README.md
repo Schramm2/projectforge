@@ -1,8 +1,8 @@
 # Documentation Map
 
-This repo separates product docs, maintainer docs, internal working docs, and reference captures so contributors can find the right source quickly.
+This repo separates product docs, maintainer docs, and reference captures so contributors can find the right source quickly.
 
-Current product truth lives in `guides/`, `maintainers/`, and the code under `src/ubundiforge/`. The `internal/` and `reference/` sections are intentionally non-authoritative: they preserve history, research prompts, and upstream snapshots that may drift over time.
+Current product truth lives in `guides/`, `maintainers/`, and the code under `src/ubundiforge/`.
 
 ## Guides
 
@@ -18,15 +18,8 @@ Current product truth lives in `guides/`, `maintainers/`, and the code under `sr
 - [maintainers/homebrew-release.md](maintainers/homebrew-release.md) — formula and tap release notes
 - [maintainers/roadmap.md](maintainers/roadmap.md) — product roadmap and future work
 
-## Internal
-
-- [internal/forge-project-spec.md](internal/forge-project-spec.md) — original product spec and build brief
-- [internal/forge-repo-research-prompt.md](internal/forge-repo-research-prompt.md) — prompt for mining existing repos into Forge defaults
-- [internal/README.md](internal/README.md) — what counts as archival versus current in internal docs
-
 ## Reference
 
-- [reference/cli-tools-help.txt](reference/cli-tools-help.txt) — captured CLI help and invocation notes
 - [reference/prompts/](reference/prompts/) — provider-specific prompting reference material
 - [claude-md-template.md](claude-md-template.md) — project-level `CLAUDE.md` authoring template
 - [reference/README.md](reference/README.md) — how to use reference snapshots safely

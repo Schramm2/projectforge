@@ -1,4 +1,4 @@
-"""First-run setup wizard for UbundiForge."""
+"""First-run setup wizard for ProjectForge."""
 
 import json
 import platform
@@ -225,7 +225,7 @@ def run_setup(console: Console) -> dict:
         make_panel(
             grouped_lines(
                 [
-                    "Welcome to UbundiForge Setup",
+                    "Welcome to ProjectForge Setup",
                     subtle("Let's configure the tools and defaults behind each scaffold."),
                 ]
             ),

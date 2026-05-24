@@ -1,6 +1,6 @@
 ---
 name: forge-scaffold
-description: Professional Forge assistant for UbundiForge v0.3.0 — scaffolds projects, audits conventions, augments existing projects, tracks quality, and manages the full lifecycle. Uses the Forge CLI directly.
+description: Professional Forge assistant for ProjectForge v0.3.0 — scaffolds projects, audits conventions, augments existing projects, tracks quality, and manages the full lifecycle. Uses the Forge CLI directly.
 ---
 
 # Forge Scaffolding Assistant
@@ -29,7 +29,7 @@ command -v uv >/dev/null 2>&1 && test -d src/ubundiforge && echo "READY" || echo
 forge --version
 ```
 
-- If **NOT_FOUND**: Do NOT guess Forge behavior from memory alone. Tell the user Forge is not available. Suggest `brew install ubundiforge` (Homebrew) or repo-local setup with `uv sync --dev`.
+- If **NOT_FOUND**: Do NOT guess Forge behavior from memory alone. Tell the user Forge is not available. Suggest `brew install projectforge` (Homebrew) or repo-local setup with `uv sync --dev`.
 
 ## Error Handling
 
@@ -58,8 +58,8 @@ Forge v0.3.0 has five commands:
 **Homebrew install:**
 
 ```bash
-brew tap matthewubundi/tap
-brew install ubundiforge
+brew tap your-org/tap
+brew install projectforge
 forge --version
 ```
 
@@ -88,7 +88,7 @@ forge \
   --ci \
   --ci-template questionnaire \
   --ci-actions lint,typecheck,unit-tests \
-  --design-template ubundi-brand-guide \
+  --design-template default-design-guide \
   --no-open \
   --dry-run
 ```
@@ -105,7 +105,7 @@ forge \
   --ci \
   --ci-template questionnaire \
   --ci-actions lint,format-check,typecheck,build,unit-tests,integration-tests,docker-build \
-  --design-template ubundi-brand-guide \
+  --design-template default-design-guide \
   --no-open \
   --export /tmp/orbit-prompt.md
 ```
@@ -124,7 +124,7 @@ forge \
   --ci \
   --ci-template questionnaire \
   --ci-actions lint,typecheck,unit-tests \
-  --design-template ubundi-brand-guide \
+  --design-template default-design-guide \
   --extra "Use a premium, editorial visual direction and include realistic starter content." \
   --no-open
 ```
@@ -167,7 +167,7 @@ forge \
   --ci \
   --ci-template questionnaire \
   --ci-actions lint,format-check,typecheck,build,unit-tests,integration-tests,docker-build \
-  --design-template ubundi-brand-guide \
+  --design-template default-design-guide \
   --no-open
 ```
 
@@ -202,7 +202,7 @@ During execution, Forge shows:
 
 ## Convention Auditing (`forge check`)
 
-Audit any project against Ubundi conventions without scaffolding:
+Audit any project against organization conventions without scaffolding:
 
 ```bash
 cd my-project
@@ -364,7 +364,7 @@ Use explicit option IDs:
 - Auth providers: `clerk`, `supabase-auth`, `authjs`, `better-auth`
 - CI templates: `questionnaire`, `blank-template`
 - CI actions: `lint`, `format-check`, `typecheck`, `build`, `unit-tests`, `integration-tests`, `docker-build`
-- Design template: `ubundi-brand-guide`
+- Design template: `default-design-guide`
 
 **Option support rules:**
 

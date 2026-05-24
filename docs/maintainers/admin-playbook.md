@@ -1,6 +1,6 @@
 # Admin Playbook
 
-This guide explains how to maintain UbundiForge as an administrator: where Ubundi conventions now live, how to update them safely, how to add new stacks and capabilities, and how to publish a release so future scaffolds pick up the latest bundled behavior.
+This guide explains how to maintain ProjectForge as an administrator: where organization conventions now live, how to update them safely, how to add new stacks and capabilities, and how to publish a release so future scaffolds pick up the latest bundled behavior.
 
 ## Mental model
 
@@ -41,7 +41,7 @@ forge admin conventions --open global/python-standards.md
 
 ## Normal admin flow: updating Python conventions
 
-If you want to change how Ubundi writes Python code:
+If you want to change how Python code is scaffolded:
 
 1. Run `forge admin conventions --preview-stack fastapi` to inspect the current compiled Python-facing bundle.
 2. Open the source Markdown file that currently owns the Python defaults, usually:
@@ -86,10 +86,10 @@ Relevant code lives in:
 
 ### Frontend brand and design direction
 
-If you want to change Ubundi's default visual language for frontend scaffolds, update:
+If you want to change the default visual language for frontend scaffolds, update:
 
 - `src/ubundiforge/design_templates.py`
-- `src/ubundiforge/templates/design-templates/ubundi-brand-guide.md`
+- `src/ubundiforge/templates/design-templates/default-design-guide.md`
 
 If you want to add a new selectable design template, add it to `DESIGN_TEMPLATE_OPTIONS` and bundle a matching template file.
 
@@ -198,7 +198,7 @@ The Homebrew release workflow handles the rest automatically:
 
 - creates `vX.Y.Z` if it does not already exist
 - creates the GitHub release
-- regenerates `Formula/ubundiforge.rb`
+- regenerates `Formula/projectforge.rb`
 - commits the updated formula back to this repo
 - syncs the formula into the Homebrew tap repo
 
@@ -215,7 +215,7 @@ If automation is unavailable, you can still run the old manual flow.
 Example:
 
 ```bash
-curl -Ls https://github.com/matthewubundi/UbundiForge/archive/refs/tags/vX.Y.Z.tar.gz | shasum -a 256
+curl -Ls https://github.com/your-org/projectforge/archive/refs/tags/vX.Y.Z.tar.gz | shasum -a 256
 ```
 
 Save the resulting SHA-256 value.
@@ -226,13 +226,14 @@ Run:
 
 ```bash
 uv run python scripts/generate_homebrew_formula.py \
-  --source-url https://github.com/matthewubundi/UbundiForge/archive/refs/tags/vX.Y.Z.tar.gz \
+  --output Formula/projectforge.rb \
+  --source-url https://github.com/your-org/projectforge/archive/refs/tags/vX.Y.Z.tar.gz \
   --source-sha256 <sha256>
 ```
 
 This updates:
 
-- `Formula/ubundiforge.rb`
+- `Formula/projectforge.rb`
 
 #### Commit the updated formula in this repo
 
@@ -240,9 +241,9 @@ Commit the regenerated formula so the main repo reflects the exact release metad
 
 #### Sync the formula into the Homebrew tap repo
 
-Copy or sync `Formula/ubundiforge.rb` into the tap repository, typically:
+Copy or sync `Formula/projectforge.rb` into the tap repository, typically:
 
-- `matthewubundi/homebrew-tap`
+- `your-org/homebrew-forge`
 
 The tap repo is what Homebrew users install from.
 
@@ -251,8 +252,8 @@ The tap repo is what Homebrew users install from.
 In the tap context, run:
 
 ```bash
-brew install --build-from-source matthewubundi/tap/ubundiforge
-brew test matthewubundi/tap/ubundiforge
+brew install --build-from-source your-org/tap/projectforge
+brew test your-org/tap/projectforge
 ```
 
 #### Push the tap update
@@ -262,7 +263,7 @@ Once validation passes, commit and push the tap repo change.
 At that point:
 
 - new installs get the new version
-- existing users get it after `brew update && brew upgrade ubundiforge`
+- existing users get it after `brew update && brew upgrade projectforge`
 
 ## Quick checklist
 

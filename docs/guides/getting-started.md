@@ -15,15 +15,15 @@ Forge will detect which tools are available and route to the best one automatica
 ### Homebrew (recommended for macOS)
 
 ```bash
-brew tap matthewubundi/tap
-brew install ubundiforge
+brew tap your-org/tap
+brew install projectforge
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/matthewubundi/UbundiForge.git
-cd UbundiForge
+git clone https://github.com/your-org/projectforge.git
+cd projectforge
 uv sync --dev
 ./forge
 ```
@@ -102,7 +102,7 @@ Once you have projects, Forge keeps working:
 
 ```bash
 forge stats              # See your scaffold history and backend performance
-forge check              # Audit any project against Ubundi conventions
+forge check              # Audit any project against organization conventions
 forge check --fix        # Auto-generate missing CLAUDE.md, .env.example, agent_docs/
 forge evolve auth        # Add authentication to an existing Forge project
 forge evolve stripe      # Add Stripe billing

@@ -1,4 +1,4 @@
-"""Shared Rich UI primitives for UbundiForge terminal surfaces."""
+"""Shared Rich UI primitives for ProjectForge terminal surfaces."""
 
 from __future__ import annotations
 
@@ -119,7 +119,7 @@ def make_panel(
     subtitle: str | Text | None = None,
     padding: tuple[int, int] = (0, 1),
 ) -> Panel:
-    """Create a bordered panel using the Ubundi palette."""
+    """Create a bordered panel using the theme palette."""
     panel_title = title
     if isinstance(title, str):
         panel_title = Text(title, style=f"bold {ACCENTS[accent]}")
@@ -145,7 +145,7 @@ def make_table(
     pad_edge: bool = True,
     box_style: box.Box | None = box.ROUNDED,
 ) -> Table:
-    """Create a table styled to match the Ubundi terminal theme."""
+    """Create a table styled to match the default terminal theme."""
     table = Table(
         title=Text(title, style=f"bold {ACCENTS[accent]}") if title else None,
         show_header=show_header,
@@ -301,11 +301,11 @@ def make_phase_timeline(phases: list[dict]) -> Group:
 
 
 def header_panel(version: str | None = None) -> Panel:
-    """Create the branded header panel for the CLI."""
+    """Create the header panel for the CLI."""
     lines = grouped_lines(
         [
-            Text("UbundiForge", style=f"bold {TEXT_PRIMARY}"),
-            Text("Ubundi project scaffolder", style=TEXT_SECONDARY),
+            Text("ProjectForge", style=f"bold {TEXT_PRIMARY}"),
+            Text("Project scaffolder", style=TEXT_SECONDARY),
         ]
     )
     subtitle = f"v{version}" if version else None

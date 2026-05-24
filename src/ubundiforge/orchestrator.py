@@ -246,7 +246,9 @@ def _get_plan(
         for attempt in range(2):
             try:
                 result = subprocess.run(
-                    cmd if attempt == 0 else adapter.build_cmd(
+                    cmd
+                    if attempt == 0
+                    else adapter.build_cmd(
                         planning_prompt + "\n\nRespond with JSON only.", model=model
                     ),
                     capture_output=True,
@@ -282,9 +284,11 @@ def _get_plan(
     with Live(console=_console, refresh_per_second=10) as live:
         while not plan_result["done"]:
             elapsed = time.monotonic() - start
-            live.update(_make_spinner_line(
-                "Planning", f"Asking {backend} to decompose {phase}", elapsed, accent="violet"
-            ))
+            live.update(
+                _make_spinner_line(
+                    "Planning", f"Asking {backend} to decompose {phase}", elapsed, accent="violet"
+                )
+            )
             time.sleep(0.1)
 
     worker.join(timeout=5)
@@ -292,14 +296,16 @@ def _get_plan(
 
     if plan_result["plan"] is not None:
         plan = plan_result["plan"]
-        _console.print(ui.status_line(
-            f"Plan ready: {len(plan.tasks)} tasks in {elapsed:.0f}s", accent="aqua"
-        ))
+        _console.print(
+            ui.status_line(f"Plan ready: {len(plan.tasks)} tasks in {elapsed:.0f}s", accent="aqua")
+        )
         return plan
 
-    _console.print(ui.status_line(
-        f"Planning failed — falling back to standard mode ({elapsed:.0f}s)", accent="amber"
-    ))
+    _console.print(
+        ui.status_line(
+            f"Planning failed — falling back to standard mode ({elapsed:.0f}s)", accent="amber"
+        )
+    )
     return _make_single_task_plan(brief, phase, backend)
 
 
@@ -467,9 +473,14 @@ def _reconcile(
     with Live(console=_console, refresh_per_second=10) as live:
         while not reconcile_result["done"]:
             elapsed = time.monotonic() - start
-            live.update(_make_spinner_line(
-                "Reconciling", "Checking for conflicts and fixing imports", elapsed, accent="plum"
-            ))
+            live.update(
+                _make_spinner_line(
+                    "Reconciling",
+                    "Checking for conflicts and fixing imports",
+                    elapsed,
+                    accent="plum",
+                )
+            )
             time.sleep(0.1)
 
     worker.join(timeout=5)
@@ -664,11 +675,13 @@ def run_phase_orchestrated(
     header.append(f"  ({elapsed:.0f}s total)", style=ui.TEXT_MUTED)
 
     accent = "aqua" if failed_count == 0 else "amber"
-    _console.print(ui.make_panel(
-        ui.grouped_lines([header, Text()] + summary_lines),
-        title="Subagent Results",
-        accent=accent,
-    ))
+    _console.print(
+        ui.make_panel(
+            ui.grouped_lines([header, Text()] + summary_lines),
+            title="Subagent Results",
+            accent=accent,
+        )
+    )
 
     # Reconcile (non-fatal)
     rc = _reconcile(adapter, project_dir, model)

@@ -1,6 +1,6 @@
 # Contributing
 
-UbundiForge is maintained as a production-focused internal developer tool. The goal of this repo is to stay easy to navigate, easy to release, and safe to evolve.
+ProjectForge is maintained as a production-focused developer tool. The goal of this repo is to stay easy to navigate, easy to release, and safe to evolve.
 
 ## Local setup
 
@@ -16,8 +16,6 @@ uv run ruff check .
 - `tests/` contains the automated test suite and prompt snapshots.
 - `docs/guides/` contains user-facing product documentation.
 - `docs/maintainers/` contains release and repo-maintenance playbooks.
-- `docs/internal/` contains working specs and internal research prompts.
-- `docs/reference/` contains captured CLI/reference material that informs Forge behavior.
 - `research/` contains exploratory repo archaeology and discovery outputs.
 - `assets/` contains README and documentation imagery.
 - `media/` is for sample media collections used during development.
@@ -33,7 +31,6 @@ uv run ruff check .
 
 - Put end-user guidance in `docs/guides/`.
 - Put repeatable maintainer procedures in `docs/maintainers/`.
-- Put temporary or research-oriented material in `docs/internal/` or `research/`.
 - Keep filenames lowercase and kebab-case unless an upstream source format needs to be preserved.
 
 ## Release and stack changes

@@ -3,13 +3,13 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ubundiforge"
+name = "projectforge"
 version = "0.4.0"
 description = "A CLI wrapper that scaffolds new projects using AI coding tools with your conventions baked in."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
-keywords = ["ai", "cli", "scaffolding", "developer-tools", "ubundi"]
+keywords = ["ai", "cli", "scaffolding", "developer-tools", "project-scaffolder"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -28,15 +28,15 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/matthewubundi/UbundiForge"
-Repository = "https://github.com/matthewubundi/UbundiForge"
-Issues = "https://github.com/matthewubundi/UbundiForge/issues"
+Homepage = "https://github.com/your-org/projectforge"
+Repository = "https://github.com/your-org/projectforge"
+Issues = "https://github.com/your-org/projectforge/issues"
 
 [project.scripts]
 forge = "ubundiforge.__main__:main"
 
 [project.entry-points."pipx.run"]
-ubundiforge = "ubundiforge.__main__:main"
+projectforge = "ubundiforge.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ubundiforge"]

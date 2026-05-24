@@ -13,13 +13,15 @@ class DesignTemplateOption:
     template_filename: str
 
 
-DESIGN_TEMPLATE_ORDER = ("ubundi-brand-guide",)
+DESIGN_TEMPLATE_ORDER = ("default-design-guide",)
 
 DESIGN_TEMPLATE_OPTIONS: dict[str, DesignTemplateOption] = {
-    "ubundi-brand-guide": DesignTemplateOption(
-        label="Ubundi Brand Guide",
-        prompt_description="Ubundi's dark, modern, glassy visual language for apps and sites.",
-        template_filename="ubundi-brand-guide.md",
+    "default-design-guide": DesignTemplateOption(
+        label="Default Design Guide",
+        prompt_description=(
+            "A clean, dark, modern, glassmorphic visual language for apps and sites."
+        ),
+        template_filename="default-design-guide.md",
     ),
 }
 

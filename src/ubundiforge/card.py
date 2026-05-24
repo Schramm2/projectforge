@@ -3,11 +3,11 @@
 
 from pathlib import Path
 
-_BADGE_MARKER = "<!-- forged-with-ubundiforge -->"
+_BADGE_MARKER = "<!-- forged-with-projectforge -->"
 
 
 def generate_badge_svg() -> str:
-    """Generate a shields.io-style 'forged with | UbundiForge' badge."""
+    """Generate a shields.io-style 'forged with | ProjectForge' badge."""
     return (
         '<svg xmlns="http://www.w3.org/2000/svg" width="170" height="20">'
         '<rect width="82" height="20" rx="3" fill="#A16EFA"/>'
@@ -16,7 +16,7 @@ def generate_badge_svg() -> str:
         '<text x="41" y="14" fill="#fff" font-family="sans-serif" '
         'font-size="11" text-anchor="middle" font-weight="bold">forged with</text>'
         '<text x="126" y="14" fill="#C6CEE6" font-family="sans-serif" '
-        'font-size="11" text-anchor="middle">UbundiForge</text>'
+        'font-size="11" text-anchor="middle">ProjectForge</text>'
         "</svg>"
     )
 
@@ -37,7 +37,7 @@ def generate_card_svg(
         f'<text x="45" y="35" fill="#F7F9FF" font-family="sans-serif" '
         f'font-size="16" font-weight="bold">{name}</text>'
         '<text x="45" y="55" fill="#8893B3" font-family="sans-serif" '
-        'font-size="11">Scaffolded with UbundiForge</text>'
+        'font-size="11">Scaffolded with ProjectForge</text>'
         f'<circle cx="25" cy="90" r="4" fill="#75DCE6"/>'
         f'<text x="35" y="94" fill="#8893B3" font-family="sans-serif" font-size="11">{stack}</text>'
         f'<circle cx="120" cy="90" r="4" fill="#A16EFA"/>'
@@ -62,7 +62,7 @@ def inject_badge_into_readme(project_dir: Path) -> None:
 
     badge_md = (
         f"\n{_BADGE_MARKER}\n"
-        f"![UbundiForge]"
+        f"![ProjectForge]"
         f"(https://img.shields.io/badge/forged%20with-forge-A16EFA)\n"
     )
 

@@ -1,4 +1,4 @@
-"""Convention drift detection — deterministic project audit against Ubundi standards."""
+"""Convention drift detection — deterministic project audit against organization standards."""
 
 from __future__ import annotations
 
