@@ -11,7 +11,7 @@ Items marked with [DONE] are implemented in this repository as of `0.4.0`. Plann
 - [DONE] **Backend readiness checks**: Setup distinguishes between installed backends and backends that are actually ready to scaffold, and routing skips known-not-ready tools.
 - [DONE] **First-run handoff**: After setup, new users can create a project immediately, review setup again, or exit cleanly and come back later.
 - [DONE] **Inline git identity setup**: Setup offers to configure global `git user.name` and `git user.email` when they are missing.
-- **Setup profiles**: Support different setup defaults for different working modes, such as "client delivery", "internal tool", and "prototype".
+- **Setup profiles**: Support different setup defaults for different working modes, such as "client delivery", "ops tool", and "prototype".
 
 ## Smarter AI Routing
 
@@ -37,7 +37,7 @@ Items marked with [DONE] are implemented in this repository as of `0.4.0`. Plann
 ## Multi-Convention Support
 
 - **Named convention profiles**: `forge --conventions fintech-client` loads `~/.forge/conventions/fintech-client.md` instead of the default. Different clients, different standards.
-- **Convention composition**: Stack multiple convention files — a base `ubundi.md` plus a client-specific overlay.
+- **Convention composition**: Stack multiple convention files — a base profile plus a client-specific overlay.
 - [DONE] **Convention drift detection**: `forge check` audits any project against organization conventions with a pass/warn/fail scorecard. Checks structure (required files/directories), tooling (Ruff config, MyPy strict, pre-commit, CI), and runtime (health endpoint, Docker non-root, HEALTHCHECK). Supports `--fix` for auto-generating missing files and `--export report.md` for sharing audits.
 - [DONE] **Project-local conventions**: Checks `.forge/conventions.md` in the current directory first, falls back to `~/.forge/conventions.md`.
 - [DONE] **Convention validation**: Warns if the conventions file is empty or suspiciously short.
@@ -125,7 +125,7 @@ Items marked with [DONE] are implemented in this repository as of `0.4.0`. Plann
 
 ## Team & Sharing
 
-- **Shared conventions via git**: `forge conventions pull git@github.com:ubundi/conventions.git` syncs team conventions from a shared repo.
+- **Shared conventions via git**: `forge conventions pull <conventions-repo-url>` syncs team conventions from a shared repo.
 - **Convention locking**: `forge conventions lock` snapshots the current conventions so scaffolds are reproducible even if the file changes later.
 - [DONE] **Export scaffold prompt**: `forge --export prompt.md` saves the assembled prompt to a file for sharing or debugging.
 
@@ -159,7 +159,7 @@ Items marked with [DONE] are implemented in this repository as of `0.4.0`. Plann
 
 ---
 
-## Internal Platform Integration
+## Platform Integration
 
 - **GitHub repo bootstrap**: `forge --create-repo` creates the repository, sets visibility, applies branch protection defaults, adds CODEOWNERS, and seeds labels or issue templates.
 - **Project naming rules**: Enforce or suggest naming conventions for repos, packages, Docker images, and service names so new projects line up with standards automatically.
@@ -199,7 +199,7 @@ The target workflow:
 4. Projects scaffold into their configured directory with organization conventions baked in
 
 Steps to ship:
-- [DONE] **Homebrew formula**: The repo includes `Formula/ubundiforge.rb`, a formula generator, and documented Homebrew release steps.
+- [DONE] **Homebrew formula**: The repo includes `Formula/projectforge.rb`, a formula generator, and documented Homebrew release steps.
 - [DONE] **Automated Homebrew release flow**: Pushing a new version to `main` creates the release tag, GitHub release, regenerates the Homebrew formula, and syncs the tap. See `.github/workflows/release-homebrew.yml`.
 - [DONE] **Buildable package metadata**: `pyproject.toml` is set up for versioned source/wheel builds.
 - **Publish releases to PyPI**: optional later, if Forge needs a Python package distribution channel.

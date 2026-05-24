@@ -77,17 +77,17 @@ That mode skips tag and GitHub release creation and only re-syncs the formulas.
 
 1. Cut a Git tag that matches the package version, for example `vX.Y.Z`.
 2. Publish the source tarball where Homebrew can fetch it, typically:
-   `https://github.com/your-org/projectforge/archive/refs/tags/vX.Y.Z.tar.gz`
+   `<release-tarball-url>`
 3. Compute the tarball checksum:
    `curl -Ls <tarball-url> | shasum -a 256`
 4. Regenerate the formula with the real release URL and checksum:
    `uv run python scripts/generate_homebrew_formula.py --source-url <tarball-url> --source-sha256 <sha256>`
 5. Commit the updated `Formula/projectforge.rb`.
-6. Copy or sync that file into the Homebrew tap repository, typically `your-org/homebrew-forge`.
+6. Copy or sync that file into the configured Homebrew tap repository.
 7. Validate in the tap:
-   `brew install --build-from-source your-org/tap/projectforge`
+   `brew install --build-from-source <tap-owner>/<tap>/projectforge`
 8. Run the tap formula test:
-   `brew test your-org/tap/projectforge`
+   `brew test <tap-owner>/<tap>/projectforge`
 
 ## Notes
 

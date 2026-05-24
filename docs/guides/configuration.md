@@ -59,9 +59,9 @@ These remain compatibility paths, not the primary maintainer workflow. Repo-admi
 
 ## Design templates
 
-Design templates encode brand guidelines as prompt tokens so AI backends produce visually consistent UIs.
+Design templates encode visual guidelines as prompt tokens so AI backends produce visually consistent UIs.
 
-**Built-in template:** `ubundi-brand-guide`
+**Built-in template:** `default-design-guide`
 
 **Override paths (checked in order):**
 
@@ -71,7 +71,7 @@ Design templates encode brand guidelines as prompt tokens so AI backends produce
 
 Design templates only apply to stacks that produce frontend output: `nextjs` and `both` (monorepo). They are ignored for backend-only and CLI stacks.
 
-Today, Forge exposes one selectable design template id: `ubundi-brand-guide`. To customize it without changing code, create an override file at either `.forge/design-templates/ubundi-brand-guide.md` or `~/.forge/design-templates/ubundi-brand-guide.md`.
+Today, Forge exposes one selectable design template id: `default-design-guide`. To customize it without changing code, create an override file at either `.forge/design-templates/default-design-guide.md` or `~/.forge/design-templates/default-design-guide.md`.
 
 ## Media assets
 
@@ -90,8 +90,10 @@ media/
 
 Forge currently reads media collections from the repo's top-level `media/` directory. The `--media` flag takes a collection name, not an arbitrary filesystem path:
 
+For example:
+
 ```bash
-forge --media ubundi_assets
+forge --media sample-assets
 ```
 
 If exactly one collection exists, Forge auto-selects it unless you pass `--no-media`.

@@ -24,12 +24,12 @@ from ubundiforge.homebrew import (  # noqa: E402
 def parse_args() -> argparse.Namespace:
     """Parse generator arguments."""
     parser = argparse.ArgumentParser(
-        description="Generate Formula/ubundiforge.rb from pyproject and uv.lock metadata.",
+        description="Generate Formula/projectforge.rb from pyproject and uv.lock metadata.",
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=ROOT / "Formula" / "ubundiforge.rb",
+        default=ROOT / "Formula" / "projectforge.rb",
         help="Formula output path.",
     )
     parser.add_argument(

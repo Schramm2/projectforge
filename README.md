@@ -2,9 +2,6 @@
 
 **AI-powered project scaffolding with your team's conventions baked in.**
 
-[![CI status](https://github.com/your-org/projectforge/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/your-org/projectforge/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/your-org/projectforge)](https://github.com/your-org/projectforge/releases/latest)
-[![License](https://img.shields.io/license/your-org/projectforge)](https://github.com/your-org/projectforge/blob/main/LICENSE)
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB)
 
 ---
@@ -64,14 +61,14 @@ See [docs/guides/stacks.md](docs/guides/stacks.md) for detailed structure, libra
 ### Homebrew (macOS)
 
 ```bash
-brew tap your-org/tap
+brew tap <tap-owner>/<tap>
 brew install projectforge
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/your-org/projectforge.git
+git clone <repository-url>
 cd projectforge
 uv sync --dev
 ```
@@ -318,6 +315,10 @@ Replay uses `.forge/scaffold.json` and `.forge/conventions-snapshot.md` (saved a
 | [Homebrew Release](docs/maintainers/homebrew-release.md) | Formula generation and release flow |
 
 ## Development
+
+The distribution package is named `projectforge` and the installed command is `forge`. The
+Python import namespace remains `ubundiforge` for compatibility with existing releases; keep
+that namespace in code, tests, and build configuration until a deliberate migration is planned.
 
 ```bash
 uv sync --dev                            # Install in dev mode

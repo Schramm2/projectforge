@@ -29,7 +29,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO || 'your-org/homebrew-forge' }}
+      TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO }}
       TAP_BRANCH: ${{ vars.HOMEBREW_TAP_BRANCH || 'main' }}
 
     steps:
@@ -128,6 +128,10 @@ jobs:
       - name: Ensure tap token is configured
         if: steps.mode.outputs.sync_formula == 'true'
         run: |
+          if [ -z "${TAP_REPO}" ]; then
+            echo "::error::HOMEBREW_TAP_REPO is not configured."
+            exit 1
+          fi
           if [ -z "${{ secrets.HOMEBREW_TAP_TOKEN }}" ]; then
             echo "::error::HOMEBREW_TAP_TOKEN is not configured. Add a token with write access to ${TAP_REPO}."
             exit 1

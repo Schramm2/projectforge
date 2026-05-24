@@ -15,14 +15,14 @@ Forge will detect which tools are available and route to the best one automatica
 ### Homebrew (recommended for macOS)
 
 ```bash
-brew tap your-org/tap
+brew tap <tap-owner>/<tap>
 brew install projectforge
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/your-org/projectforge.git
+git clone <repository-url>
 cd projectforge
 uv sync --dev
 ./forge
