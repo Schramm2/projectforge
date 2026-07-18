@@ -38,7 +38,7 @@ class TestClaudeAdapterBuildCmd:
         cmd = adapter.build_cmd("some prompt")
         assert cmd[0] == "claude"
         assert "-p" in cmd
-        assert "--dangerously-skip-permissions" in cmd
+        assert cmd[cmd.index("--permission-mode") + 1] == "acceptEdits"
 
     def test_without_model(self):
         adapter = ClaudeAdapter()
@@ -52,10 +52,10 @@ class TestClaudeAdapterBuildCmd:
         idx = cmd.index("--model")
         assert cmd[idx + 1] == "claude-opus-4-5"
 
-    def test_has_dangerously_skip_permissions(self):
+    def test_does_not_bypass_permissions_by_default(self):
         adapter = ClaudeAdapter()
         cmd = adapter.build_cmd("irrelevant")
-        assert "--dangerously-skip-permissions" in cmd
+        assert "--dangerously-skip-permissions" not in cmd
 
 
 # ---------------------------------------------------------------------------

@@ -24,6 +24,54 @@ def test_version_output_uses_public_project_name():
     assert "ubundiforge" not in result.stdout.lower()
 
 
+def test_doctor_json_has_deterministic_exit_semantics(monkeypatch):
+    report = {
+        "schema_version": 1,
+        "projectforge_version": __version__,
+        "status": "attention",
+        "config": {"status": "missing"},
+        "providers": {},
+    }
+    monkeypatch.setattr("ubundiforge.cli.build_doctor_report", lambda: report)
+
+    result = runner.invoke(app, ["doctor", "--json"])
+
+    assert result.exit_code == 1
+    assert json.loads(result.stdout) == report
+
+
+def test_live_unsafe_mode_requires_explicit_cli_consent():
+    result = runner.invoke(
+        app,
+        [
+            "--approval-mode",
+            "unsafe",
+            "--name",
+            "unsafe-demo",
+            "--stack",
+            "fastapi",
+            "--description",
+            "Must not start",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "explicit consent" in result.stdout.lower()
+
+
+def test_provider_running_commands_expose_approval_controls():
+    root_help = runner.invoke(app, ["--help"])
+    evolve_help = runner.invoke(app, ["evolve", "--help"])
+    replay_help = runner.invoke(app, ["replay", "--help"])
+
+    assert root_help.exit_code == 0
+    assert evolve_help.exit_code == 0
+    assert replay_help.exit_code == 0
+    for output in (root_help.stdout, evolve_help.stdout, replay_help.stdout):
+        assert "--approval-mode" in output
+        assert "--allow-unsafe" in output
+
+
 def _patch_prompt_only_dependencies(monkeypatch, *, setup_called: list[bool]) -> None:
     monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
     monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: True)
@@ -74,6 +122,73 @@ def test_dry_run_skips_setup_and_missing_backend_checks(monkeypatch):
     assert "<project>" in result.stdout
     assert "<stack>Python API (FastAPI)</stack>" in result.stdout
     assert "Use strict typing." in result.stdout
+
+
+def test_dry_run_agents_never_starts_provider_processes(monkeypatch):
+    setup_called = [False]
+    _patch_prompt_only_dependencies(monkeypatch, setup_called=setup_called)
+    monkeypatch.setattr(
+        "ubundiforge.orchestrator._get_plan",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("dry-run must not call a provider planner")
+        ),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "--dry-run",
+            "--agents",
+            "--name",
+            "preview-only",
+            "--stack",
+            "fastapi",
+            "--description",
+            "No provider calls",
+            "--no-docker",
+            "--no-open",
+            "--no-verify",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "no model calls made" in result.stdout
+
+
+def test_unknown_provider_readiness_is_not_executable(monkeypatch, tmp_path):
+    monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: False)
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_forge_config",
+        lambda: {"projects_dir": str(tmp_path)},
+    )
+    monkeypatch.setattr(
+        "ubundiforge.cli.get_backend_statuses",
+        lambda: {
+            "claude": BackendStatus(installed=False, ready=False),
+            "gemini": BackendStatus(installed=True, ready=None),
+            "codex": BackendStatus(installed=False, ready=False),
+        },
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "--use",
+            "gemini",
+            "--name",
+            "preflight-needed",
+            "--stack",
+            "fastapi",
+            "--description",
+            "Must not run",
+            "--no-open",
+            "--no-verify",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "preflight" in result.stdout.lower()
 
 
 def test_export_skips_setup_and_writes_prompt(monkeypatch, tmp_path):
@@ -272,7 +387,11 @@ def test_mock_backends_cover_full_cli_flow_without_installed_ai_clis(monkeypatch
         verbose: bool = False,
         label: str = "",
         phase_context: list[dict] | None = None,
+        approval_mode: str = "safe",
+        allow_unsafe: bool = False,
     ) -> int:
+        assert approval_mode == "safe"
+        assert allow_unsafe is False
         phase_calls.append(label)
         project_dir.mkdir(parents=True, exist_ok=True)
         slug = label.lower().replace(" & ", "-").replace(" ", "-")
@@ -634,7 +753,7 @@ def test_run_setup_does_not_create_legacy_conventions_file(monkeypatch, tmp_path
     config_path = forge_dir / "config.json"
     conventions_path = forge_dir / "conventions.md"
 
-    prompt_select_answers = iter(["claude-opus-4-6"])
+    prompt_select_answers = iter(["_provider_default"])
 
     monkeypatch.setattr("ubundiforge.setup.FORGE_DIR", forge_dir)
     monkeypatch.setattr("ubundiforge.setup.CONFIG_PATH", config_path)
@@ -668,6 +787,7 @@ def test_run_setup_does_not_create_legacy_conventions_file(monkeypatch, tmp_path
     output = console.export_text()
 
     assert config["available_backends"] == ["claude"]
+    assert config["backend_models"] == {}
     assert not conventions_path.exists()
     assert "bundled conventions" in output.lower()
     assert "bundled source tree" in output.lower()

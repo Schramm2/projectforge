@@ -42,12 +42,7 @@ territories. Use the same JSON structure as the example."""
 class CodexAdapter(CLIAdapterBase):
     """Backend adapter for Codex CLI (`codex` CLI)."""
 
-    def build_cmd(self, prompt: str, model: str | None = None) -> list[str]:
-        cmd = ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox"]
-        if model:
-            cmd += ["--model", model]
-        cmd.append(prompt)
-        return cmd
+    backend = "codex"
 
     def build_prompt(self, task: AgentTask) -> str:
         territory = ", ".join(task.file_territory)

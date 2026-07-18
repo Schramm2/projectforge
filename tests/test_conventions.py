@@ -5,6 +5,7 @@ from ubundiforge.conventions import (
     MIN_CONVENTIONS_LENGTH,
     load_bundled_conventions,
     load_conventions,
+    load_conventions_bundle,
     resolve_bundled_conventions_dir,
 )
 
@@ -104,7 +105,7 @@ def test_load_conventions_prefers_bundled_tree(tmp_path, monkeypatch):
     assert any("short" in w.lower() for w in warnings)
 
 
-def test_load_conventions_stack_prefers_local_override(tmp_path, monkeypatch):
+def test_load_conventions_stack_composes_bundle_before_local_override(tmp_path, monkeypatch):
     root = tmp_path / "conventions"
     (root / "global").mkdir(parents=True)
     (root / "global" / "shared.md").write_text("Use strict typing in bundled content.")
@@ -117,9 +118,44 @@ def test_load_conventions_stack_prefers_local_override(tmp_path, monkeypatch):
 
     content, warnings = load_conventions(stack="fastapi")
 
-    assert content == "Local rules always win, even when we mention TODO items in prose."
+    assert content.index("bundled content") < content.index("Local rules always win")
     assert warnings[0] == f"Using local conventions from {local}"
     assert any("local conventions" in w.lower() for w in warnings)
+
+
+def test_stack_bundle_composes_profile_user_and_project_layers_with_hashes(
+    tmp_path, monkeypatch
+):
+    root = tmp_path / "bundled"
+    (root / "global").mkdir(parents=True)
+    (root / "global" / "shared.md").write_text("Bundled defaults apply first.")
+    profiles_dir = tmp_path / "profiles"
+    profiles_dir.mkdir()
+    (profiles_dir / "default.md").write_text("Selected profile applies second.")
+    user_path = tmp_path / "user-wide.md"
+    user_path.write_text("User-wide rules apply third.")
+    local_path = tmp_path / "project" / ".forge" / "conventions.md"
+    local_path.parent.mkdir(parents=True)
+    local_path.write_text("Project-local rules apply last.")
+
+    monkeypatch.setattr("ubundiforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
+    monkeypatch.setattr("ubundiforge.conventions.PROFILES_DIR", profiles_dir)
+    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", user_path)
+    monkeypatch.setattr("ubundiforge.conventions.LOCAL_CONVENTIONS_PATH", local_path)
+
+    bundle = load_conventions_bundle(stack="fastapi", profile="default")
+
+    assert bundle.prompt_block.index("Bundled defaults") < bundle.prompt_block.index(
+        "Selected profile"
+    )
+    assert bundle.prompt_block.index("Selected profile") < bundle.prompt_block.index("User-wide")
+    assert bundle.prompt_block.index("User-wide") < bundle.prompt_block.index("Project-local")
+    assert [item.source_id for item in bundle.contributions][-3:] == [
+        "profile:default",
+        "user-wide",
+        "project-local",
+    ]
+    assert all(item.sha256.startswith("sha256:") for item in bundle.contributions)
 
 
 def test_load_conventions_stack_ignores_placeholder_local_override(tmp_path, monkeypatch):
@@ -136,10 +172,7 @@ def test_load_conventions_stack_ignores_placeholder_local_override(tmp_path, mon
     content, warnings = load_conventions(stack="fastapi")
 
     assert "bundled content" in content
-    assert (
-        warnings[0]
-        == f"Ignoring placeholder local conventions from {local}; using bundled stack conventions."
-    )
+    assert any("ignoring placeholder conventions" in warning.lower() for warning in warnings)
     assert any("placeholder" in w.lower() for w in warnings)
 
 
@@ -183,8 +216,13 @@ def test_load_conventions_stack_keeps_bundle_warnings_when_bundle_is_empty(tmp_p
         tmp_path / ".forge" / "conventions.md",
     )
     monkeypatch.setattr(
-        "ubundiforge.conventions.load_bundled_conventions",
-        lambda stack=None: ("", ["bundle warning"]),
+        "ubundiforge.conventions.load_conventions_bundle",
+        lambda stack=None: CompiledBundle(
+            bundle_id=stack or "default",
+            prompt_block="",
+            sources=(),
+            warnings=("bundle warning",),
+        ),
     )
 
     content, warnings = load_conventions(stack="fastapi")

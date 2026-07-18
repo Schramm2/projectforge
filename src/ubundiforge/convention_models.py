@@ -10,6 +10,15 @@ class ConventionValidationError(ValueError):
 
 
 @dataclass(frozen=True)
+class ConventionContribution:
+    """One ordered, hashed input to an effective conventions bundle."""
+
+    source_id: str
+    display_path: str
+    sha256: str
+
+
+@dataclass(frozen=True)
 class ConventionSource:
     """A markdown source file that can contribute to a compiled bundle."""
 
@@ -83,3 +92,4 @@ class CompiledBundle:
     prompt_block: str
     sources: tuple[Path, ...]
     warnings: tuple[str, ...] = ()
+    contributions: tuple[ConventionContribution, ...] = ()
