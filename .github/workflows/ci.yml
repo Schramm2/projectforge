@@ -35,13 +35,13 @@ jobs:
         run: uv sync --dev
 
       - name: Run public-safety scan
-        run: python scripts/scan_safety.py
+        run: uv run python scripts/scan_safety.py
 
       - name: Check documentation links
-        run: python scripts/check_docs.py
+        run: uv run python scripts/check_docs.py
 
       - name: Validate Forge operator skill
-        run: python scripts/validate_forge_skill.py
+        run: uv run python scripts/validate_forge_skill.py
 
       - name: Lint
         run: uv run ruff check src/ubundiforge tests
@@ -53,7 +53,7 @@ jobs:
         run: uv build
 
       - name: Inspect package artifacts
-        run: python scripts/inspect_artifacts.py
+        run: uv run python scripts/inspect_artifacts.py
 
       - name: Smoke-test forge dry run
         run: |
