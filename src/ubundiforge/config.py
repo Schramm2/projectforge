@@ -28,11 +28,12 @@ class BackendStatus:
     ready: bool | None
     detail: str = ""
     login_command: str = ""
+    auth_mode: str = ""
 
     @property
     def usable(self) -> bool:
         """Return whether the backend should be considered routable."""
-        return self.installed and self.ready is not False
+        return self.installed and self.ready is True
 
     @property
     def status_label(self) -> str:
@@ -82,13 +83,19 @@ def _check_claude_status() -> BackendStatus:
     except json.JSONDecodeError:
         payload = {}
 
-    if payload.get("loggedIn") is True:
-        auth_method = payload.get("authMethod", "authenticated")
+    if result.returncode == 0 and payload.get("loggedIn") is True:
+        raw_auth_method = payload.get("authMethod")
+        auth_method = (
+            raw_auth_method
+            if raw_auth_method in {"claude.ai", "api_key", "console", "bedrock", "vertex"}
+            else "authenticated"
+        )
         return BackendStatus(
             installed=True,
             ready=True,
             detail=f"Logged in via {auth_method}.",
             login_command="claude auth login",
+            auth_mode=auth_method,
         )
 
     if payload.get("loggedIn") is False or "not logged in" in stdout.lower():
@@ -129,12 +136,13 @@ def _check_codex_status() -> BackendStatus:
             detail="Codex is installed but not authenticated.",
             login_command="codex login",
         )
-    if "logged in" in output:
+    if result.returncode == 0 and "logged in" in output:
         return BackendStatus(
             installed=True,
             ready=True,
             detail="Codex login verified.",
             login_command="codex login",
+            auth_mode="chatgpt" if "chatgpt" in output else "authenticated",
         )
 
     return BackendStatus(
@@ -163,16 +171,16 @@ def _check_gemini_status() -> BackendStatus:
             detail = f"Gemini CLI responded successfully ({version.splitlines()[0]})."
         return BackendStatus(
             installed=True,
-            ready=True,
-            detail=detail,
+            ready=None,
+            detail=f"{detail} Authentication was not auto-checked.",
         )
 
     help_result = _run_status_command(["gemini", "--help"])
     if help_result and help_result.returncode == 0:
         return BackendStatus(
             installed=True,
-            ready=True,
-            detail="Gemini CLI help loaded successfully.",
+            ready=None,
+            detail="Gemini CLI help loaded successfully. Authentication was not auto-checked.",
         )
 
     return BackendStatus(
@@ -202,5 +210,5 @@ def get_backend_statuses() -> dict[str, BackendStatus]:
 
 
 def get_usable_backends() -> list[str]:
-    """Return installed backends that are ready or cannot be verified safely."""
+    """Return installed backends whose readiness has been verified."""
     return [backend for backend, status in get_backend_statuses().items() if status.usable]

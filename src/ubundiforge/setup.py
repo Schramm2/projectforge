@@ -1,9 +1,12 @@
 """First-run setup wizard for ProjectForge."""
 
 import json
+import os
 import platform
 import shutil
 import subprocess
+import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 
 import questionary
@@ -28,29 +31,16 @@ from ubundiforge.ui import (
 )
 
 CONFIG_PATH = FORGE_DIR / "config.json"
-
-# Available models per backend — id, description, and whether it's the default.
-# Update these when new models are released.
-BACKEND_MODELS: dict[str, list[dict[str, str | bool]]] = {
-    "claude": [
-        {"id": "claude-opus-4-6", "desc": "Most capable, complex reasoning", "default": True},
-        {"id": "claude-sonnet-4-6", "desc": "Fast, near-Opus quality"},
-        {"id": "claude-opus-4-5", "desc": "Previous-gen flagship"},
-        {"id": "claude-sonnet-4-5", "desc": "Previous-gen balanced"},
-        {"id": "claude-haiku-4-5", "desc": "Fastest, lightweight tasks"},
-    ],
-    "gemini": [
-        {"id": "gemini-2.5-pro", "desc": "Production, strong reasoning", "default": True},
-        {"id": "gemini-2.5-flash", "desc": "Fast and cost-efficient"},
-        {"id": "gemini-2.5-flash-lite", "desc": "Lightest, simple routing tasks"},
-    ],
-    "codex": [
-        {"id": "gpt-5.4", "desc": "Flagship, best overall", "default": True},
-        {"id": "gpt-5.4-mini", "desc": "Fast, efficient for subagents"},
-        {"id": "gpt-5.3-codex", "desc": "Industry-leading coding model"},
-        {"id": "gpt-5.3-codex-spark", "desc": "Near-instant coding (Pro only)"},
-        {"id": "gpt-5.2-codex", "desc": "Previous-gen coding model"},
-    ],
+CONFIG_VERSION = 1
+_CONFIG_TYPES = {
+    "config_version": int,
+    "preferred_editor": str,
+    "available_backends": list,
+    "backend_models": dict,
+    "docker_available": bool,
+    "projects_dir": str,
+    "agents": bool,
+    "sound": bool,
 }
 
 # (cli_command, display_label, macOS .app bundle name)
@@ -125,29 +115,86 @@ def needs_setup() -> bool:
     return not CONFIG_PATH.exists()
 
 
+def _normalize_forge_config(payload: object) -> dict:
+    """Validate config shape and migrate the unversioned v0.4.1 format in memory."""
+    if not isinstance(payload, dict):
+        raise ValueError("config root must be an object")
+    unknown_keys = sorted(set(payload) - set(_CONFIG_TYPES))
+    if unknown_keys:
+        raise ValueError(f"unsupported config key: {unknown_keys[0]}")
+
+    normalized = {"config_version": CONFIG_VERSION, **payload}
+    if normalized["config_version"] != CONFIG_VERSION:
+        raise ValueError(f"unsupported config version: {normalized['config_version']}")
+    for key, value in normalized.items():
+        expected_type = _CONFIG_TYPES[key]
+        if not isinstance(value, expected_type):
+            raise ValueError(f"invalid value type for config key: {key}")
+
+    backends = normalized.get("available_backends", [])
+    if any(
+        not isinstance(backend, str) or backend not in SUPPORTED_BACKENDS
+        for backend in backends
+    ):
+        raise ValueError("available_backends contains an unsupported backend")
+    backend_models = normalized.get("backend_models", {})
+    if any(
+        backend not in SUPPORTED_BACKENDS or not isinstance(model, str) or not model.strip()
+        for backend, model in backend_models.items()
+    ):
+        raise ValueError("backend_models contains an invalid override")
+    return normalized
+
+
 def load_forge_config() -> dict:
     """Load the saved Forge config, or return defaults if none exists."""
     if CONFIG_PATH.exists():
         try:
-            return json.loads(CONFIG_PATH.read_text())
-        except (json.JSONDecodeError, OSError):
+            return _normalize_forge_config(json.loads(CONFIG_PATH.read_text()))
+        except (json.JSONDecodeError, ValueError):
             from ubundiforge.ui import create_console, status_line
 
+            timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+            backup_path = CONFIG_PATH.with_name(f"{CONFIG_PATH.name}.corrupt-{timestamp}")
+            try:
+                CONFIG_PATH.replace(backup_path)
+                recovery = f"The original was preserved at {backup_path}."
+            except OSError:
+                recovery = "The original could not be moved; it was left unchanged."
             console = create_console()
             console.print(
                 status_line(
-                    f"Config file is corrupted: {CONFIG_PATH}. Run forge --setup to recreate it.",
+                    f"Config file is corrupted: {CONFIG_PATH}. {recovery} "
+                    "Run forge --setup to recreate it.",
                     accent="amber",
                 )
             )
+            return {}
+        except OSError:
             return {}
     return {}
 
 
 def save_forge_config(config: dict) -> None:
-    """Write Forge config to ~/.forge/config.json."""
+    """Atomically write Forge config with user-only permissions."""
+    normalized = _normalize_forge_config(config)
     FORGE_DIR.mkdir(parents=True, exist_ok=True)
-    CONFIG_PATH.write_text(json.dumps(config, indent=2) + "\n")
+    fd, raw_temp_path = tempfile.mkstemp(
+        prefix=f".{CONFIG_PATH.name}.",
+        suffix=".tmp",
+        dir=FORGE_DIR,
+        text=True,
+    )
+    temp_path = Path(raw_temp_path)
+    try:
+        with os.fdopen(fd, "w") as handle:
+            handle.write(json.dumps(normalized, indent=2) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        temp_path.chmod(0o600)
+        temp_path.replace(CONFIG_PATH)
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 def _routing_summary(available: list[str], console: Console) -> None:
@@ -314,8 +361,8 @@ def run_setup(console: Console) -> dict:
         ]
         lines.append(
             muted(
-                "Forge can still route to these backends, but the first real scaffold run is the "
-                "final check."
+                "Forge will not route to these backends until readiness is confirmed by a "
+                "provider-specific preflight."
             )
         )
         console.print(make_panel(grouped_lines(lines), title="Backend Checks", accent="amber"))
@@ -333,34 +380,33 @@ def run_setup(console: Console) -> dict:
     if len(available) > 0:
         console.print(
             status_line(
-                "Choose a model for each backend, or keep the default.",
+                "Use each provider's current default, or enter an advanced override.",
                 accent="plum",
             )
         )
         console.print()
 
         for backend in available:
-            models = BACKEND_MODELS.get(backend, [])
-            if not models:
-                continue
-
             existing = existing_models.get(backend, "")
             choices = [
                 questionary.Choice(
-                    f"{m['id']}{' (default)' if m.get('default') else ''} — {m['desc']}",
-                    value=m["id"],
+                    "Provider default / auto (recommended)",
+                    value="_provider_default",
                 )
-                for m in models
             ]
+            if existing:
+                choices.append(
+                    questionary.Choice(
+                        f"Keep existing override: {existing}",
+                        value=existing,
+                    )
+                )
             choices.append(questionary.Choice("Custom model ID...", value="_custom"))
-
-            # Find preselect: existing config, else the default model
-            preselect = existing or next((m["id"] for m in models if m.get("default")), None)
 
             model_val = prompt_select(
                 f"Choose the model for {backend}",
                 choices=choices,
-                default=preselect,
+                default=existing or "_provider_default",
             ).ask()
             if model_val is None:
                 raise SystemExit(0)
@@ -374,9 +420,7 @@ def run_setup(console: Console) -> dict:
                     raise SystemExit(0)
                 model_val = model_val.strip()
 
-            # Always save the selected model so it gets passed via --model
-            # to the CLI tool (which may have its own different default)
-            if model_val:
+            if model_val and model_val != "_provider_default":
                 backend_models[backend] = model_val
 
         if backend_models:

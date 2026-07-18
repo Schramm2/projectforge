@@ -2,6 +2,7 @@
 
 import json
 
+from ubundiforge.convention_models import ConventionContribution
 from ubundiforge.scaffold_log import append_scaffold_log, write_scaffold_manifest
 
 
@@ -61,6 +62,14 @@ def test_write_scaffold_manifest(tmp_path):
         "conventions content here",
         model_override="opus",
         backend_models={"claude": "opus"},
+        approval_mode="safe",
+        convention_sources=(
+            ConventionContribution(
+                source_id="bundled:global/shared",
+                display_path="bundled:global/shared.md",
+                sha256="sha256:abc123",
+            ),
+        ),
     )
 
     manifest_path = project_dir / ".forge" / "scaffold.json"
@@ -72,6 +81,14 @@ def test_write_scaffold_manifest(tmp_path):
     assert manifest["model_override"] == "opus"
     assert manifest["design_template"] == "default-dark"
     assert manifest["conventions_hash"].startswith("sha256:")
+    assert manifest["approval_mode"] == "safe"
+    assert manifest["convention_sources"] == [
+        {
+            "source_id": "bundled:global/shared",
+            "path": "bundled:global/shared.md",
+            "sha256": "sha256:abc123",
+        }
+    ]
     assert "forge_version" in manifest
     assert "timestamp" in manifest
     assert len(manifest["routing"]) == 2

@@ -1,13 +1,29 @@
 """Convention bundle compilation for stack-aware prompts."""
 
+import hashlib
+
 from .convention_models import (
     CompiledBundle,
+    ConventionContribution,
     ConventionRecord,
     ConventionRegistry,
     ConventionValidationError,
 )
 
 _MIN_BUNDLE_LENGTH = 50
+
+
+def _bundled_contribution(registry: ConventionRegistry, path, source_id: str):
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    try:
+        display_path = f"bundled:{path.relative_to(registry.root).as_posix()}"
+    except ValueError:
+        display_path = str(path)
+    return ConventionContribution(
+        source_id=f"bundled:{source_id}",
+        display_path=display_path,
+        sha256=f"sha256:{digest}",
+    )
 
 
 def _resolve_sources_for_record(
@@ -45,7 +61,8 @@ def _resolve_sources_for_record(
 
 
 def _all_sources_bundle(registry: ConventionRegistry, bundle_id: str) -> CompiledBundle:
-    sources = tuple(source.path for source in registry.sources.values())
+    source_items = tuple(registry.sources.items())
+    sources = tuple(source.path for _, source in source_items)
     prompt_block = "\n\n".join(
         path.read_text().strip() for path in sources if path.read_text().strip()
     ).strip()
@@ -59,6 +76,10 @@ def _all_sources_bundle(registry: ConventionRegistry, bundle_id: str) -> Compile
         prompt_block=prompt_block,
         sources=sources,
         warnings=tuple(warnings),
+        contributions=tuple(
+            _bundled_contribution(registry, source.path, source_id)
+            for source_id, source in source_items
+        ),
     )
 
 
@@ -110,4 +131,8 @@ def compile_bundle(registry: ConventionRegistry, stack: str | None = None) -> Co
         prompt_block=prompt_block,
         sources=ordered_paths,
         warnings=tuple(warnings),
+        contributions=tuple(
+            _bundled_contribution(registry, registry.source(source_id).path, source_id)
+            for source_id in ordered_source_ids
+        ),
     )

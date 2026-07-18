@@ -14,6 +14,7 @@ from pathlib import Path
 from rich.live import Live
 from rich.text import Text
 
+from ubundiforge.execution_policy import build_provider_command
 from ubundiforge.subprocess_utils import (
     PHASE_TIMEOUT,
     format_activity,
@@ -69,26 +70,22 @@ class ActivityTracker:
         return self.steps[-self._max_visible :]
 
 
-def _build_cmd(backend: str, prompt: str, model: str | None = None) -> list[str]:
+def _build_cmd(
+    backend: str,
+    prompt: str,
+    model: str | None = None,
+    *,
+    approval_mode: str = "safe",
+    allow_unsafe: bool = False,
+) -> list[str]:
     """Build the subprocess command for the given backend."""
-    if backend == "claude":
-        cmd = ["claude", "-p", "--dangerously-skip-permissions"]
-        if model:
-            cmd.extend(["--model", model])
-        cmd.append(prompt)
-    elif backend == "gemini":
-        cmd = ["gemini", "-p", prompt, "-y"]
-        if model:
-            cmd.extend(["--model", model])
-    elif backend == "codex":
-        cmd = ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox"]
-        if model:
-            cmd.extend(["--model", model])
-        cmd.append(prompt)
-    else:
-        return []
-
-    return cmd
+    return build_provider_command(
+        backend,
+        prompt,
+        model,
+        approval_mode=approval_mode,
+        allow_unsafe=allow_unsafe,
+    )
 
 
 def _phase_accent(backend: str) -> str:
@@ -118,6 +115,8 @@ def run_ai(
     verbose: bool = False,
     label: str = "",
     phase_context: list[dict] | None = None,
+    approval_mode: str = "safe",
+    allow_unsafe: bool = False,
 ) -> int:
     """Execute the AI CLI with the assembled prompt.
 
@@ -138,7 +137,13 @@ def run_ai(
     project_dir.mkdir(parents=True, exist_ok=True)
     display_label = label or backend
 
-    cmd = _build_cmd(backend, prompt, model)
+    cmd = _build_cmd(
+        backend,
+        prompt,
+        model,
+        approval_mode=approval_mode,
+        allow_unsafe=allow_unsafe,
+    )
     if not cmd:
         console.print(status_line(f"Unknown backend: {backend}", accent="amber"))
         return 1
@@ -363,8 +368,16 @@ def run_ai_parallel(
         backend = phase["backend"]
         prompt = phase["prompt"]
         model = phase.get("model")
+        approval_mode = phase.get("approval_mode", "safe")
+        allow_unsafe = phase.get("allow_unsafe", False)
 
-        cmd = _build_cmd(backend, prompt, model)
+        cmd = _build_cmd(
+            backend,
+            prompt,
+            model,
+            approval_mode=approval_mode,
+            allow_unsafe=allow_unsafe,
+        )
         if not cmd:
             with lock:
                 trackers[label].returncode = 1

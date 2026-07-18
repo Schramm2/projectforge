@@ -35,11 +35,7 @@ Return a JSON object with this exact structure:
 class GeminiAdapter(CLIAdapterBase):
     """Backend adapter for Gemini CLI (`gemini` CLI)."""
 
-    def build_cmd(self, prompt: str, model: str | None = None) -> list[str]:
-        cmd = ["gemini", "-p", prompt, "-y"]
-        if model:
-            cmd += ["--model", model]
-        return cmd
+    backend = "gemini"
 
     def build_prompt(self, task: AgentTask) -> str:
         territory = "\n".join(f"- {f}" for f in task.file_territory)

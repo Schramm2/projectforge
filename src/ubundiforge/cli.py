@@ -34,6 +34,7 @@ from ubundiforge.conventions import (
     load_bundled_conventions,
     load_claude_md_template,
     load_conventions,
+    load_conventions_bundle,
 )
 from ubundiforge.dashboard import render_dashboard
 from ubundiforge.design_templates import (
@@ -42,7 +43,9 @@ from ubundiforge.design_templates import (
     design_template_supported_for_stack,
     load_design_template,
 )
+from ubundiforge.doctor import build_doctor_report, doctor_exit_code
 from ubundiforge.evolutions import build_evolve_prompt, get_capabilities, get_capability
+from ubundiforge.execution_policy import validate_approval_mode
 from ubundiforge.logo import print_logo
 from ubundiforge.media_assets import (
     MEDIA_DIR,
@@ -123,6 +126,59 @@ _BACKEND_LOGIN_COMMANDS = {
 }
 
 
+@app.command()
+def doctor(
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Emit deterministic machine-readable diagnostics."),
+    ] = False,
+) -> None:
+    """Check configuration and AI provider readiness without running a model."""
+    import json
+
+    report = build_doctor_report()
+    if json_output:
+        console.print_json(json.dumps(report))
+    else:
+        console.print(header_panel(__version__))
+        config_status = report["config"]["status"]
+        console.print(status_line(f"Configuration: {config_status}", accent="violet"))
+        environment = report["environment"]
+        console.print(
+            status_line(
+                f"Python: {environment['python']['version']} "
+                f"({'supported' if environment['python']['supported'] else 'unsupported'})",
+                accent="aqua" if environment["python"]["supported"] else "amber",
+            )
+        )
+        for tool in ("git", "docker"):
+            tool_status = environment[tool]
+            label = tool_status["version"] or (
+                "installed" if tool_status["installed"] else "not installed"
+            )
+            console.print(status_line(f"{tool}: {label}", accent="violet"))
+        installed_editors = [
+            editor for editor, installed in environment["editors"].items() if installed
+        ]
+        console.print(
+            status_line(
+                f"Editors: {', '.join(installed_editors) if installed_editors else 'none found'}",
+                accent="violet",
+            )
+        )
+        for backend, provider in report["providers"].items():
+            version = f" ({provider['version']})" if provider["version"] else ""
+            console.print(
+                status_line(
+                    f"{backend}: {provider['readiness']}{version}",
+                    accent="aqua" if provider["readiness"] == "ready" else "amber",
+                )
+            )
+    exit_code = doctor_exit_code(report)
+    if exit_code:
+        raise typer.Exit(exit_code)
+
+
 STACK_ALIASES = {
     "nextjs": "nextjs",
     "next": "nextjs",
@@ -200,6 +256,7 @@ def _render_loaded_context(
     design_template_label: str | None,
     media_collection: str | None = None,
     media_asset_count: int = 0,
+    convention_sources: tuple = (),
 ) -> None:
     """Render loaded scaffold context."""
     lines: list[Text] = []
@@ -212,6 +269,10 @@ def _render_loaded_context(
                 lines.append(subtle(f"{backend} model: {configured_model}"))
 
     lines.append(subtle(f"Conventions: {len(conventions)} chars loaded"))
+    for source in convention_sources:
+        lines.append(
+            muted(f"  {source.source_id}: {source.display_path} ({source.sha256})")
+        )
     if claude_md_loaded:
         lines.append(subtle("CLAUDE.md starter loaded"))
     if design_template_label:
@@ -229,7 +290,10 @@ def _backend_help_line(backend: str, status: BackendStatus) -> Text:
         return subtle(f"{backend} needs login. Run {login_command}.")
     if not status.installed:
         return subtle(f"{backend} is not installed or not on PATH.")
-    return subtle(f"{backend} is installed, but Forge could not auto-check readiness.")
+    return subtle(
+        f"{backend} is installed but requires a provider-specific readiness preflight. "
+        "Run forge doctor for details."
+    )
 
 
 def _render_backend_readiness_notice(
@@ -611,6 +675,14 @@ def evolve(
         str | None,
         typer.Option("--model", "-m", help="Model to pass to the AI CLI."),
     ] = None,
+    approval_mode: Annotated[
+        str,
+        typer.Option("--approval-mode", help="Execution mode: safe, plan, or unsafe."),
+    ] = "safe",
+    allow_unsafe: Annotated[
+        bool,
+        typer.Option("--allow-unsafe", help="Confirm provider bypass/yolo execution."),
+    ] = False,
     verbose: Annotated[
         bool,
         typer.Option("--verbose", help="Show detailed execution info."),
@@ -622,6 +694,15 @@ def evolve(
 ) -> None:
     """Add a capability to an existing Forge project."""
     import json
+
+    try:
+        validate_approval_mode(
+            approval_mode,
+            allow_unsafe=allow_unsafe or dry_run,
+        )
+    except ValueError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
 
     project_dir = Path.cwd()
     manifest_path = project_dir / ".forge" / "scaffold.json"
@@ -694,7 +775,14 @@ def evolve(
     console.print(status_line(f"Adding {cap['name']} via {backend}...", accent="violet"))
 
     returncode = run_ai(
-        backend, prompt, project_dir, model=model, verbose=verbose, label=f"Evolve: {cap['name']}"
+        backend,
+        prompt,
+        project_dir,
+        model=model,
+        verbose=verbose,
+        label=f"Evolve: {cap['name']}",
+        approval_mode=approval_mode,
+        allow_unsafe=allow_unsafe,
     )
 
     if returncode == 0:
@@ -819,6 +907,14 @@ def replay(
         str | None,
         typer.Option("--model", "-m", help="Model to pass to the AI CLI."),
     ] = None,
+    approval_mode: Annotated[
+        str,
+        typer.Option("--approval-mode", help="Execution mode: safe, plan, or unsafe."),
+    ] = "safe",
+    allow_unsafe: Annotated[
+        bool,
+        typer.Option("--allow-unsafe", help="Confirm provider bypass/yolo execution."),
+    ] = False,
     verbose: Annotated[
         bool,
         typer.Option("--verbose", help="Show detailed execution info."),
@@ -831,6 +927,15 @@ def replay(
     """Replay a scaffold using the project's original inputs."""
     import json
     import tempfile
+
+    try:
+        validate_approval_mode(
+            approval_mode,
+            allow_unsafe=allow_unsafe or dry_run,
+        )
+    except ValueError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
 
     project_dir = Path.cwd()
     manifest_path = project_dir / ".forge" / "scaffold.json"
@@ -957,6 +1062,8 @@ def replay(
             model=effective_model,
             verbose=verbose,
             label=label,
+            approval_mode=approval_mode,
+            allow_unsafe=allow_unsafe,
         )
         if returncode != 0:
             console.print(
@@ -1046,6 +1153,20 @@ def main(
         str | None,
         typer.Option("--model", "-m", help="Model to pass to the AI CLI backend."),
     ] = None,
+    approval_mode: Annotated[
+        str,
+        typer.Option(
+            "--approval-mode",
+            help="Provider-neutral execution mode: safe, plan, or unsafe.",
+        ),
+    ] = "safe",
+    allow_unsafe: Annotated[
+        bool,
+        typer.Option(
+            "--allow-unsafe",
+            help="Confirm blanket provider bypass/yolo execution for this run.",
+        ),
+    ] = False,
     name: Annotated[
         str | None,
         typer.Option("--name", "-n", help="Project name (skips interactive prompt)."),
@@ -1160,6 +1281,14 @@ def main(
         return
 
     prompt_only = dry_run or bool(export)
+    try:
+        validate_approval_mode(
+            approval_mode,
+            allow_unsafe=allow_unsafe or prompt_only,
+        )
+    except ValueError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
     explicit_scaffold_request = _has_explicit_scaffold_request(
         use=use,
         model=model,
@@ -1393,7 +1522,7 @@ def main(
                     "\n[dim]Install at least one AI CLI (claude, gemini, or codex).[/dim]"
                 )
                 raise typer.Exit(1)
-            if status.ready is False:
+            if status.ready is not True:
                 _render_backend_readiness_notice(backend_statuses, required_backends={backend})
                 raise typer.Exit(1)
 
@@ -1403,6 +1532,7 @@ def main(
     # Load conventions and CLAUDE.md template
     try:
         conventions, conv_warnings = load_conventions(stack=answers["stack"])
+        convention_bundle = load_conventions_bundle(stack=answers["stack"])
     except ConventionValidationError as exc:
         console.print(status_line(f"Conventions error: {exc}", accent="amber"))
         raise typer.Exit(1) from exc
@@ -1445,6 +1575,7 @@ def main(
         design_template_label=answers.get("design_template_label"),
         media_collection=selected_collection,
         media_asset_count=media_asset_count,
+        convention_sources=convention_bundle.contributions,
     )
 
     # Check all user-supplied text for secrets before passing to AI
@@ -1534,21 +1665,18 @@ def main(
                     )
                 console.print(prompt)
 
-        if dry_run and agents:
-            import tempfile
-
-            from ubundiforge.adapters import get_adapter
-            from ubundiforge.orchestrator import _get_plan, _render_decomposition_plan
-
-            # Use a temp dir for planning when project_dir doesn't exist yet
-            plan_cwd = project_dir if project_dir.exists() else Path(tempfile.mkdtemp())
-            for phase, backend, prompt in phase_prompts:
-                adapter = get_adapter(backend, conventions)
-                effective_model = model or backend_models.get(backend)
-                plan = _get_plan(
-                    adapter, prompt, phase, answers["stack"], backend, plan_cwd, effective_model
+        if dry_run:
+            console.print()
+            console.print(
+                status_line(
+                    "Preview only: no provider processes started and no model calls made.",
+                    accent="aqua",
                 )
-                _render_decomposition_plan(plan)
+            )
+            if agents:
+                console.print(
+                    muted("Multi-agent decomposition is generated only when a live run starts.")
+                )
 
         if export:
             export_path = Path(export)
@@ -1583,6 +1711,31 @@ def main(
                 accent="violet",
             )
         )
+
+    selected_backends = sorted({backend for _, backend in phase_backends})
+    model_summary = ", ".join(
+        f"{backend}={model or backend_models.get(backend) or 'provider default'}"
+        for backend in selected_backends
+    )
+    console.print(
+        make_panel(
+            grouped_lines(
+                [
+                    subtle(f"Workspace: {project_dir.resolve()}"),
+                    subtle(f"Providers: {', '.join(selected_backends)}"),
+                    subtle(f"Models: {model_summary}"),
+                    subtle(f"Approval mode: {approval_mode}"),
+                    muted(
+                        "Unsafe mode disables provider approval boundaries."
+                        if approval_mode == "unsafe"
+                        else "Writes remain constrained by the selected provider's workspace mode."
+                    ),
+                ]
+            ),
+            title="Execution Preflight",
+            accent="amber" if approval_mode == "unsafe" else "aqua",
+        )
+    )
 
     # --- Copy media assets before AI runs (so the AI can see them) ---
     if answers.get("media_assets_manifest") and media_source_dir:
@@ -1643,6 +1796,8 @@ def main(
                 conventions=conventions,
                 model=effective_model,
                 verbose=verbose,
+                approval_mode=approval_mode,
+                allow_unsafe=allow_unsafe,
             )
             _any_orchestrated = True
             for key in ("planned", "completed", "failed"):
@@ -1656,6 +1811,8 @@ def main(
                 verbose=verbose,
                 label=label,
                 phase_context=phase_context,
+                approval_mode=approval_mode,
+                allow_unsafe=allow_unsafe,
             )
         phase_context[phase_idx]["status"] = "completed"
         phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
@@ -1694,6 +1851,8 @@ def main(
                     conventions=conventions,
                     model=effective_model,
                     verbose=verbose,
+                    approval_mode=approval_mode,
+                    allow_unsafe=allow_unsafe,
                 )
                 _any_orchestrated = True
                 for key in ("planned", "completed", "failed"):
@@ -1729,6 +1888,8 @@ def main(
                         "backend": backend,
                         "prompt": phase_prompt,
                         "model": effective_model,
+                        "approval_mode": approval_mode,
+                        "allow_unsafe": allow_unsafe,
                     }
                 )
 
@@ -1762,6 +1923,8 @@ def main(
                     verbose=verbose,
                     label=label,
                     phase_context=phase_context,
+                    approval_mode=approval_mode,
+                    allow_unsafe=allow_unsafe,
                 )
                 phase_context[phase_idx]["status"] = "completed"
                 phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
@@ -1796,6 +1959,8 @@ def main(
                 conventions=conventions,
                 model=effective_model,
                 verbose=verbose,
+                approval_mode=approval_mode,
+                allow_unsafe=allow_unsafe,
             )
             _any_orchestrated = True
             for key in ("planned", "completed", "failed"):
@@ -1809,6 +1974,8 @@ def main(
                 verbose=verbose,
                 label=label,
                 phase_context=phase_context,
+                approval_mode=approval_mode,
+                allow_unsafe=allow_unsafe,
             )
         phase_context[phase_idx]["status"] = "completed"
         phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
@@ -1827,6 +1994,8 @@ def main(
         conventions,
         model_override=model,
         backend_models=backend_models,
+        approval_mode=approval_mode,
+        convention_sources=convention_bundle.contributions,
     )
 
     git_ok = ensure_git_init(project_dir)
