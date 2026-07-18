@@ -144,8 +144,18 @@ def test_run_check_pass(mock_run, tmp_path):
     assert result.name == "lint"
     assert result.command == "uv run ruff check ."
     assert result.cwd == str(tmp_path)
-    assert result.timeout_seconds == 30
+    assert result.timeout_seconds == 60
     assert result.exit_code == 0
+
+
+@patch("ubundiforge.verify.subprocess.run")
+def test_run_check_does_not_leak_parent_virtual_environment(mock_run, monkeypatch, tmp_path):
+    monkeypatch.setenv("VIRTUAL_ENV", "/private/parent/.venv")
+    mock_run.return_value = MagicMock(returncode=0)
+
+    _run_check("lint", "uv run ruff check .", tmp_path)
+
+    assert "VIRTUAL_ENV" not in mock_run.call_args.kwargs["env"]
 
 
 @patch("ubundiforge.verify.subprocess.run")
@@ -160,12 +170,12 @@ def test_run_check_fail(mock_run, tmp_path):
 
 @patch("ubundiforge.verify.subprocess.run")
 def test_run_check_timeout(mock_run, tmp_path):
-    mock_run.side_effect = subprocess.TimeoutExpired(cmd="test", timeout=30)
+    mock_run.side_effect = subprocess.TimeoutExpired(cmd="test", timeout=60)
     result = _run_check("test", "uv run pytest tests/", tmp_path)
     assert result.passed is False
     assert "timed out" in result.detail
     assert result.exit_code is None
-    assert result.timeout_seconds == 30
+    assert result.timeout_seconds == 60
 
 
 # --- _install_deps ---
@@ -328,10 +338,10 @@ def test_write_verification_report_defensively_redacts_all_text_fields(tmp_path)
             CheckResult(
                 name="test",
                 passed=False,
-                detail=f"failed with {token}",
+                detail=f"failed with {token} in {tmp_path}",
                 command=f"tool --token {token}",
                 cwd=str(tmp_path),
-                remediation=f"remove {token}",
+                remediation=f"run in {tmp_path} then remove {token}",
                 attempted_endpoints=(f"http://localhost:8000/{token}",),
             )
         ]
@@ -341,4 +351,5 @@ def test_write_verification_report_defensively_redacts_all_text_fields(tmp_path)
     raw = output_path.read_text()
 
     assert token not in raw
+    assert str(tmp_path) not in raw
     assert "REDACTED" in raw

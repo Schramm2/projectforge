@@ -1,6 +1,7 @@
 """Post-scaffold verification — install deps, run checks, probe health endpoint."""
 
 import json
+import os
 import re
 import subprocess
 import time
@@ -62,6 +63,27 @@ _DEFAULT_HEALTH_PORT = 8000
 _DEFAULT_HEALTH_ENDPOINTS = ("/health", "/ready")
 _DEFAULT_HEALTH_STARTUP_TIMEOUT = 12
 _DEFAULT_HEALTH_REQUEST_TIMEOUT = 3
+
+
+def _verification_env() -> dict[str, str]:
+    """Return an environment isolated from Forge's own active virtual environment."""
+    env = os.environ.copy()
+    env.pop("VIRTUAL_ENV", None)
+    return env
+
+
+def _privacy_safe_text(value: str, project_dir: Path) -> str:
+    """Redact credentials and make local filesystem paths non-identifying."""
+    if not value:
+        return ""
+    safe = redact_secrets(value)
+    replacements = (
+        (str(project_dir.resolve()), "."),
+        (str(Path.home().resolve()), "~"),
+    )
+    for local_path, replacement in replacements:
+        safe = safe.replace(local_path, replacement)
+    return safe
 
 
 def _load_pyproject(project_dir: Path) -> dict | None:
@@ -174,7 +196,7 @@ def _run_check(
     name: str,
     cmd: str,
     cwd: Path,
-    timeout: int = 30,
+    timeout: int = 60,
 ) -> CheckResult:
     """Run a shell command and return pass/fail."""
     started = time.monotonic()
@@ -191,6 +213,7 @@ def _run_check(
             capture_output=True,
             text=True,
             timeout=timeout,
+            env=_verification_env(),
         )
         if result.returncode == 0:
             return CheckResult(
@@ -201,7 +224,11 @@ def _run_check(
                 **metadata,
             )
         stderr = result.stderr.strip()
-        detail = redact_secrets(stderr)[:200] if stderr else f"exit code {result.returncode}"
+        detail = (
+            _privacy_safe_text(stderr, cwd)[:200]
+            if stderr
+            else f"exit code {result.returncode}"
+        )
         return CheckResult(
             name=name,
             passed=False,
@@ -282,6 +309,7 @@ def _check_health(
             cwd=project_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=_verification_env(),
         )
         attempts = max(1, startup_timeout // 2)
         for _attempt in range(attempts):
@@ -290,7 +318,7 @@ def _check_health(
             if process.poll() is not None:
                 stderr = (process.stderr.read() or b"").decode(errors="replace")
                 detail = (
-                    redact_secrets(stderr.strip())[:200]
+                    _privacy_safe_text(stderr.strip(), project_dir)[:200]
                     if stderr.strip()
                     else "server exited early"
                 )
@@ -332,7 +360,7 @@ def _check_health(
         return CheckResult(
             name="health",
             passed=False,
-            detail=redact_secrets(str(exc))[:200],
+            detail=_privacy_safe_text(str(exc), project_dir)[:200],
             remediation="Run the server command manually and inspect startup output.",
             attempted_endpoints=tuple(attempted_endpoints),
             duration_seconds=time.monotonic() - started,
@@ -422,7 +450,7 @@ def write_verification_report(report: VerifyReport, project_dir: Path) -> Path:
     """Persist a privacy-safe, reproducible verification evidence report."""
 
     def _safe(value: str) -> str:
-        return redact_secrets(value) if value else ""
+        return _privacy_safe_text(value, project_dir)
 
     payload = {
         "schema_version": 1,
