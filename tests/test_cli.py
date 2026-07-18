@@ -133,9 +133,10 @@ def test_live_unsafe_mode_requires_explicit_cli_consent():
 
 
 def test_provider_running_commands_expose_approval_controls():
-    root_help = runner.invoke(app, ["--help"])
-    evolve_help = runner.invoke(app, ["evolve", "--help"])
-    replay_help = runner.invoke(app, ["replay", "--help"])
+    plain_help_env = {"TERM": "dumb"}
+    root_help = runner.invoke(app, ["--help"], env=plain_help_env)
+    evolve_help = runner.invoke(app, ["evolve", "--help"], env=plain_help_env)
+    replay_help = runner.invoke(app, ["replay", "--help"], env=plain_help_env)
 
     assert root_help.exit_code == 0
     assert evolve_help.exit_code == 0
@@ -524,7 +525,7 @@ def test_mock_backends_cover_full_cli_flow_without_installed_ai_clis(monkeypatch
 
 
 def test_root_help_documents_safe_resume_contract():
-    result = runner.invoke(app, ["--help"])
+    result = runner.invoke(app, ["--help"], env={"TERM": "dumb"})
 
     assert result.exit_code == 0
     assert "--resume" in result.stdout
