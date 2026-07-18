@@ -1,6 +1,9 @@
 """ProjectForge CLI — entry point."""
 
+import os
 import re
+import shutil
+import subprocess
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,7 +31,13 @@ from ubundiforge.convention_admin import (
     resolve_open_path,
 )
 from ubundiforge.convention_history import load_history
-from ubundiforge.convention_models import ConventionValidationError
+from ubundiforge.convention_models import CompiledBundle, ConventionValidationError
+from ubundiforge.convention_profiles import (
+    import_profile,
+    initialize_profile,
+    list_profiles,
+    profile_path,
+)
 from ubundiforge.conventions import (
     build_registry,
     load_bundled_conventions,
@@ -85,7 +94,7 @@ from ubundiforge.scaffold_options import (
     auth_provider_supported_for_stack,
     ci_action_ids_for_stack,
 )
-from ubundiforge.setup import load_forge_config, needs_setup, run_setup
+from ubundiforge.setup import load_forge_config, needs_setup, run_setup, save_forge_config
 from ubundiforge.sound import play_completion_sound
 from ubundiforge.ui import (
     ACCENTS,
@@ -104,11 +113,13 @@ from ubundiforge.ui import (
     status_line,
     subtle,
 )
-from ubundiforge.verify import verify_scaffold
+from ubundiforge.verify import verify_scaffold, write_verification_report
 
 app = typer.Typer()
 admin_app = typer.Typer(help="Repo admin tools.")
+conventions_app = typer.Typer(help="Manage user-owned convention profiles.")
 app.add_typer(admin_app, name="admin")
+app.add_typer(conventions_app, name="conventions")
 console = create_console()
 
 _PROJECT_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
@@ -577,6 +588,189 @@ def _run_admin_conventions_interactive(registry) -> None:
         raise typer.Exit(0)
     resolved_path = resolve_open_path(registry.root, open_target)
     console.print(make_panel(path_text(resolved_path), title="Open Markdown", accent="plum"))
+
+
+def _selected_conventions_profile() -> str:
+    """Return the configured profile without exposing other config values."""
+    return load_forge_config().get("conventions_profile", "default")
+
+
+@conventions_app.command("init")
+def conventions_init(
+    name: Annotated[str, typer.Argument(help="Profile name.")] = "default",
+) -> None:
+    """Create a starter convention profile without overwriting existing work."""
+    try:
+        path = initialize_profile(name)
+    except ConventionValidationError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    console.print(status_line(f"Created convention profile: {path}", accent="aqua"))
+
+
+@conventions_app.command("import")
+def conventions_import(
+    source: Annotated[Path, typer.Argument(help="Markdown instruction file to import.")],
+    name: Annotated[
+        str | None,
+        typer.Option("--name", help="Destination profile name; defaults to the source stem."),
+    ] = None,
+) -> None:
+    """Import AGENTS.md, CLAUDE.md, or another Markdown file as a new profile."""
+    try:
+        path = import_profile(source, name or source.stem)
+    except ConventionValidationError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    console.print(status_line(f"Imported convention profile: {path}", accent="aqua"))
+
+
+@conventions_app.command("list")
+def conventions_list() -> None:
+    """List profiles and show the selected profile."""
+    selected = _selected_conventions_profile()
+    profiles = list_profiles()
+    if not profiles:
+        console.print(status_line("No profiles found. Run forge conventions init.", accent="amber"))
+        return
+    for name in profiles:
+        marker = " (selected)" if name == selected else ""
+        console.print(status_line(f"{name}{marker}", accent="aqua"))
+
+
+@conventions_app.command("select")
+def conventions_select(
+    name: Annotated[str, typer.Argument(help="Existing profile name.")],
+) -> None:
+    """Select the profile used for future scaffolds."""
+    try:
+        path = profile_path(name)
+    except ConventionValidationError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    if not path.exists():
+        console.print(status_line(f"Convention profile not found: {name}", accent="amber"))
+        raise typer.Exit(1)
+    config = load_forge_config()
+    config["conventions_profile"] = name
+    save_forge_config(config)
+    console.print(status_line(f"Selected convention profile: {name}", accent="aqua"))
+
+
+def _conventions_inspection(stack: str | None) -> tuple[str, CompiledBundle, dict]:
+    profile = _selected_conventions_profile()
+    bundle = load_conventions_bundle(stack=stack, profile=profile)
+    report = {
+        "profile": profile,
+        "stack": stack,
+        "bundle_id": bundle.bundle_id,
+        "warnings": list(bundle.warnings),
+        "sources": [
+            {
+                "source_id": source.source_id,
+                "path": source.display_path,
+                "sha256": source.sha256,
+            }
+            for source in bundle.contributions
+        ],
+    }
+    return profile, bundle, report
+
+
+@conventions_app.command("inspect")
+def conventions_inspect(
+    stack: Annotated[
+        str | None,
+        typer.Option("--stack", help="Stack whose effective bundle should be inspected."),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Emit machine-readable source metadata."),
+    ] = False,
+) -> None:
+    """Inspect effective source order, paths, warnings, and hashes."""
+    import json
+
+    try:
+        profile, bundle, report = _conventions_inspection(stack)
+    except ConventionValidationError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    if json_output:
+        console.print_json(json.dumps(report))
+        return
+    console.print(status_line(f"Profile: {profile}; bundle: {bundle.bundle_id}", accent="aqua"))
+    for source in bundle.contributions:
+        console.print(
+            muted(f"{source.source_id}: {source.display_path} ({source.sha256})")
+        )
+    for warning in bundle.warnings:
+        console.print(status_line(f"Warning: {warning}", accent="amber"))
+
+
+@conventions_app.command("preview")
+def conventions_preview(
+    stack: Annotated[str | None, typer.Option("--stack", help="Stack to preview.")] = None,
+) -> None:
+    """Print the effective conventions content without starting a provider."""
+    try:
+        _, bundle, _ = _conventions_inspection(stack)
+    except ConventionValidationError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    console.print(bundle.prompt_block)
+
+
+@conventions_app.command("validate")
+def conventions_validate(
+    stack: Annotated[str | None, typer.Option("--stack", help="Stack to validate.")] = None,
+) -> None:
+    """Validate the selected profile and its effective bundle."""
+    try:
+        profile, bundle, _ = _conventions_inspection(stack)
+    except ConventionValidationError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    secret_types = check_for_secrets(bundle.prompt_block)
+    if secret_types:
+        console.print(
+            status_line(
+                f"Validation failed: credential-like content ({', '.join(secret_types)}).",
+                accent="amber",
+            )
+        )
+        raise typer.Exit(1)
+    console.print(status_line(f"Validation passed for profile {profile}.", accent="aqua"))
+
+
+@conventions_app.command("edit")
+def conventions_edit(
+    name: Annotated[str | None, typer.Argument(help="Profile name; defaults to selected.")] = None,
+) -> None:
+    """Open a profile in the configured editor."""
+    profile = name or _selected_conventions_profile()
+    try:
+        path = profile_path(profile)
+    except ConventionValidationError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    if not path.exists():
+        console.print(status_line(f"Convention profile not found: {profile}", accent="amber"))
+        raise typer.Exit(1)
+    configured = load_forge_config().get("preferred_editor", "")
+    editor = configured or os.environ.get("EDITOR", "")
+    executable = shutil.which(editor) if editor else None
+    if not executable:
+        console.print(
+            status_line(
+                "No configured editor command found. Set one with forge --setup or $EDITOR.",
+                accent="amber",
+            )
+        )
+        raise typer.Exit(1)
+    result = subprocess.run([executable, str(path)], check=False)
+    if result.returncode != 0:
+        raise typer.Exit(result.returncode)
 
 
 @admin_app.command("conventions")
@@ -1531,8 +1725,18 @@ def main(
 
     # Load conventions and CLAUDE.md template
     try:
-        conventions, conv_warnings = load_conventions(stack=answers["stack"])
-        convention_bundle = load_conventions_bundle(stack=answers["stack"])
+        conventions_profile = forge_config.get("conventions_profile", "default")
+        if conventions_profile == "default":
+            conventions, conv_warnings = load_conventions(stack=answers["stack"])
+        else:
+            conventions, conv_warnings = load_conventions(
+                stack=answers["stack"],
+                profile=conventions_profile,
+            )
+        convention_bundle = load_conventions_bundle(
+            stack=answers["stack"],
+            profile=conventions_profile,
+        )
     except ConventionValidationError as exc:
         console.print(status_line(f"Conventions error: {exc}", accent="amber"))
         raise typer.Exit(1) from exc
@@ -2003,6 +2207,7 @@ def main(
     verify_report = None
     if verify:
         verify_report = verify_scaffold(answers["stack"], project_dir, verbose=verbose)
+        write_verification_report(verify_report, project_dir)
 
     append_quality_signal(
         stack=answers["stack"],

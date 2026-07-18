@@ -94,7 +94,15 @@ def render_dashboard(
 
     # --- Header row ---
     header = Text()
-    header.append("Project Ready", style=f"bold {ACCENTS['violet']}")
+    if verify_report is not None and not verify_report.all_passed:
+        header.append(
+            "Project Created — verification needs attention",
+            style=f"bold {ACCENTS['amber']}",
+        )
+    elif verify_report is None:
+        header.append("Project Created", style=f"bold {ACCENTS['violet']}")
+    else:
+        header.append("Project Ready", style=f"bold {ACCENTS['violet']}")
     console.print()
     console.print(header)
     console.print()
@@ -127,7 +135,8 @@ def render_dashboard(
                 check_line.append(f"{detail}  ", style=TEXT_SECONDARY)
             else:
                 check_line.append("✗ ", style=ACCENTS["plum"])
-                check_line.append(f"{check.name}  ", style=TEXT_SECONDARY)
+                detail = check.detail or check.name
+                check_line.append(f"{check.name}: {detail}  ", style=TEXT_SECONDARY)
         console.print(muted("  HEALTH CHECKS"))
         console.print(check_line)
     else:
@@ -175,4 +184,6 @@ def render_dashboard(
         run_cmd = meta.dev_commands.get("run") or meta.dev_commands.get("dev")
         if run_cmd:
             console.print(command_text(f"  {run_cmd}"))
+    if verify_report is not None and not verify_report.all_passed:
+        console.print(subtle("  inspect .forge/verification.json, fix failures, then rerun checks"))
     console.print()

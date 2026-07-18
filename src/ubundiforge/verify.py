@@ -1,8 +1,10 @@
 """Post-scaffold verification — install deps, run checks, probe health endpoint."""
 
+import json
 import re
 import subprocess
 import time
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.error import URLError
@@ -10,6 +12,7 @@ from urllib.request import urlopen
 
 from rich.console import Console
 
+from ubundiforge.safety import redact_secrets
 from ubundiforge.stacks import STACK_META
 from ubundiforge.ui import badge, make_table, muted
 
@@ -22,6 +25,13 @@ class CheckResult:
     passed: bool
     detail: str = ""
     skipped: bool = False
+    command: str = ""
+    cwd: str = ""
+    timeout_seconds: int | None = None
+    exit_code: int | None = None
+    remediation: str = ""
+    attempted_endpoints: tuple[str, ...] = ()
+    duration_seconds: float = 0.0
 
 
 @dataclass
@@ -50,6 +60,77 @@ _HEALTH_PORT_RE = re.compile(r"--port\s+(\d+)")
 _DEFAULT_HEALTH_PORT = 8000
 
 
+def _load_pyproject(project_dir: Path) -> dict | None:
+    path = project_dir / "pyproject.toml"
+    if not path.exists():
+        return None
+    try:
+        return tomllib.loads(path.read_text())
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+
+
+def _python_dev_dependencies(pyproject: dict) -> set[str]:
+    project = pyproject.get("project", {})
+    groups = pyproject.get("dependency-groups", {})
+    tool_uv = pyproject.get("tool", {}).get("uv", {})
+    raw_dependencies = [
+        *project.get("dependencies", []),
+        *project.get("optional-dependencies", {}).get("dev", []),
+        *groups.get("dev", []),
+        *tool_uv.get("dev-dependencies", []),
+    ]
+    names: set[str] = set()
+    for value in raw_dependencies:
+        if not isinstance(value, str):
+            continue
+        match = re.match(r"[a-zA-Z0-9_.-]+", value)
+        if match:
+            names.add(match.group(0).lower())
+    return names
+
+
+def _python_install_command(project_dir: Path) -> str:
+    pyproject = _load_pyproject(project_dir)
+    if pyproject is None:
+        return "uv sync"
+    optional = pyproject.get("project", {}).get("optional-dependencies", {})
+    if isinstance(optional, dict) and "dev" in optional:
+        return "uv sync --extra dev"
+    groups = pyproject.get("dependency-groups", {})
+    tool_uv = pyproject.get("tool", {}).get("uv", {})
+    if (isinstance(groups, dict) and "dev" in groups) or tool_uv.get("dev-dependencies"):
+        return "uv sync --dev"
+    return "uv sync"
+
+
+def _effective_dev_commands(stack: str, project_dir: Path) -> dict[str, str]:
+    """Derive Python checks from generated metadata, falling back to stack recipes."""
+    meta = STACK_META[stack]
+    commands = dict(meta.dev_commands)
+    if "uv" not in meta.package_manager:
+        return commands
+    pyproject = _load_pyproject(project_dir)
+    if pyproject is None:
+        return commands
+
+    dependencies = _python_dev_dependencies(pyproject)
+    tool = pyproject.get("tool", {})
+    if "ruff" in dependencies or "ruff" in tool:
+        commands["lint"] = "uv run ruff check ."
+    else:
+        commands.pop("lint", None)
+    if "mypy" in dependencies or "mypy" in tool:
+        commands["typecheck"] = "uv run mypy ."
+    else:
+        commands.pop("typecheck", None)
+    if "pytest" in dependencies or "pytest" in tool or (project_dir / "tests").exists():
+        commands["test"] = "uv run pytest -q"
+    else:
+        commands.pop("test", None)
+    return commands
+
+
 def _run_check(
     name: str,
     cmd: str,
@@ -57,6 +138,12 @@ def _run_check(
     timeout: int = 30,
 ) -> CheckResult:
     """Run a shell command and return pass/fail."""
+    started = time.monotonic()
+    metadata = {
+        "command": cmd,
+        "cwd": str(cwd),
+        "timeout_seconds": timeout,
+    }
     try:
         result = subprocess.run(
             cmd,
@@ -67,12 +154,33 @@ def _run_check(
             timeout=timeout,
         )
         if result.returncode == 0:
-            return CheckResult(name=name, passed=True)
+            return CheckResult(
+                name=name,
+                passed=True,
+                exit_code=0,
+                duration_seconds=time.monotonic() - started,
+                **metadata,
+            )
         stderr = result.stderr.strip()
-        detail = stderr[:200] if stderr else f"exit code {result.returncode}"
-        return CheckResult(name=name, passed=False, detail=detail)
+        detail = redact_secrets(stderr)[:200] if stderr else f"exit code {result.returncode}"
+        return CheckResult(
+            name=name,
+            passed=False,
+            detail=detail,
+            exit_code=result.returncode,
+            remediation=f"Run `{cmd}` in `{cwd}` and inspect the complete output.",
+            duration_seconds=time.monotonic() - started,
+            **metadata,
+        )
     except subprocess.TimeoutExpired:
-        return CheckResult(name=name, passed=False, detail="timed out")
+        return CheckResult(
+            name=name,
+            passed=False,
+            detail=f"timed out after {timeout}s",
+            remediation=f"Run `{cmd}` manually or increase the verification timeout.",
+            duration_seconds=time.monotonic() - started,
+            **metadata,
+        )
 
 
 def _install_deps(stack: str, project_dir: Path) -> CheckResult:
@@ -95,7 +203,11 @@ def _install_deps(stack: str, project_dir: Path) -> CheckResult:
                 return CheckResult(name="install", passed=False, detail=npm_result.detail)
         return CheckResult(name="install", passed=True)
 
-    install_cmd = _INSTALL_COMMANDS.get(pkg_mgr)
+    install_cmd = (
+        _python_install_command(project_dir)
+        if pkg_mgr == "uv"
+        else _INSTALL_COMMANDS.get(pkg_mgr)
+    )
     if not install_cmd:
         return CheckResult(name="install", passed=False, detail=f"no install cmd for {pkg_mgr}")
     return _run_check("install", install_cmd, project_dir, timeout=60)
@@ -110,10 +222,21 @@ def _extract_port(run_cmd: str) -> int:
 def _check_health(
     project_dir: Path,
     run_cmd: str,
+    *,
+    endpoints: tuple[str, ...] = ("/health", "/ready"),
+    startup_timeout: int = 12,
+    request_timeout: int = 3,
 ) -> CheckResult:
-    """Start the server, poll /health, then kill it."""
+    """Start the server, poll configured endpoints, then stop it."""
     port = _extract_port(run_cmd)
     process = None
+    started = time.monotonic()
+    attempted_endpoints: list[str] = []
+    metadata = {
+        "command": run_cmd,
+        "cwd": str(project_dir),
+        "timeout_seconds": startup_timeout,
+    }
     try:
         process = subprocess.Popen(
             run_cmd,
@@ -122,25 +245,61 @@ def _check_health(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        for attempt in range(8):
+        attempts = max(1, startup_timeout // 2)
+        for _attempt in range(attempts):
             time.sleep(1.5)
             # Check if process died
             if process.poll() is not None:
                 stderr = (process.stderr.read() or b"").decode(errors="replace")
-                detail = stderr.strip()[:200] if stderr.strip() else "server exited early"
-                return CheckResult(name="health", passed=False, detail=detail)
-            for path in ("/health", "/ready"):
+                detail = (
+                    redact_secrets(stderr.strip())[:200]
+                    if stderr.strip()
+                    else "server exited early"
+                )
+                return CheckResult(
+                    name="health",
+                    passed=False,
+                    detail=detail,
+                    exit_code=process.returncode,
+                    remediation="Inspect the server command and startup output.",
+                    attempted_endpoints=tuple(attempted_endpoints),
+                    duration_seconds=time.monotonic() - started,
+                    **metadata,
+                )
+            for path in endpoints:
+                url = f"http://localhost:{port}{path}"
+                attempted_endpoints.append(url)
                 try:
-                    resp = urlopen(f"http://localhost:{port}{path}", timeout=3)
+                    resp = urlopen(url, timeout=request_timeout)
                     if resp.status == 200:
-                        return CheckResult(name="health", passed=True)
+                        return CheckResult(
+                            name="health",
+                            passed=True,
+                            attempted_endpoints=tuple(attempted_endpoints),
+                            duration_seconds=time.monotonic() - started,
+                            **metadata,
+                        )
                 except (URLError, OSError, TimeoutError):
                     continue
         return CheckResult(
-            name="health", passed=False, detail=f"no response on :{port}/health after 12s"
+            name="health",
+            passed=False,
+            detail=f"no successful response on port {port} after {startup_timeout}s",
+            remediation="Confirm the server command, port, and configured health endpoints.",
+            attempted_endpoints=tuple(attempted_endpoints),
+            duration_seconds=time.monotonic() - started,
+            **metadata,
         )
     except Exception as exc:
-        return CheckResult(name="health", passed=False, detail=str(exc)[:200])
+        return CheckResult(
+            name="health",
+            passed=False,
+            detail=redact_secrets(str(exc))[:200],
+            remediation="Run the server command manually and inspect startup output.",
+            attempted_endpoints=tuple(attempted_endpoints),
+            duration_seconds=time.monotonic() - started,
+            **metadata,
+        )
     finally:
         if process and process.poll() is None:
             process.terminate()
@@ -163,7 +322,7 @@ def verify_scaffold(
         )
 
     report = VerifyReport()
-    dev = meta.dev_commands
+    dev = _effective_dev_commands(stack, project_dir)
 
     # 1. Install dependencies
     install_result = _install_deps(stack, project_dir)
@@ -202,6 +361,45 @@ def verify_scaffold(
         report.checks.append(health_result)
 
     return report
+
+
+def _portable_cwd(cwd: str, project_dir: Path) -> str:
+    if not cwd:
+        return ""
+    try:
+        relative = Path(cwd).resolve().relative_to(project_dir.resolve())
+    except (OSError, ValueError):
+        return "<external>"
+    return "." if str(relative) == "." else f"./{relative.as_posix()}"
+
+
+def write_verification_report(report: VerifyReport, project_dir: Path) -> Path:
+    """Persist a privacy-safe, reproducible verification evidence report."""
+    payload = {
+        "schema_version": 1,
+        "all_passed": report.all_passed,
+        "checks": [
+            {
+                "name": check.name,
+                "passed": check.passed,
+                "skipped": check.skipped,
+                "detail": check.detail,
+                "command": check.command,
+                "cwd": _portable_cwd(check.cwd, project_dir),
+                "timeout_seconds": check.timeout_seconds,
+                "exit_code": check.exit_code,
+                "remediation": check.remediation,
+                "attempted_endpoints": list(check.attempted_endpoints),
+                "duration_seconds": round(check.duration_seconds, 3),
+            }
+            for check in report.checks
+        ],
+    }
+    forge_dir = project_dir / ".forge"
+    forge_dir.mkdir(parents=True, exist_ok=True)
+    output_path = forge_dir / "verification.json"
+    output_path.write_text(json.dumps(payload, indent=2) + "\n")
+    return output_path
 
 
 def print_report(report: VerifyReport, console: Console) -> None:

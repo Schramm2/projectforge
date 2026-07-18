@@ -11,6 +11,7 @@ from .convention_models import (
     ConventionValidationError,
 )
 from .convention_registry import build_registry as _build_registry
+from .safety import check_for_secrets
 
 _PLACEHOLDER_LOCAL_EXACT_LINES = {
     "todo",
@@ -148,6 +149,12 @@ def load_conventions_bundle(
         if not path.exists():
             continue
         content, layer_warnings = _load_conventions_file(path)
+        secret_types = check_for_secrets(content)
+        if secret_types:
+            raise ConventionValidationError(
+                f"Convention source contains credential-like content: {source_id} "
+                f"({', '.join(secret_types)})."
+            )
         if source_id == "user-wide" and content.strip() == LEGACY_DEFAULT_CONVENTIONS.strip():
             warnings.append(
                 "Ignoring the legacy generated user-wide conventions mirror; bundled rules apply."
@@ -205,11 +212,15 @@ def _load_local_conventions(path: Path) -> tuple[str, list[str]]:
     return content, warnings
 
 
-def load_conventions(stack: str | None = None) -> tuple[str, list[str]]:
+def load_conventions(
+    stack: str | None = None,
+    *,
+    profile: str = "default",
+) -> tuple[str, list[str]]:
     """Load bundled conventions first and use legacy files only as a compatibility fallback."""
 
     if stack is not None:
-        bundle = load_conventions_bundle(stack)
+        bundle = load_conventions_bundle(stack, profile=profile)
         return bundle.prompt_block, list(bundle.warnings)
 
     if LOCAL_CONVENTIONS_PATH.exists():

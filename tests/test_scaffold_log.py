@@ -22,6 +22,8 @@ def test_append_scaffold_log_creates_file(tmp_path, monkeypatch):
     assert entry["stack"] == "nextjs"
     assert set(entry["backends"]) == {"claude", "codex"}
     assert entry["demo_mode"] is True
+    assert entry["directory"] == "demo"
+    assert str(tmp_path) not in log_path.read_text()
     assert "timestamp" in entry
 
 

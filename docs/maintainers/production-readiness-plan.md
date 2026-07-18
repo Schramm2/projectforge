@@ -85,9 +85,9 @@ Baseline gaps already proven:
 
 - [x] Define deterministic precedence: bundled defaults -> selected user profile -> user-wide
   override -> project-local override.
-- [ ] Support profiles under `~/.forge` with a stable default profile.
-- [ ] Add friendly initialize, import, edit, select, inspect, preview, and validate commands.
-- [ ] Safely import Markdown instruction surfaces including `AGENTS.md`, `CLAUDE.md`, and ordinary
+- [x] Support profiles under `~/.forge` with a stable default profile.
+- [x] Add friendly initialize, import, edit, select, inspect, preview, and validate commands.
+- [x] Safely import Markdown instruction surfaces including `AGENTS.md`, `CLAUDE.md`, and ordinary
   convention files.
 - [ ] Support documented placeholders and reject unknown or secret-bearing values.
 - [x] Show exact source paths, order, warnings, and hashes in dry runs and live preflight.
@@ -113,12 +113,12 @@ Baseline gaps already proven:
 
 ## Reliability, verification, and recovery
 
-- [ ] Reproduce the showcase dashboard false negative as a failing test.
-- [ ] Make stack verification commands reflect the generated project layout and actual metadata.
-- [ ] Record commands, working directories, timeouts, skipped reasons, exit codes, and concise
+- [x] Reproduce the showcase dashboard false negative as a failing test.
+- [x] Make stack verification commands reflect the generated project layout and actual metadata.
+- [x] Record commands, working directories, timeouts, skipped reasons, exit codes, and concise
   remediation in verification reports.
 - [ ] Make health probes configurable and report every attempted endpoint and timeout honestly.
-- [ ] Ensure dashboard status and independently executed checks agree.
+- [x] Ensure dashboard status and independently executed checks agree.
 - [ ] Preserve partial project output after provider failure and write phase progress for resume.
 - [ ] Add actionable retry/resume/rerun guidance without overwriting successful work.
 - [ ] State duration, provider-call count, cost possibility, quick/thorough behavior, and demo-mode

@@ -41,6 +41,7 @@ _CONFIG_TYPES = {
     "projects_dir": str,
     "agents": bool,
     "sound": bool,
+    "conventions_profile": str,
 }
 
 # (cli_command, display_label, macOS .app bundle name)

@@ -139,6 +139,15 @@ def test_progress_summary_for_line_maps_common_backend_output_to_clean_loader_co
     )
 
 
+def test_progress_output_redacts_credential_shaped_values():
+    from ubundiforge.subprocess_utils import sanitize_progress_line
+
+    clean = sanitize_progress_line("clone failed: ghp_abcdefghijklmnopqrstuvwxyz1234567890")
+
+    assert "ghp_" not in clean
+    assert "REDACTED" in clean
+
+
 def test_progress_summary_for_line_uses_clean_fallback_for_non_noisy_updates():
     current = "Setting up tests and developer workflows"
 
