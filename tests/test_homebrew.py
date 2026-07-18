@@ -53,6 +53,12 @@ def test_runtime_formula_resources_resolve_recursive_runtime_dependencies():
         "typer",
         "wcwidth",
     ]
+    assert all(
+        resource.url.startswith(
+            f"https://files.pythonhosted.org/packages/source/{resource.name[0]}/{resource.name}/"
+        )
+        for resource in resources
+    )
 
 
 def test_render_homebrew_formula_contains_expected_install_surface():
