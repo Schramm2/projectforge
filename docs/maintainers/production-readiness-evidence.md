@@ -52,3 +52,29 @@ accurately.
 
 See [Provider Compatibility](provider-compatibility.md) for official sources, safe command shapes,
 and provider-specific limitations.
+
+## Publication evidence
+
+- [ProjectForge PR #5](https://github.com/Schramm2/projectforge/pull/5) merged through the hosted
+  workflow after all Python 3.12/3.13 Ubuntu/macOS checks passed.
+- The release workflow created annotated tag `v0.5.0`, published the
+  [GitHub release](https://github.com/Schramm2/projectforge/releases/tag/v0.5.0), measured archive
+  SHA-256 `f1293f2405690a7c6c33182fa826a29ce5a39d41323e80ac491f9f573764955d`, and committed the
+  generated formula to `main`.
+- Its first tap checkout failed because the configured secret was nonempty but unusable. The local
+  authenticated GitHub session had verified tap push authority, so
+  [tap PR #3](https://github.com/Schramm2/homebrew-tap/pull/3) synchronized the exact generated
+  formula through review rather than a direct default-branch push.
+- [ProjectForge PR #6](https://github.com/Schramm2/projectforge/pull/6) hardened the release
+  workflow: every new tag now requires a real tap push-permission check. An existing release can
+  skip writes only after the public and generated formulas compare byte-for-byte.
+- The subsequent
+  [sync-only workflow](https://github.com/Schramm2/projectforge/actions/runs/29646098616) succeeded,
+  regenerated the v0.5.0 formula, verified the exact tap match, and skipped all publication writes.
+- A clean isolated `uv tool install` from the immutable tag passed version, help, JSON doctor, and
+  zero-call dry-run checks. A Homebrew source reinstall from the public tap built v0.5.0, and
+  `brew test`, version, help, JSON doctor, and zero-call dry run all passed.
+
+The remaining operational risk is explicit: the stored tap secret must be replaced before the next
+new release. It was not changed during this task. The hardened workflow will stop before creating a
+future tag until that credential proves push permission.
