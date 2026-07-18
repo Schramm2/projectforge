@@ -2,6 +2,8 @@
 
 import re
 
+from ubundiforge.safety import redact_secrets
+
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 
 PHASE_TIMEOUT = 1800  # 30 minutes per phase
@@ -18,7 +20,7 @@ PULSE_STYLES = {
 
 def sanitize_progress_line(line: str) -> str:
     """Normalize backend output into compact text suitable for a loader."""
-    clean = ANSI_RE.sub("", line).strip()
+    clean = redact_secrets(ANSI_RE.sub("", line)).strip()
     clean = re.sub(r"\s+", " ", clean)
     return clean[:120]
 

@@ -46,9 +46,10 @@ def test_codex_status_reports_ready(monkeypatch):
 
     assert status.installed is True
     assert status.ready is True
+    assert status.auth_mode == "chatgpt"
 
 
-def test_gemini_status_reports_ready_when_cli_responds(monkeypatch):
+def test_gemini_status_reports_unknown_when_cli_responds(monkeypatch):
     monkeypatch.setattr(
         "ubundiforge.config.check_backend_installed",
         lambda backend: backend == "gemini",
@@ -66,11 +67,36 @@ def test_gemini_status_reports_ready_when_cli_responds(monkeypatch):
     status = get_backend_status("gemini")
 
     assert status.installed is True
+    assert status.ready is None
+    assert "authentication" in status.detail.lower()
+
+
+def test_gemini_status_reports_ready_from_matching_fresh_preflight(monkeypatch):
+    monkeypatch.setattr(
+        "ubundiforge.config.check_backend_installed",
+        lambda backend: backend == "gemini",
+    )
+    monkeypatch.setattr(
+        "ubundiforge.config._run_status_command",
+        lambda cmd, timeout=5: CompletedProcess(
+            args=cmd,
+            returncode=0,
+            stdout="0.51.0\n",
+            stderr="",
+        ),
+    )
+    monkeypatch.setattr(
+        "ubundiforge.config.load_valid_preflight",
+        lambda backend, *, version: backend == "gemini" and version == "0.51.0",
+    )
+
+    status = get_backend_status("gemini")
+
     assert status.ready is True
-    assert "responded successfully" in status.detail
+    assert status.auth_mode == "verified_preflight"
 
 
-def test_get_usable_backends_excludes_known_unready_backends(monkeypatch):
+def test_get_usable_backends_requires_verified_readiness(monkeypatch):
     monkeypatch.setattr(
         "ubundiforge.config.get_backend_statuses",
         lambda: {
@@ -80,4 +106,25 @@ def test_get_usable_backends_excludes_known_unready_backends(monkeypatch):
         },
     )
 
-    assert get_usable_backends() == ["gemini", "codex"]
+    assert get_usable_backends() == ["codex"]
+
+
+def test_codex_nonzero_status_is_not_treated_as_ready(monkeypatch):
+    monkeypatch.setattr(
+        "ubundiforge.config.check_backend_installed",
+        lambda backend: backend == "codex",
+    )
+    monkeypatch.setattr(
+        "ubundiforge.config._run_status_command",
+        lambda cmd, timeout=5: CompletedProcess(
+            args=cmd,
+            returncode=1,
+            stdout="Logged in using ChatGPT",
+            stderr="status command failed",
+        ),
+    )
+
+    status = get_backend_status("codex")
+
+    assert status.installed is True
+    assert status.ready is None

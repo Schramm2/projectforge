@@ -39,10 +39,11 @@ class TestCodexAdapterBuildCmd:
         assert cmd[0] == "codex"
         assert "exec" in cmd
 
-    def test_has_bypass_flag(self):
+    def test_uses_workspace_sandbox_by_default(self):
         adapter = CodexAdapter()
         cmd = adapter.build_cmd("irrelevant")
-        assert "--dangerously-bypass-approvals-and-sandbox" in cmd
+        assert "--dangerously-bypass-approvals-and-sandbox" not in cmd
+        assert cmd[cmd.index("--sandbox") + 1] == "workspace-write"
 
     def test_prompt_is_included(self):
         adapter = CodexAdapter()

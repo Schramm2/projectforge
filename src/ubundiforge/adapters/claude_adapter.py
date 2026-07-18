@@ -32,12 +32,7 @@ this exact structure:
 class ClaudeAdapter(CLIAdapterBase):
     """Backend adapter for Claude Code (`claude` CLI)."""
 
-    def build_cmd(self, prompt: str, model: str | None = None) -> list[str]:
-        cmd = ["claude", "-p", "--dangerously-skip-permissions"]
-        if model:
-            cmd += ["--model", model]
-        cmd.append(prompt)
-        return cmd
+    backend = "claude"
 
     def build_prompt(self, task: AgentTask) -> str:
         territory = "\n".join(f"- {f}" for f in task.file_territory)

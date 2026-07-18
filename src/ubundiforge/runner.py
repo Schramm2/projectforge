@@ -14,6 +14,8 @@ from pathlib import Path
 from rich.live import Live
 from rich.text import Text
 
+from ubundiforge.execution_policy import build_provider_command
+from ubundiforge.failure_taxonomy import classify_provider_failure
 from ubundiforge.subprocess_utils import (
     PHASE_TIMEOUT,
     format_activity,
@@ -38,6 +40,17 @@ from ubundiforge.ui import (
 )
 
 console = create_console()
+
+
+class ProviderExit(int):
+    """Integer-compatible provider exit code carrying a privacy-safe category."""
+
+    failure_category: str | None
+
+    def __new__(cls, code: int, failure_category: str | None = None):
+        value = int.__new__(cls, code)
+        value.failure_category = failure_category
+        return value
 
 
 class ActivityTracker:
@@ -69,26 +82,22 @@ class ActivityTracker:
         return self.steps[-self._max_visible :]
 
 
-def _build_cmd(backend: str, prompt: str, model: str | None = None) -> list[str]:
+def _build_cmd(
+    backend: str,
+    prompt: str,
+    model: str | None = None,
+    *,
+    approval_mode: str = "safe",
+    allow_unsafe: bool = False,
+) -> list[str]:
     """Build the subprocess command for the given backend."""
-    if backend == "claude":
-        cmd = ["claude", "-p", "--dangerously-skip-permissions"]
-        if model:
-            cmd.extend(["--model", model])
-        cmd.append(prompt)
-    elif backend == "gemini":
-        cmd = ["gemini", "-p", prompt, "-y"]
-        if model:
-            cmd.extend(["--model", model])
-    elif backend == "codex":
-        cmd = ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox"]
-        if model:
-            cmd.extend(["--model", model])
-        cmd.append(prompt)
-    else:
-        return []
-
-    return cmd
+    return build_provider_command(
+        backend,
+        prompt,
+        model,
+        approval_mode=approval_mode,
+        allow_unsafe=allow_unsafe,
+    )
 
 
 def _phase_accent(backend: str) -> str:
@@ -118,6 +127,8 @@ def run_ai(
     verbose: bool = False,
     label: str = "",
     phase_context: list[dict] | None = None,
+    approval_mode: str = "safe",
+    allow_unsafe: bool = False,
 ) -> int:
     """Execute the AI CLI with the assembled prompt.
 
@@ -138,7 +149,13 @@ def run_ai(
     project_dir.mkdir(parents=True, exist_ok=True)
     display_label = label or backend
 
-    cmd = _build_cmd(backend, prompt, model)
+    cmd = _build_cmd(
+        backend,
+        prompt,
+        model,
+        approval_mode=approval_mode,
+        allow_unsafe=allow_unsafe,
+    )
     if not cmd:
         console.print(status_line(f"Unknown backend: {backend}", accent="amber"))
         return 1
@@ -163,6 +180,7 @@ def run_ai(
     tracker = ActivityTracker()
     tracker.update(_initial_phase_summary(display_label, backend))
     last_line = ""
+    provider_tail: list[str] = []
     lock = threading.Lock()
 
     def _stream_stdout(pipe: io.BufferedReader, live: Live) -> None:
@@ -177,11 +195,14 @@ def run_ai(
                         continue
                     with lock:
                         last_line = clean
+                        provider_tail.append(clean)
+                        if len(provider_tail) > 50:
+                            del provider_tail[0]
                         new_summary = summarize_output_line(clean)
                         if new_summary and new_summary != tracker.current:
                             tracker.update(new_summary)
                     if verbose:
-                        live.console.print(line)
+                        live.console.print(clean)
         except ValueError:
             pass  # pipe closed
 
@@ -203,6 +224,7 @@ def run_ai(
                     proc.kill()
                     proc.wait()
                     reader.join(timeout=5)
+                    failure = classify_provider_failure("", returncode=None, timed_out=True)
                     console.print(
                         make_panel(
                             grouped_lines(
@@ -212,14 +234,15 @@ def run_ai(
                                         Text("  "),
                                         subtle(f"{display_label} timed out after {elapsed:.0f}s."),
                                     ),
-                                    muted("The phase may have stalled."),
+                                    muted(failure.summary),
+                                    muted(failure.remediation),
                                 ]
                             ),
                             title="Execution",
                             accent="amber",
                         )
                     )
-                    return 1
+                    return ProviderExit(124, failure.category)
                 with lock:
                     current_activities = tracker.visible_steps()
                     current_detail = last_line if last_line != tracker.current else None
@@ -244,12 +267,15 @@ def run_ai(
             reader.join(timeout=5)
 
     except FileNotFoundError:
-        console.print(status_line(f"{backend} command not found.", accent="amber"))
-        return 1
+        failure = classify_provider_failure("command not found", returncode=None)
+        console.print(status_line(failure.summary, accent="amber"))
+        console.print(muted(failure.remediation))
+        return ProviderExit(127, failure.category)
 
     elapsed = time.monotonic() - start
 
     if proc.returncode != 0 and not verbose:
+        failure = classify_provider_failure("\n".join(provider_tail), returncode=proc.returncode)
         failure_lines: list[Text] = [
             Text.assemble(
                 badge("failed", "error"),
@@ -259,6 +285,7 @@ def run_ai(
         ]
         if last_line:
             failure_lines.append(muted(format_activity(last_line, limit=110)))
+        failure_lines.extend([muted(failure.summary), muted(failure.remediation)])
         console.print(make_panel(grouped_lines(failure_lines), title="Execution", accent="plum"))
 
     if verbose:
@@ -268,7 +295,13 @@ def run_ai(
     else:
         console.print(status_line(f"{display_label} finished in {elapsed:.0f}s", accent=accent))
 
-    return proc.returncode
+    failure_category = None
+    if proc.returncode != 0:
+        failure_category = classify_provider_failure(
+            "\n".join(provider_tail),
+            returncode=proc.returncode,
+        ).category
+    return ProviderExit(proc.returncode, failure_category)
 
 
 @dataclass
@@ -282,6 +315,7 @@ class _PhaseProgress:
     returncode: int | None = None
     lines: list[str] = field(default_factory=list)
     last_line: str = ""
+    failure_category: str | None = None
 
 
 def run_ai_parallel(
@@ -328,7 +362,7 @@ def run_ai_parallel(
                     status = f"finished in {elapsed:.0f}s"
                 else:
                     icon = badge("failed", "error")
-                    status = f"exit {t.returncode}"
+                    status = t.failure_category or f"exit {t.returncode}"
             else:
                 icon = badge("live", "info")
                 status = f"working... {elapsed:.0f}s"
@@ -351,6 +385,8 @@ def run_ai_parallel(
                         continue
                     with lock:
                         trackers[label].lines.append(clean)
+                        if len(trackers[label].lines) > 200:
+                            del trackers[label].lines[0]
                         trackers[label].last_line = clean
                         trackers[label].summary = progress_summary_for_line(
                             clean, trackers[label].summary
@@ -363,12 +399,20 @@ def run_ai_parallel(
         backend = phase["backend"]
         prompt = phase["prompt"]
         model = phase.get("model")
+        approval_mode = phase.get("approval_mode", "safe")
+        allow_unsafe = phase.get("allow_unsafe", False)
 
-        cmd = _build_cmd(backend, prompt, model)
+        cmd = _build_cmd(
+            backend,
+            prompt,
+            model,
+            approval_mode=approval_mode,
+            allow_unsafe=allow_unsafe,
+        )
         if not cmd:
             with lock:
                 trackers[label].returncode = 1
-            return label, 1
+            return label, ProviderExit(1, "unknown")
 
         start = time.monotonic()
         with lock:
@@ -385,7 +429,7 @@ def run_ai_parallel(
             with lock:
                 trackers[label].returncode = 1
                 trackers[label].summary = f"{backend} command not found"
-            return label, 1
+            return label, ProviderExit(127, "missing_binary")
 
         with lock:
             procs[label] = proc
@@ -403,14 +447,21 @@ def run_ai_parallel(
                 reader.join(timeout=5)
                 with lock:
                     trackers[label].returncode = 1
-                return label, 1
+                    trackers[label].failure_category = "timeout"
+                return label, ProviderExit(124, "timeout")
             time.sleep(0.5)
 
         reader.join(timeout=5)
         with lock:
             trackers[label].returncode = proc.returncode
+            if proc.returncode != 0:
+                failure = classify_provider_failure(
+                    trackers[label].last_line,
+                    returncode=proc.returncode,
+                )
+                trackers[label].failure_category = failure.category
 
-        return label, proc.returncode
+        return label, ProviderExit(proc.returncode, trackers[label].failure_category)
 
     # Initialize trackers
     for phase in phases:

@@ -1,6 +1,6 @@
 """Tests for secrets detection."""
 
-from ubundiforge.safety import check_for_secrets
+from ubundiforge.safety import check_for_secrets, redact_secrets
 
 
 def test_no_secrets_in_normal_text():
@@ -34,3 +34,13 @@ def test_detects_private_key():
 def test_detects_slack_token():
     warnings = check_for_secrets("use xoxb-1234567890-abcdefghij")
     assert any("Slack" in w for w in warnings)
+
+
+def test_redact_secrets_removes_credential_value_but_keeps_context():
+    text = "provider failed with ghp_abcdefghijklmnopqrstuvwxyz1234567890 during clone"
+
+    redacted = redact_secrets(text)
+
+    assert "ghp_" not in redacted
+    assert "provider failed" in redacted
+    assert "REDACTED" in redacted

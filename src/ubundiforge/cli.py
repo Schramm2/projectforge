@@ -1,6 +1,9 @@
 """ProjectForge CLI — entry point."""
 
+import os
 import re
+import shutil
+import subprocess
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,12 +31,19 @@ from ubundiforge.convention_admin import (
     resolve_open_path,
 )
 from ubundiforge.convention_history import load_history
-from ubundiforge.convention_models import ConventionValidationError
+from ubundiforge.convention_models import CompiledBundle, ConventionValidationError
+from ubundiforge.convention_profiles import (
+    import_profile,
+    initialize_profile,
+    list_profiles,
+    profile_path,
+)
 from ubundiforge.conventions import (
     build_registry,
     load_bundled_conventions,
     load_claude_md_template,
     load_conventions,
+    load_conventions_bundle,
 )
 from ubundiforge.dashboard import render_dashboard
 from ubundiforge.design_templates import (
@@ -42,7 +52,10 @@ from ubundiforge.design_templates import (
     design_template_supported_for_stack,
     load_design_template,
 )
+from ubundiforge.doctor import build_doctor_report, doctor_exit_code
 from ubundiforge.evolutions import build_evolve_prompt, get_capabilities, get_capability
+from ubundiforge.execution_policy import validate_approval_mode
+from ubundiforge.execution_state import ProgressContractError, initialize_progress, mark_phase
 from ubundiforge.logo import print_logo
 from ubundiforge.media_assets import (
     MEDIA_DIR,
@@ -55,6 +68,7 @@ from ubundiforge.media_assets import (
 from ubundiforge.preferences import record_preferences
 from ubundiforge.prompt_builder import build_phase_prompt
 from ubundiforge.prompts import collect_answers
+from ubundiforge.provider_preflight import run_gemini_preflight
 from ubundiforge.quality import append_quality_signal, compute_backend_scores, read_quality_signals
 from ubundiforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
 from ubundiforge.router import (
@@ -82,7 +96,7 @@ from ubundiforge.scaffold_options import (
     auth_provider_supported_for_stack,
     ci_action_ids_for_stack,
 )
-from ubundiforge.setup import load_forge_config, needs_setup, run_setup
+from ubundiforge.setup import load_forge_config, needs_setup, run_setup, save_forge_config
 from ubundiforge.sound import play_completion_sound
 from ubundiforge.ui import (
     ACCENTS,
@@ -101,11 +115,13 @@ from ubundiforge.ui import (
     status_line,
     subtle,
 )
-from ubundiforge.verify import verify_scaffold
+from ubundiforge.verify import verify_scaffold, write_verification_report
 
 app = typer.Typer()
 admin_app = typer.Typer(help="Repo admin tools.")
+conventions_app = typer.Typer(help="Manage user-owned convention profiles.")
 app.add_typer(admin_app, name="admin")
+app.add_typer(conventions_app, name="conventions")
 console = create_console()
 
 _PROJECT_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
@@ -121,6 +137,115 @@ _BACKEND_LOGIN_COMMANDS = {
     "claude": "claude auth login",
     "codex": "codex login",
 }
+_FORGE_RUNTIME_BOUNDARY = """
+
+<forge_runtime_boundary>
+Do not read, edit, delete, or replace `.forge/progress.json`; ProjectForge owns that runtime
+evidence file. Preserve existing project output from earlier phases.
+</forge_runtime_boundary>"""
+
+
+@app.command()
+def doctor(
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Emit deterministic machine-readable diagnostics."),
+    ] = False,
+    preflight: Annotated[
+        str | None,
+        typer.Option(
+            "--preflight",
+            help="Make one opt-in readiness model call for a provider without a status API.",
+        ),
+    ] = None,
+) -> None:
+    """Check configuration and provider readiness; normal checks make no model calls."""
+    import json
+
+    preflight_result = None
+    if preflight is not None:
+        if preflight != "gemini":
+            raise typer.BadParameter(
+                "only gemini needs an explicit model preflight",
+                param_hint="--preflight",
+            )
+        if not json_output:
+            console.print(
+                status_line(
+                    "Gemini preflight: making one isolated, read-only model call; quota may apply",
+                    accent="amber",
+                )
+            )
+        preflight_result = run_gemini_preflight()
+
+    report = build_doctor_report()
+    if preflight_result is not None and json_output:
+        report["preflight"] = {
+            "provider": "gemini",
+            "success": preflight_result.success,
+            "category": preflight_result.category,
+            "detail": preflight_result.detail,
+        }
+    if json_output:
+        console.print_json(json.dumps(report))
+    else:
+        if preflight_result is not None:
+            console.print(
+                status_line(
+                    preflight_result.detail,
+                    accent="aqua" if preflight_result.success else "amber",
+                )
+            )
+        console.print(header_panel(__version__))
+        config_status = report["config"]["status"]
+        console.print(status_line(f"Configuration: {config_status}", accent="violet"))
+        environment = report["environment"]
+        console.print(
+            status_line(
+                f"Python: {environment['python']['version']} "
+                f"({'supported' if environment['python']['supported'] else 'unsupported'})",
+                accent="aqua" if environment["python"]["supported"] else "amber",
+            )
+        )
+        for tool in ("git", "docker"):
+            tool_status = environment[tool]
+            label = tool_status["version"] or (
+                "installed" if tool_status["installed"] else "not installed"
+            )
+            console.print(status_line(f"{tool}: {label}", accent="violet"))
+        installed_editors = [
+            editor for editor, installed in environment["editors"].items() if installed
+        ]
+        console.print(
+            status_line(
+                f"Editors: {', '.join(installed_editors) if installed_editors else 'none found'}",
+                accent="violet",
+            )
+        )
+        for backend, provider in report["providers"].items():
+            version = f" ({provider['version']})" if provider["version"] else ""
+            console.print(
+                status_line(
+                    f"{backend}: {provider['readiness']}{version}",
+                    accent="aqua" if provider["readiness"] == "ready" else "amber",
+                )
+            )
+            model_behavior = provider["model_behavior"]
+            model_label = (
+                f"override {model_behavior['value']}"
+                if model_behavior["mode"] == "override"
+                else "provider default"
+            )
+            console.print(muted(f"  model: {model_label}"))
+            if provider.get("auth_mode"):
+                console.print(muted(f"  authentication mode: {provider['auth_mode']}"))
+            if provider.get("repair") != "No action required.":
+                console.print(muted(f"  repair: {provider['repair']}"))
+    exit_code = doctor_exit_code(report)
+    if preflight_result is not None and not preflight_result.success:
+        exit_code = 1
+    if exit_code:
+        raise typer.Exit(exit_code)
 
 
 STACK_ALIASES = {
@@ -195,23 +320,24 @@ def _render_loaded_context(
     backend_models: dict[str, str],
     *,
     model_override: str | None,
+    approval_mode: str,
     conventions: str,
     claude_md_loaded: bool,
     design_template_label: str | None,
     media_collection: str | None = None,
     media_asset_count: int = 0,
+    convention_sources: tuple = (),
 ) -> None:
     """Render loaded scaffold context."""
     lines: list[Text] = []
-    if model_override:
-        lines.append(subtle(f"Model override: {model_override}"))
-    elif backend_models:
-        for backend in sorted(required_backends):
-            configured_model = backend_models.get(backend)
-            if configured_model:
-                lines.append(subtle(f"{backend} model: {configured_model}"))
+    for backend in sorted(required_backends):
+        configured_model = model_override or backend_models.get(backend)
+        lines.append(subtle(f"{backend} model: {configured_model or 'provider default'}"))
+    lines.append(subtle(f"Approval mode: {approval_mode}"))
 
     lines.append(subtle(f"Conventions: {len(conventions)} chars loaded"))
+    for source in convention_sources:
+        lines.append(muted(f"  {source.source_id}: {source.display_path} ({source.sha256})"))
     if claude_md_loaded:
         lines.append(subtle("CLAUDE.md starter loaded"))
     if design_template_label:
@@ -229,7 +355,10 @@ def _backend_help_line(backend: str, status: BackendStatus) -> Text:
         return subtle(f"{backend} needs login. Run {login_command}.")
     if not status.installed:
         return subtle(f"{backend} is not installed or not on PATH.")
-    return subtle(f"{backend} is installed, but Forge could not auto-check readiness.")
+    return subtle(
+        f"{backend} is installed but requires a provider-specific readiness preflight. "
+        "Run forge doctor for details."
+    )
 
 
 def _render_backend_readiness_notice(
@@ -250,9 +379,9 @@ def _render_phase_failure(backend: str, label: str, returncode: int) -> None:
     """Render helpful follow-up guidance when a scaffold phase fails."""
     lines: list[Text] = [
         subtle(f"{label} failed with {backend} (exit {returncode})."),
-        subtle("Re-run with --quiet to suppress subprocess output."),
-        subtle("Use --dry-run to inspect the assembled prompt before trying again."),
-        muted("You can also force a different backend with --use if another one is ready."),
+        subtle("Partial project output and .forge/progress.json were preserved."),
+        subtle("Fix the reported provider issue, then repeat the same command with --resume."),
+        muted("Resume verifies the original contract and does not rerun completed phases."),
     ]
     console.print(make_panel(grouped_lines(lines), title="Execution", accent="amber"))
 
@@ -344,6 +473,7 @@ def _has_explicit_scaffold_request(**kwargs: object) -> bool:
             bool(kwargs.get("ci_actions")),
             bool(kwargs.get("media")),
             bool(kwargs.get("no_media")),
+            bool(kwargs.get("resume")),
         ]
     )
 
@@ -515,6 +645,187 @@ def _run_admin_conventions_interactive(registry) -> None:
     console.print(make_panel(path_text(resolved_path), title="Open Markdown", accent="plum"))
 
 
+def _selected_conventions_profile() -> str:
+    """Return the configured profile without exposing other config values."""
+    return load_forge_config().get("conventions_profile", "default")
+
+
+@conventions_app.command("init")
+def conventions_init(
+    name: Annotated[str, typer.Argument(help="Profile name.")] = "default",
+) -> None:
+    """Create a starter convention profile without overwriting existing work."""
+    try:
+        path = initialize_profile(name)
+    except ConventionValidationError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    console.print(status_line(f"Created convention profile: {path}", accent="aqua"))
+
+
+@conventions_app.command("import")
+def conventions_import(
+    source: Annotated[Path, typer.Argument(help="Markdown instruction file to import.")],
+    name: Annotated[
+        str | None,
+        typer.Option("--name", help="Destination profile name; defaults to the source stem."),
+    ] = None,
+) -> None:
+    """Import AGENTS.md, CLAUDE.md, or another Markdown file as a new profile."""
+    try:
+        path = import_profile(source, name or source.stem)
+    except ConventionValidationError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    console.print(status_line(f"Imported convention profile: {path}", accent="aqua"))
+
+
+@conventions_app.command("list")
+def conventions_list() -> None:
+    """List profiles and show the selected profile."""
+    selected = _selected_conventions_profile()
+    profiles = list_profiles()
+    if not profiles:
+        console.print(status_line("No profiles found. Run forge conventions init.", accent="amber"))
+        return
+    for name in profiles:
+        marker = " (selected)" if name == selected else ""
+        console.print(status_line(f"{name}{marker}", accent="aqua"))
+
+
+@conventions_app.command("select")
+def conventions_select(
+    name: Annotated[str, typer.Argument(help="Existing profile name.")],
+) -> None:
+    """Select the profile used for future scaffolds."""
+    try:
+        path = profile_path(name)
+    except ConventionValidationError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    if not path.exists():
+        console.print(status_line(f"Convention profile not found: {name}", accent="amber"))
+        raise typer.Exit(1)
+    config = load_forge_config()
+    config["conventions_profile"] = name
+    save_forge_config(config)
+    console.print(status_line(f"Selected convention profile: {name}", accent="aqua"))
+
+
+def _conventions_inspection(stack: str | None) -> tuple[str, CompiledBundle, dict]:
+    profile = _selected_conventions_profile()
+    bundle = load_conventions_bundle(stack=stack, profile=profile)
+    report = {
+        "profile": profile,
+        "stack": stack,
+        "bundle_id": bundle.bundle_id,
+        "warnings": list(bundle.warnings),
+        "sources": [
+            {
+                "source_id": source.source_id,
+                "path": source.display_path,
+                "sha256": source.sha256,
+            }
+            for source in bundle.contributions
+        ],
+    }
+    return profile, bundle, report
+
+
+@conventions_app.command("inspect")
+def conventions_inspect(
+    stack: Annotated[
+        str | None,
+        typer.Option("--stack", help="Stack whose effective bundle should be inspected."),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Emit machine-readable source metadata."),
+    ] = False,
+) -> None:
+    """Inspect effective source order, paths, warnings, and hashes."""
+    import json
+
+    try:
+        profile, bundle, report = _conventions_inspection(stack)
+    except ConventionValidationError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    if json_output:
+        console.print_json(json.dumps(report))
+        return
+    console.print(status_line(f"Profile: {profile}; bundle: {bundle.bundle_id}", accent="aqua"))
+    for source in bundle.contributions:
+        console.print(muted(f"{source.source_id}: {source.display_path} ({source.sha256})"))
+    for warning in bundle.warnings:
+        console.print(status_line(f"Warning: {warning}", accent="amber"))
+
+
+@conventions_app.command("preview")
+def conventions_preview(
+    stack: Annotated[str | None, typer.Option("--stack", help="Stack to preview.")] = None,
+) -> None:
+    """Print the effective conventions content without starting a provider."""
+    try:
+        _, bundle, _ = _conventions_inspection(stack)
+    except ConventionValidationError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    console.print(bundle.prompt_block)
+
+
+@conventions_app.command("validate")
+def conventions_validate(
+    stack: Annotated[str | None, typer.Option("--stack", help="Stack to validate.")] = None,
+) -> None:
+    """Validate the selected profile and its effective bundle."""
+    try:
+        profile, bundle, _ = _conventions_inspection(stack)
+    except ConventionValidationError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    secret_types = check_for_secrets(bundle.prompt_block)
+    if secret_types:
+        console.print(
+            status_line(
+                f"Validation failed: credential-like content ({', '.join(secret_types)}).",
+                accent="amber",
+            )
+        )
+        raise typer.Exit(1)
+    console.print(status_line(f"Validation passed for profile {profile}.", accent="aqua"))
+
+
+@conventions_app.command("edit")
+def conventions_edit(
+    name: Annotated[str | None, typer.Argument(help="Profile name; defaults to selected.")] = None,
+) -> None:
+    """Open a profile in the configured editor."""
+    profile = name or _selected_conventions_profile()
+    try:
+        path = profile_path(profile)
+    except ConventionValidationError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    if not path.exists():
+        console.print(status_line(f"Convention profile not found: {profile}", accent="amber"))
+        raise typer.Exit(1)
+    configured = load_forge_config().get("preferred_editor", "")
+    editor = configured or os.environ.get("EDITOR", "")
+    executable = shutil.which(editor) if editor else None
+    if not executable:
+        console.print(
+            status_line(
+                "No configured editor command found. Set one with forge --setup or $EDITOR.",
+                accent="amber",
+            )
+        )
+        raise typer.Exit(1)
+    result = subprocess.run([executable, str(path)], check=False)
+    if result.returncode != 0:
+        raise typer.Exit(result.returncode)
+
+
 @admin_app.command("conventions")
 def admin_conventions(
     validate: Annotated[
@@ -611,6 +922,14 @@ def evolve(
         str | None,
         typer.Option("--model", "-m", help="Model to pass to the AI CLI."),
     ] = None,
+    approval_mode: Annotated[
+        str,
+        typer.Option("--approval-mode", help="Execution mode: safe, plan, or unsafe."),
+    ] = "safe",
+    allow_unsafe: Annotated[
+        bool,
+        typer.Option("--allow-unsafe", help="Confirm provider bypass/yolo execution."),
+    ] = False,
     verbose: Annotated[
         bool,
         typer.Option("--verbose", help="Show detailed execution info."),
@@ -622,6 +941,15 @@ def evolve(
 ) -> None:
     """Add a capability to an existing Forge project."""
     import json
+
+    try:
+        validate_approval_mode(
+            approval_mode,
+            allow_unsafe=allow_unsafe or dry_run,
+        )
+    except ValueError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
 
     project_dir = Path.cwd()
     manifest_path = project_dir / ".forge" / "scaffold.json"
@@ -694,7 +1022,14 @@ def evolve(
     console.print(status_line(f"Adding {cap['name']} via {backend}...", accent="violet"))
 
     returncode = run_ai(
-        backend, prompt, project_dir, model=model, verbose=verbose, label=f"Evolve: {cap['name']}"
+        backend,
+        prompt,
+        project_dir,
+        model=model,
+        verbose=verbose,
+        label=f"Evolve: {cap['name']}",
+        approval_mode=approval_mode,
+        allow_unsafe=allow_unsafe,
     )
 
     if returncode == 0:
@@ -819,6 +1154,14 @@ def replay(
         str | None,
         typer.Option("--model", "-m", help="Model to pass to the AI CLI."),
     ] = None,
+    approval_mode: Annotated[
+        str,
+        typer.Option("--approval-mode", help="Execution mode: safe, plan, or unsafe."),
+    ] = "safe",
+    allow_unsafe: Annotated[
+        bool,
+        typer.Option("--allow-unsafe", help="Confirm provider bypass/yolo execution."),
+    ] = False,
     verbose: Annotated[
         bool,
         typer.Option("--verbose", help="Show detailed execution info."),
@@ -831,6 +1174,15 @@ def replay(
     """Replay a scaffold using the project's original inputs."""
     import json
     import tempfile
+
+    try:
+        validate_approval_mode(
+            approval_mode,
+            allow_unsafe=allow_unsafe or dry_run,
+        )
+    except ValueError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
 
     project_dir = Path.cwd()
     manifest_path = project_dir / ".forge" / "scaffold.json"
@@ -957,6 +1309,8 @@ def replay(
             model=effective_model,
             verbose=verbose,
             label=label,
+            approval_mode=approval_mode,
+            allow_unsafe=allow_unsafe,
         )
         if returncode != 0:
             console.print(
@@ -1046,6 +1400,20 @@ def main(
         str | None,
         typer.Option("--model", "-m", help="Model to pass to the AI CLI backend."),
     ] = None,
+    approval_mode: Annotated[
+        str,
+        typer.Option(
+            "--approval-mode",
+            help="Provider-neutral execution mode: safe, plan, or unsafe.",
+        ),
+    ] = "safe",
+    allow_unsafe: Annotated[
+        bool,
+        typer.Option(
+            "--allow-unsafe",
+            help="Confirm blanket provider bypass/yolo execution for this run.",
+        ),
+    ] = False,
     name: Annotated[
         str | None,
         typer.Option("--name", "-n", help="Project name (skips interactive prompt)."),
@@ -1150,6 +1518,13 @@ def main(
         bool,
         typer.Option("--verify/--no-verify", help="Run post-scaffold verification checks."),
     ] = True,
+    resume: Annotated[
+        bool,
+        typer.Option(
+            "--resume",
+            help="Resume failure; preserve completed phases.",
+        ),
+    ] = False,
     export: Annotated[
         str | None,
         typer.Option("--export", help="Export assembled prompt to a file."),
@@ -1160,6 +1535,17 @@ def main(
         return
 
     prompt_only = dry_run or bool(export)
+    if resume and prompt_only:
+        console.print(status_line("--resume cannot be combined with --dry-run or --export."))
+        raise typer.Exit(1)
+    try:
+        validate_approval_mode(
+            approval_mode,
+            allow_unsafe=allow_unsafe or prompt_only,
+        )
+    except ValueError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
     explicit_scaffold_request = _has_explicit_scaffold_request(
         use=use,
         model=model,
@@ -1176,6 +1562,7 @@ def main(
         ci_actions=ci_actions,
         media=media,
         no_media=no_media,
+        resume=resume,
     )
 
     if version:
@@ -1393,7 +1780,7 @@ def main(
                     "\n[dim]Install at least one AI CLI (claude, gemini, or codex).[/dim]"
                 )
                 raise typer.Exit(1)
-            if status.ready is False:
+            if status.ready is not True:
                 _render_backend_readiness_notice(backend_statuses, required_backends={backend})
                 raise typer.Exit(1)
 
@@ -1402,7 +1789,18 @@ def main(
 
     # Load conventions and CLAUDE.md template
     try:
-        conventions, conv_warnings = load_conventions(stack=answers["stack"])
+        conventions_profile = forge_config.get("conventions_profile", "default")
+        if conventions_profile == "default":
+            conventions, conv_warnings = load_conventions(stack=answers["stack"])
+        else:
+            conventions, conv_warnings = load_conventions(
+                stack=answers["stack"],
+                profile=conventions_profile,
+            )
+        convention_bundle = load_conventions_bundle(
+            stack=answers["stack"],
+            profile=conventions_profile,
+        )
     except ConventionValidationError as exc:
         console.print(status_line(f"Conventions error: {exc}", accent="amber"))
         raise typer.Exit(1) from exc
@@ -1440,11 +1838,13 @@ def main(
         required_backends,
         backend_models,
         model_override=model,
+        approval_mode=approval_mode,
         conventions=conventions,
         claude_md_loaded=bool(claude_md_template),
         design_template_label=answers.get("design_template_label"),
         media_collection=selected_collection,
         media_asset_count=media_asset_count,
+        convention_sources=convention_bundle.contributions,
     )
 
     # Check all user-supplied text for secrets before passing to AI
@@ -1475,7 +1875,16 @@ def main(
     # Skip directory resolution in prompt-only mode to avoid side effects.
     base_dir = Path(forge_config.get("projects_dir") or Path.cwd())
     project_dir = base_dir / answers["name"]
-    if not prompt_only:
+    if resume:
+        if not project_dir.is_dir():
+            console.print(
+                status_line(
+                    "Resume target does not exist. Repeat the original project name and options.",
+                    accent="amber",
+                )
+            )
+            raise typer.Exit(1)
+    elif not prompt_only:
         project_dir = _resolve_project_dir(base_dir, answers)
 
     # Build prompts for each individual phase
@@ -1489,6 +1898,7 @@ def main(
             backend=backend,
             claude_md_template=claude_md_template,
         )
+        prompt += _FORGE_RUNTIME_BOUNDARY
         phase_prompts.append((phase, backend, prompt))
 
     # Also build merged prompts for dry-run/export (preserves existing behavior)
@@ -1502,6 +1912,7 @@ def main(
             backend=backend,
             claude_md_template=claude_md_template,
         )
+        prompt += _FORGE_RUNTIME_BOUNDARY
         merged_prompts.append((phases, backend, prompt))
 
     # Dry run / export: show all phase prompts
@@ -1534,21 +1945,18 @@ def main(
                     )
                 console.print(prompt)
 
-        if dry_run and agents:
-            import tempfile
-
-            from ubundiforge.adapters import get_adapter
-            from ubundiforge.orchestrator import _get_plan, _render_decomposition_plan
-
-            # Use a temp dir for planning when project_dir doesn't exist yet
-            plan_cwd = project_dir if project_dir.exists() else Path(tempfile.mkdtemp())
-            for phase, backend, prompt in phase_prompts:
-                adapter = get_adapter(backend, conventions)
-                effective_model = model or backend_models.get(backend)
-                plan = _get_plan(
-                    adapter, prompt, phase, answers["stack"], backend, plan_cwd, effective_model
+        if dry_run:
+            console.print()
+            console.print(
+                status_line(
+                    "Preview only: no provider processes started and no model calls made.",
+                    accent="aqua",
                 )
-                _render_decomposition_plan(plan)
+            )
+            if agents:
+                console.print(
+                    muted("Multi-agent decomposition is generated only when a live run starts.")
+                )
 
         if export:
             export_path = Path(export)
@@ -1574,6 +1982,29 @@ def main(
 
         raise typer.Exit()
 
+    try:
+        progress_state = initialize_progress(
+            project_dir,
+            name=answers["name"],
+            stack=answers["stack"],
+            approval_mode=approval_mode,
+            phase_prompts=phase_prompts,
+            resume=resume,
+        )
+    except ProgressContractError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    completed_phases = {
+        phase["phase"] for phase in progress_state["phases"] if phase.get("status") == "completed"
+    }
+    if resume:
+        console.print(
+            status_line(
+                f"Resume validated: preserving {len(completed_phases)} completed phase(s).",
+                accent="aqua",
+            )
+        )
+
     if verbose:
         total_chars = sum(len(prompt) for _, _, prompt in phase_prompts)
         n = len(phase_prompts)
@@ -1583,6 +2014,66 @@ def main(
                 accent="violet",
             )
         )
+
+    selected_backends = sorted({backend for _, backend in phase_backends})
+    model_summary = ", ".join(
+        f"{backend}={model or backend_models.get(backend) or 'provider default'}"
+        for backend in selected_backends
+    )
+    execution_windows = len(serial_first) + len(serial_last)
+    execution_windows += 1 if can_parallel else len(parallel_middle)
+    minimum_minutes = max(1, execution_windows * 2)
+    maximum_minutes = max(5, execution_windows * 15)
+    remaining_provider_calls = len(phase_backends) - len(completed_phases)
+    provider_call_summary = (
+        f"at least {remaining_provider_calls}; multi-agent planning/tasks add calls"
+        if agents
+        else str(remaining_provider_calls)
+    )
+    console.print(
+        make_panel(
+            grouped_lines(
+                [
+                    subtle(f"Workspace: {project_dir.resolve()}"),
+                    subtle(f"Providers: {', '.join(selected_backends)}"),
+                    subtle(f"Models: {model_summary}"),
+                    subtle(f"Approval mode: {approval_mode}"),
+                    subtle(f"Provider calls: {provider_call_summary}"),
+                    subtle(
+                        f"Planning range: about {minimum_minutes}-{maximum_minutes} minutes; "
+                        "provider and network latency may vary"
+                    ),
+                    subtle(
+                        "Strategy: thorough multi-agent planning and task execution"
+                        if agents
+                        else "Strategy: standard one-call-per-phase execution"
+                    ),
+                    subtle(
+                        "Demo mode: generated startup should not require real service credentials"
+                        if answers.get("demo_mode")
+                        else (
+                            "Demo mode: disabled; generated startup may require service credentials"
+                        )
+                    ),
+                    subtle(
+                        "Verification: enabled"
+                        if verify
+                        else "Verification: disabled; completion cannot be independently verified"
+                    ),
+                    muted(
+                        "Provider quota or billing may apply; Forge cannot predict provider cost."
+                    ),
+                    muted(
+                        "Unsafe mode disables provider approval boundaries."
+                        if approval_mode == "unsafe"
+                        else "Writes remain constrained by the selected provider's workspace mode."
+                    ),
+                ]
+            ),
+            title="Execution Preflight",
+            accent="amber" if approval_mode == "unsafe" else "aqua",
+        )
+    )
 
     # --- Copy media assets before AI runs (so the AI can see them) ---
     if answers.get("media_assets_manifest") and media_source_dir:
@@ -1605,7 +2096,7 @@ def main(
         phase_context.append(
             {
                 "label": PHASE_LABELS.get(phase, phase),
-                "status": "pending",
+                "status": "completed" if phase in completed_phases else "pending",
                 "elapsed": 0.0,
                 "accent": BACKEND_ACCENTS.get(backend, "violet"),
             }
@@ -1622,6 +2113,10 @@ def main(
     # Step 1: Run architecture (serial)
     for phase, backend in serial_first:
         label = PHASE_LABELS.get(phase, phase)
+        if phase in completed_phases:
+            console.print(status_line(f"Preserved completed phase: {label}", accent="aqua"))
+            step += 1
+            continue
         console.print()
         console.print(
             make_step_panel(step, total_phases, label, detail=f"backend: {backend}", accent="aqua")
@@ -1631,6 +2126,7 @@ def main(
         phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
         phase_context[phase_idx]["status"] = "active"
         phase_start = time.monotonic()
+        mark_phase(project_dir, phase, status="running")
         if agents:
             from ubundiforge.orchestrator import run_phase_orchestrated
 
@@ -1643,6 +2139,8 @@ def main(
                 conventions=conventions,
                 model=effective_model,
                 verbose=verbose,
+                approval_mode=approval_mode,
+                allow_unsafe=allow_unsafe,
             )
             _any_orchestrated = True
             for key in ("planned", "completed", "failed"):
@@ -1656,24 +2154,56 @@ def main(
                 verbose=verbose,
                 label=label,
                 phase_context=phase_context,
+                approval_mode=approval_mode,
+                allow_unsafe=allow_unsafe,
             )
         phase_context[phase_idx]["status"] = "completed"
-        phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
+        phase_elapsed = time.monotonic() - phase_start
+        phase_context[phase_idx]["elapsed"] = phase_elapsed
         if returncode != 0:
+            phase_context[phase_idx]["status"] = "failed"
+            mark_phase(
+                project_dir,
+                phase,
+                status="failed",
+                duration_seconds=phase_elapsed,
+                exit_code=returncode,
+                failure_category=getattr(returncode, "failure_category", "unknown"),
+            )
             _render_phase_failure(backend, label, returncode)
             raise typer.Exit(returncode)
+        mark_phase(
+            project_dir, phase, status="completed", duration_seconds=phase_elapsed, exit_code=0
+        )
         console.print()
         console.print(make_file_tree(project_dir))
         step += 1
 
     # Step 2: Run middle phases (parallel if multiple, serial if single)
     if parallel_middle:
+        remaining_middle = [
+            (phase, backend) for phase, backend in parallel_middle if phase not in completed_phases
+        ]
+        if not agents:
+            for phase, _backend in parallel_middle:
+                if phase in completed_phases:
+                    console.print(
+                        status_line(
+                            f"Preserved completed phase: {PHASE_LABELS.get(phase, phase)}",
+                            accent="aqua",
+                        )
+                    )
+                    step += 1
         if agents:
             # Orchestrator handles its own internal parallelism — run sequentially here
             from ubundiforge.orchestrator import run_phase_orchestrated
 
             for phase, backend in parallel_middle:
                 label = PHASE_LABELS.get(phase, phase)
+                if phase in completed_phases:
+                    console.print(status_line(f"Preserved completed phase: {label}", accent="aqua"))
+                    step += 1
+                    continue
                 console.print()
                 console.print(
                     make_step_panel(
@@ -1685,6 +2215,7 @@ def main(
                 phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
                 phase_context[phase_idx]["status"] = "active"
                 phase_start = time.monotonic()
+                mark_phase(project_dir, phase, status="running")
                 returncode, _phase_stats = run_phase_orchestrated(
                     phase=phase,
                     backend=backend,
@@ -1694,20 +2225,39 @@ def main(
                     conventions=conventions,
                     model=effective_model,
                     verbose=verbose,
+                    approval_mode=approval_mode,
+                    allow_unsafe=allow_unsafe,
                 )
                 _any_orchestrated = True
                 for key in ("planned", "completed", "failed"):
                     _agent_stats[key] += _phase_stats.get(key, 0)
-                phase_context[phase_idx]["status"] = "completed"
-                phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
+                phase_elapsed = time.monotonic() - phase_start
+                phase_context[phase_idx]["elapsed"] = phase_elapsed
                 if returncode != 0:
+                    phase_context[phase_idx]["status"] = "failed"
+                    mark_phase(
+                        project_dir,
+                        phase,
+                        status="failed",
+                        duration_seconds=phase_elapsed,
+                        exit_code=returncode,
+                        failure_category=getattr(returncode, "failure_category", "unknown"),
+                    )
                     _render_phase_failure(backend, label, returncode)
                     raise typer.Exit(returncode)
+                phase_context[phase_idx]["status"] = "completed"
+                mark_phase(
+                    project_dir,
+                    phase,
+                    status="completed",
+                    duration_seconds=phase_elapsed,
+                    exit_code=0,
+                )
                 console.print()
                 console.print(make_file_tree(project_dir))
                 step += 1
-        elif can_parallel:
-            labels = " + ".join(f"{PHASE_LABELS.get(p, p)} ({b})" for p, b in parallel_middle)
+        elif len(remaining_middle) > 1:
+            labels = " + ".join(f"{PHASE_LABELS.get(p, p)} ({b})" for p, b in remaining_middle)
             console.print()
             console.print(
                 make_step_panel(
@@ -1720,28 +2270,62 @@ def main(
             )
 
             parallel_args = []
-            for phase, backend in parallel_middle:
+            label_to_phase: dict[str, str] = {}
+            for phase, backend in remaining_middle:
                 phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
                 effective_model = model or backend_models.get(backend)
+                label = PHASE_LABELS.get(phase, phase)
+                label_to_phase[label] = phase
+                phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
+                phase_context[phase_idx]["status"] = "active"
+                mark_phase(project_dir, phase, status="running")
                 parallel_args.append(
                     {
-                        "label": PHASE_LABELS.get(phase, phase),
+                        "label": label,
                         "backend": backend,
                         "prompt": phase_prompt,
                         "model": effective_model,
+                        "approval_mode": approval_mode,
+                        "allow_unsafe": allow_unsafe,
                     }
                 )
 
+            parallel_started = time.monotonic()
             results = run_ai_parallel(parallel_args, project_dir, verbose=verbose)
+            parallel_elapsed = time.monotonic() - parallel_started
+            failed_results: list[tuple[str, int]] = []
             for label, returncode in results:
+                phase = label_to_phase[label]
+                phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
                 if returncode != 0:
+                    phase_context[phase_idx]["status"] = "failed"
+                    mark_phase(
+                        project_dir,
+                        phase,
+                        status="failed",
+                        duration_seconds=parallel_elapsed,
+                        exit_code=returncode,
+                        failure_category=getattr(returncode, "failure_category", "unknown"),
+                    )
+                    failed_results.append((label, returncode))
+                else:
+                    phase_context[phase_idx]["status"] = "completed"
+                    mark_phase(
+                        project_dir,
+                        phase,
+                        status="completed",
+                        duration_seconds=parallel_elapsed,
+                        exit_code=0,
+                    )
+            if failed_results:
+                for label, returncode in failed_results:
                     _render_phase_failure("parallel backend", label, returncode)
-                    raise typer.Exit(returncode)
+                raise typer.Exit(failed_results[0][1])
             console.print()
             console.print(make_file_tree(project_dir))
-            step += len(parallel_middle)
+            step += len(remaining_middle)
         else:
-            for phase, backend in parallel_middle:
+            for phase, backend in remaining_middle:
                 label = PHASE_LABELS.get(phase, phase)
                 console.print()
                 console.print(
@@ -1754,6 +2338,7 @@ def main(
                 phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
                 phase_context[phase_idx]["status"] = "active"
                 phase_start = time.monotonic()
+                mark_phase(project_dir, phase, status="running")
                 returncode = run_ai(
                     backend,
                     phase_prompt,
@@ -1762,12 +2347,31 @@ def main(
                     verbose=verbose,
                     label=label,
                     phase_context=phase_context,
+                    approval_mode=approval_mode,
+                    allow_unsafe=allow_unsafe,
                 )
-                phase_context[phase_idx]["status"] = "completed"
-                phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
+                phase_elapsed = time.monotonic() - phase_start
+                phase_context[phase_idx]["elapsed"] = phase_elapsed
                 if returncode != 0:
+                    phase_context[phase_idx]["status"] = "failed"
+                    mark_phase(
+                        project_dir,
+                        phase,
+                        status="failed",
+                        duration_seconds=phase_elapsed,
+                        exit_code=returncode,
+                        failure_category=getattr(returncode, "failure_category", "unknown"),
+                    )
                     _render_phase_failure(backend, label, returncode)
                     raise typer.Exit(returncode)
+                phase_context[phase_idx]["status"] = "completed"
+                mark_phase(
+                    project_dir,
+                    phase,
+                    status="completed",
+                    duration_seconds=phase_elapsed,
+                    exit_code=0,
+                )
                 console.print()
                 console.print(make_file_tree(project_dir))
                 step += 1
@@ -1775,6 +2379,10 @@ def main(
     # Step 3: Run verify (serial)
     for phase, backend in serial_last:
         label = PHASE_LABELS.get(phase, phase)
+        if phase in completed_phases:
+            console.print(status_line(f"Preserved completed phase: {label}", accent="aqua"))
+            step += 1
+            continue
         console.print()
         console.print(
             make_step_panel(step, total_phases, label, detail=f"backend: {backend}", accent="plum")
@@ -1784,6 +2392,7 @@ def main(
         phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
         phase_context[phase_idx]["status"] = "active"
         phase_start = time.monotonic()
+        mark_phase(project_dir, phase, status="running")
         if agents:
             from ubundiforge.orchestrator import run_phase_orchestrated
 
@@ -1796,6 +2405,8 @@ def main(
                 conventions=conventions,
                 model=effective_model,
                 verbose=verbose,
+                approval_mode=approval_mode,
+                allow_unsafe=allow_unsafe,
             )
             _any_orchestrated = True
             for key in ("planned", "completed", "failed"):
@@ -1809,12 +2420,31 @@ def main(
                 verbose=verbose,
                 label=label,
                 phase_context=phase_context,
+                approval_mode=approval_mode,
+                allow_unsafe=allow_unsafe,
             )
-        phase_context[phase_idx]["status"] = "completed"
-        phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
+        phase_elapsed = time.monotonic() - phase_start
+        phase_context[phase_idx]["elapsed"] = phase_elapsed
         if returncode != 0:
+            phase_context[phase_idx]["status"] = "failed"
+            mark_phase(
+                project_dir,
+                phase,
+                status="failed",
+                duration_seconds=phase_elapsed,
+                exit_code=returncode,
+                failure_category=getattr(returncode, "failure_category", "unknown"),
+            )
             _render_phase_failure(backend, label, returncode)
             raise typer.Exit(returncode)
+        phase_context[phase_idx]["status"] = "completed"
+        mark_phase(
+            project_dir,
+            phase,
+            status="completed",
+            duration_seconds=phase_elapsed,
+            exit_code=0,
+        )
         console.print()
         console.print(make_file_tree(project_dir))
         step += 1
@@ -1827,6 +2457,8 @@ def main(
         conventions,
         model_override=model,
         backend_models=backend_models,
+        approval_mode=approval_mode,
+        convention_sources=convention_bundle.contributions,
     )
 
     git_ok = ensure_git_init(project_dir)
@@ -1834,6 +2466,7 @@ def main(
     verify_report = None
     if verify:
         verify_report = verify_scaffold(answers["stack"], project_dir, verbose=verbose)
+        write_verification_report(verify_report, project_dir)
 
     append_quality_signal(
         stack=answers["stack"],

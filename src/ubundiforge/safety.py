@@ -28,3 +28,11 @@ def check_for_secrets(text: str) -> list[str]:
             found.append(label)
 
     return found
+
+
+def redact_secrets(text: str) -> str:
+    """Replace credential-shaped values while preserving useful surrounding context."""
+    redacted = text
+    for pattern, label in SECRET_PATTERNS:
+        redacted = re.sub(pattern, f"[REDACTED: {label}]", redacted)
+    return redacted

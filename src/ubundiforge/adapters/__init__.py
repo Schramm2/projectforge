@@ -11,8 +11,18 @@ ADAPTER_REGISTRY: dict[str, type] = {
 }
 
 
-def get_adapter(backend: str, conventions: str = ""):
+def get_adapter(
+    backend: str,
+    conventions: str = "",
+    *,
+    approval_mode: str = "safe",
+    allow_unsafe: bool = False,
+):
     adapter_cls = ADAPTER_REGISTRY.get(backend)
     if adapter_cls is None:
         raise ValueError(f"No adapter for backend: {backend}")
-    return adapter_cls(conventions=conventions)
+    return adapter_cls(
+        conventions=conventions,
+        approval_mode=approval_mode,
+        allow_unsafe=allow_unsafe,
+    )

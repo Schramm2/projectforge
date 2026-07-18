@@ -120,3 +120,26 @@ def test_render_dashboard_without_agent_stats(tmp_path: Path):
     output = buf.getvalue()
     assert "AGENT TASKS" not in output
     assert "planned" not in output.lower()
+
+
+def test_dashboard_does_not_claim_ready_when_verification_failed(tmp_path: Path):
+    answers = {"name": "pulse", "stack": "fastapi"}
+    report = VerifyReport(
+        checks=[CheckResult(name="test", passed=False, detail="one test failed")]
+    )
+    buf = StringIO()
+    console = Console(file=buf, width=100)
+
+    render_dashboard(
+        console=console,
+        answers=answers,
+        phase_backends=[("architecture", "claude")],
+        project_dir=tmp_path,
+        verify_report=report,
+        elapsed=10.0,
+    )
+
+    output = buf.getvalue()
+    assert "Project Ready" not in output
+    assert "verification needs attention" in output.lower()
+    assert "one test failed" in output

@@ -561,6 +561,8 @@ def run_phase_orchestrated(
     model: str | None = None,
     verbose: bool = True,
     phase_context: str | None = None,
+    approval_mode: str = "safe",
+    allow_unsafe: bool = False,
 ) -> tuple[int, dict]:
     """Main entry point for orchestrated phase execution.
 
@@ -568,7 +570,12 @@ def run_phase_orchestrated(
     succeeded (1 otherwise) and *agent_stats* is a dict with keys:
     ``planned``, ``completed``, ``failed``.
     """
-    adapter = get_adapter(backend, conventions)
+    adapter = get_adapter(
+        backend,
+        conventions,
+        approval_mode=approval_mode,
+        allow_unsafe=allow_unsafe,
+    )
     adapter.phase_brief = prompt
     plan = _get_plan(adapter, prompt, phase, stack, backend, project_dir, model)
 
