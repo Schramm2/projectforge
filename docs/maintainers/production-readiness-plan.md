@@ -165,7 +165,7 @@ Baseline gaps already proven:
 - [x] `uv build`
 - [x] Documented dry-run smoke test
 - [x] Clean wheel and sdist inspection
-- [ ] Isolated wheel and immutable archive installation
+- [x] Isolated wheel and immutable archive installation
 - [x] Skill validation and behavioral tests
 - [x] All new doctor/onboarding/provider/conventions/security/verification acceptance tests
 - [x] Realistic isolated Claude, Codex, and Gemini probes with evidence classification
@@ -182,12 +182,14 @@ Baseline gaps already proven:
 - [x] Make intentional scoped commits on `feat/production-readiness`.
 - [x] Push the branch and open a ready PR.
 - [x] Wait for CI and resolve every failure.
-- [ ] Merge through the hosted workflow only after required evidence and authorization gates pass.
-- [ ] Verify the release workflow creates the tag and GitHub release and syncs the Homebrew tap.
-- [ ] Verify release notes and all hosted workflows.
-- [ ] Verify clean `uv tool install` from the immutable tag.
-- [ ] Verify clean `brew install schramm2/tap/projectforge`, `brew test`, version, help, and doctor.
-- [ ] Verify a release-archive dry run.
+- [x] Merge through the hosted workflow only after required evidence and authorization gates pass.
+- [x] Verify the release workflow creates the tag and GitHub release and the Homebrew tap is
+  synchronized. The first cross-repository checkout failed; tap PR #3 completed the update and a
+  hardened sync-only run then verified an exact no-op match.
+- [x] Verify release notes and all hosted workflows, including the successful sync-only recovery.
+- [x] Verify clean `uv tool install` from the immutable tag.
+- [x] Verify clean `brew install schramm2/tap/projectforge`, `brew test`, version, help, and doctor.
+- [x] Verify a release-archive dry run.
 
 ## Current external evidence status
 
@@ -196,8 +198,8 @@ Baseline gaps already proven:
 | Claude Code | Live | v2.1.214 installed and authenticated; safe three-phase scaffold, targeted repair, resume, and independent checks completed |
 | Codex CLI | Partial | v0.144.0 installed and authenticated; official latest v0.144.5 version/help surface passed in an isolated npm probe; authenticated bounded-write evidence remains |
 | Gemini CLI | Unavailable for live use | Official v0.51.0 version/help surface passed through the no-install route; no global binary, deterministic auth status, authenticated preflight, or model call is available |
-| GitHub release | Not started | Current latest is v0.4.1; publication must wait for all gates |
-| Homebrew tap | Not started | Current v0.4.1 formula is synchronized; next release requires workflow and clean-install proof |
+| GitHub release | Released | v0.5.0 is tagged, published, and installs from its immutable archive |
+| Homebrew tap | Released | v0.5.0 formula matches the generated main-repo formula and passes source install plus `brew test` |
 
 ## Stop-before-publish blockers
 
@@ -205,3 +207,9 @@ Stop before publication if any of these remain unresolved: no authenticated end-
 missing release/tap credentials, branch protection or CI failures, unsafe provider execution that
 cannot be bounded, an unresolved compatibility/version decision, or unavailable external
 infrastructure. Record the exact missing evidence rather than weakening a claim.
+
+No blocker remains for the published v0.5.0 release. The stored `HOMEBREW_TAP_TOKEN` is present but
+cannot currently authenticate to the tap. A future new release is intentionally blocked before tag
+creation until a maintainer replaces that credential outside this task. v0.5.0 was synchronized
+through reviewed tap PR #3, and the hardened release workflow subsequently verified the public tap
+as an exact generated-formula match in a successful, non-mutating sync-only run.
