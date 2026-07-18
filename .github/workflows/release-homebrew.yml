@@ -125,27 +125,6 @@ jobs:
         if: steps.mode.outputs.run_checks == 'true'
         run: uv run ruff check .
 
-      - name: Ensure tap token is configured
-        if: steps.mode.outputs.sync_formula == 'true'
-        run: |
-          if [ -z "${TAP_REPO}" ]; then
-            echo "::error::HOMEBREW_TAP_REPO is not configured."
-            exit 1
-          fi
-          if [ -z "${{ secrets.HOMEBREW_TAP_TOKEN }}" ]; then
-            echo "::error::HOMEBREW_TAP_TOKEN is not configured. Add a token with write access to ${TAP_REPO}."
-            exit 1
-          fi
-
-      - name: Check out Homebrew tap
-        if: steps.mode.outputs.sync_formula == 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.TAP_REPO }}
-          ref: ${{ env.TAP_BRANCH }}
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          path: tap-checkout
-
       - name: Run tests
         if: steps.mode.outputs.run_checks == 'true'
         run: uv run pytest
@@ -216,6 +195,30 @@ jobs:
           fi
           git commit -m "release: update Homebrew formula for ${{ steps.meta.outputs.tag }}"
           git push origin HEAD:main
+
+      # Tap access is checked only after the release and canonical formula are published. A stale
+      # cross-repository token should make tap synchronization fail visibly without suppressing
+      # the GitHub release itself.
+      - name: Ensure tap token is configured
+        if: steps.mode.outputs.sync_formula == 'true'
+        run: |
+          if [ -z "${TAP_REPO}" ]; then
+            echo "::error::HOMEBREW_TAP_REPO is not configured."
+            exit 1
+          fi
+          if [ -z "${{ secrets.HOMEBREW_TAP_TOKEN }}" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN is not configured. Add a token with write access to ${TAP_REPO}."
+            exit 1
+          fi
+
+      - name: Check out Homebrew tap
+        if: steps.mode.outputs.sync_formula == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TAP_REPO }}
+          ref: ${{ env.TAP_BRANCH }}
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap-checkout
 
       - name: Sync formula into Homebrew tap
         if: steps.mode.outputs.sync_formula == 'true'
