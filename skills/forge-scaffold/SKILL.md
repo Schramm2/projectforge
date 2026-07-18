@@ -29,7 +29,7 @@ command -v uv >/dev/null 2>&1 && test -d src/ubundiforge && echo "READY" || echo
 forge --version
 ```
 
-- If **NOT_FOUND**: Do NOT guess Forge behavior from memory alone. Tell the user Forge is not available. Suggest `uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1` or repo-local setup with `uv sync --dev`.
+- If **NOT_FOUND**: Do NOT guess Forge behavior from memory alone. Tell the user Forge is not available. Suggest `uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz` or repo-local setup with `uv sync --dev`.
 
 ## Error Handling
 
@@ -59,13 +59,19 @@ Forge v0.4.1 exposes the default scaffold flow plus five subcommands:
 **Supported public install:**
 
 ```bash
-uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1
+uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz
 forge --version
 ```
 
-Do not suggest PyPI or Homebrew for ProjectForge until a maintainer has published and verified
-those channels. `--dry-run` and `--export` do not require backend authentication; live generation
-does.
+Homebrew is also a verified public route:
+
+```bash
+brew install --build-from-source schramm2/tap/projectforge
+forge --version
+```
+
+Do not suggest PyPI for ProjectForge until a maintainer has published and verified that channel.
+`--dry-run` and `--export` do not require backend authentication; live generation does.
 
 **Repo-local setup:**
 

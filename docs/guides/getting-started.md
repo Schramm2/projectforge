@@ -13,16 +13,27 @@ Forge will detect which tools are available and route to the best one automatica
 
 ## Installation
 
-### Supported public install
+### uv
 
 ```bash
-uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1
+uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz
 forge --version
 forge --help
 ```
 
 This installs the `projectforge` distribution from an immutable release and exposes the `forge`
 command. ProjectForge is not currently published to PyPI.
+
+### Homebrew
+
+```bash
+brew install --build-from-source schramm2/tap/projectforge
+forge --version
+forge --help
+```
+
+The public tap is synchronized by the release workflow and verified with `brew test` before it is
+documented as supported.
 
 ### Development checkout
 
