@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 from ubundiforge import __version__
 
 FORMULA_NAME = "projectforge"
+DISTRIBUTION_NAME = "matt-projectforge"
 DEFAULT_HOMEPAGE = "https://github.com/Schramm2/projectforge"
 DEFAULT_REPOSITORY = "https://github.com/Schramm2/projectforge"
 DEFAULT_SOURCE_URL = f"{DEFAULT_REPOSITORY}/archive/refs/tags/v{__version__}.tar.gz"
@@ -34,7 +35,7 @@ def _package_index(lock_data: dict) -> dict[str, dict]:
 def _runtime_dependency_names(lock_data: dict) -> list[str]:
     """Return Forge's direct runtime dependencies from uv.lock metadata."""
     packages = _package_index(lock_data)
-    project = packages[FORMULA_NAME]
+    project = packages[DISTRIBUTION_NAME]
     requires_dist = project["metadata"]["requires-dist"]
     return sorted({requirement["name"] for requirement in requires_dist})
 
@@ -131,11 +132,12 @@ def render_homebrew_formula(
   end
 
   test do
-    command = "#{{bin}}/forge --dry-run --name brew-smoke --stack fastapi " \\
+    command = "#{{bin}}/projectforge --dry-run --name brew-smoke --stack fastapi " \\
               "--description 'Homebrew smoke test' --no-docker --no-open --no-verify"
     output = shell_output(command)
     assert_match "Homebrew smoke test", output
     assert_match "Routing Plan", output
+    assert_match "projectforge", shell_output("#{{bin}}/forge --version")
   end
 end
 '''

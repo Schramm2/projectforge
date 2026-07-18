@@ -1,5 +1,6 @@
-"""Tests for Homebrew formula generation."""
+"""Tests for Homebrew formula generation and release packaging."""
 
+import tomllib
 from pathlib import Path
 
 from ubundiforge import __version__
@@ -7,6 +8,7 @@ from ubundiforge.homebrew import (
     DEFAULT_HOMEPAGE,
     DEFAULT_REPOSITORY,
     DEFAULT_SOURCE_URL,
+    DISTRIBUTION_NAME,
     render_homebrew_formula,
     runtime_formula_resources,
     write_homebrew_formula,
@@ -16,6 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_homebrew_defaults_use_canonical_public_repository():
+    assert DISTRIBUTION_NAME == "matt-projectforge"
     assert DEFAULT_HOMEPAGE == "https://github.com/Schramm2/projectforge"
     assert DEFAULT_REPOSITORY == "https://github.com/Schramm2/projectforge"
     assert DEFAULT_SOURCE_URL == (
@@ -73,7 +76,18 @@ def test_render_homebrew_formula_contains_expected_install_surface():
     assert 'depends_on "python@3.13"' in formula
     assert 'conflicts_with "forge"' in formula
     assert 'resource "typer" do' in formula
-    assert "#{bin}/forge --dry-run --name brew-smoke" in formula
+    assert "#{bin}/projectforge --dry-run --name brew-smoke" in formula
+    assert 'shell_output("#{bin}/forge --version")' in formula
+
+
+def test_package_metadata_installs_collision_free_and_compatibility_commands():
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+
+    assert project["name"] == "matt-projectforge"
+    assert project["scripts"] == {
+        "projectforge": "ubundiforge.__main__:main",
+        "forge": "ubundiforge.__main__:main",
+    }
 
 
 def test_release_workflow_verifies_real_tap_access_before_tagging():
@@ -86,3 +100,14 @@ def test_release_workflow_verifies_real_tap_access_before_tagging():
     assert ".permissions.push" in workflow
     assert "Compare generated formula with Homebrew tap" in workflow
     assert "steps.tap_sync.outputs.already_synced != 'true'" in workflow
+
+
+def test_release_workflow_publishes_pypi_only_after_homebrew_release_job():
+    workflow = (ROOT / ".github/workflows/release-homebrew.yml").read_text()
+
+    assert "publish-pypi:" in workflow
+    assert "needs: release" in workflow
+    assert "if: needs.release.outputs.publish_release == 'true'" in workflow
+    assert "id-token: write" in workflow
+    assert "https://pypi.org/p/matt-projectforge" in workflow
+    assert "pypa/gh-action-pypi-publish@release/v1" in workflow

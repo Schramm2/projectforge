@@ -22,6 +22,11 @@ _VERSION_COMMANDS = {
     "antigravity": ["agy", "--version"],
     "codex": ["codex", "--version"],
 }
+_READINESS_COMMANDS = {
+    "claude": "claude auth status",
+    "antigravity": "agy --version; agy models",
+    "codex": "codex login status",
+}
 _EDITOR_COMMANDS = ("cursor", "code", "antigravity", "windsurf", "zed")
 
 
@@ -95,22 +100,51 @@ def _provider_repair(backend: str, status: BackendStatus) -> str:
     if not status.installed:
         return (
             f"Install from {PROVIDER_CAPABILITIES[backend].install_url}, authenticate there, "
-            "then rerun forge doctor."
+            "then rerun `projectforge doctor`."
         )
     if status.ready is False:
         if backend == "antigravity":
             return (
                 "Run agy, complete Google Sign-In in the browser (or the displayed SSH URL), "
-                "exit with /exit, then rerun forge doctor."
+                "exit with /exit, then rerun `projectforge doctor`."
             )
         command = status.login_command or f"{backend} login"
-        return f"Run {command}, then rerun forge doctor."
+        return f"Run `{command}`, then rerun `projectforge doctor`."
     if backend == "antigravity":
         return (
-            "Run agy, complete Google Sign-In in the browser (or the displayed SSH URL), "
-            "exit with /exit, then rerun forge doctor."
+            "Run `agy models` directly. If it does not list models, run `agy`, complete Google "
+            "Sign-In in the browser (or displayed SSH URL), exit with `/exit`, then rerun "
+            "`projectforge doctor`."
         )
-    return f"Recheck the provider-owned login flow, then rerun forge doctor for {backend}."
+    if backend == "claude":
+        return (
+            "Run `claude auth status` directly. If it does not report logged in, run "
+            "`claude auth login`, then rerun `projectforge doctor`."
+        )
+    return (
+        "Run `codex login status` directly. If it does not report logged in, run `codex login`, "
+        "then rerun `projectforge doctor`."
+    )
+
+
+def _provider_check(backend: str, status: BackendStatus) -> dict[str, str]:
+    """Describe the credential-safe readiness check and its observed result."""
+    command = _READINESS_COMMANDS[backend]
+    if not status.installed:
+        executable = command.split()[0]
+        return {
+            "command": f"PATH lookup for `{executable}`",
+            "observed": f"No `{executable}` executable was found on PATH.",
+        }
+    if backend == "antigravity" and "version check" in status.detail.lower():
+        command = "agy --version"
+    if status.ready is True:
+        observed = "The readiness check confirmed an authenticated provider session."
+    elif status.ready is False:
+        observed = "The readiness check reported that authentication is required."
+    else:
+        observed = "The readiness check did not return a recognized authentication result."
+    return {"command": command, "observed": observed}
 
 
 def build_doctor_report() -> dict:
@@ -133,6 +167,7 @@ def build_doctor_report() -> dict:
                 "value": backend_models.get(backend),
             },
             "capabilities": capability.diagnostic_payload(),
+            "check": _provider_check(backend, status),
             "repair": _provider_repair(backend, status),
         }
 

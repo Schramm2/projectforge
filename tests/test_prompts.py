@@ -1,6 +1,31 @@
 """Tests for interactive prompt review behavior."""
 
-from ubundiforge.prompts import collect_answers
+from ubundiforge.prompts import _ask_execution_mode, collect_answers
+
+
+def test_execution_mode_labels_standard_as_the_actual_default(monkeypatch):
+    captured = {}
+
+    class Selection:
+        def ask(self):
+            return "standard"
+
+    def fake_select(message, *, choices, default=None):
+        captured["message"] = message
+        captured["choices"] = choices
+        captured["default"] = default
+        return Selection()
+
+    monkeypatch.setattr("ubundiforge.prompts.prompt_select", fake_select)
+    answers = {"agents": False}
+
+    _ask_execution_mode(answers)
+
+    assert captured["default"] == "standard"
+    assert captured["choices"][0].value == "standard"
+    assert "Standard (default)" in captured["choices"][0].title
+    assert "recommended" not in captured["choices"][1].title.lower()
+    assert answers["agents"] is False
 
 
 def test_collect_answers_allows_review_edit_before_scaffold(monkeypatch):

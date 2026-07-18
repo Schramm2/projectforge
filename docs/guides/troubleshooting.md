@@ -1,6 +1,6 @@
 # Troubleshooting
 
-This guide documents ProjectForge v0.5.1 with Antigravity support. Older Gemini-backed releases
+This guide documents ProjectForge v0.6.0 with Antigravity support. Older Gemini-backed releases
 retain their own bundled troubleshooting guidance.
 
 Start with the credential-free diagnostic:
@@ -18,12 +18,14 @@ only when config is valid and at least one provider is verifiably ready.
 Check the install route:
 
 - Current checkout: run `uv sync --dev`, then use `./forge` from the repository root.
-- Published GitHub/uv package: run `uv tool list`, then reinstall the intended immutable release
-  if needed.
+- PyPI/uv or pipx package: run `uv tool list` or `pipx list`, then reinstall
+  `matt-projectforge` if needed.
+- Published GitHub archive: run `uv tool list`, then reinstall the intended immutable release.
 - Homebrew: run `brew list projectforge` and `brew info schramm2/tap/projectforge`.
 
-ProjectForge is not published to PyPI. Follow any PATH guidance printed by `uv tool install` or
-Homebrew rather than installing a similarly named package from another channel.
+Current source installs both `projectforge` (preferred) and `forge` (compatibility). If Foundry's
+Ethereum CLI already owns `forge` on PATH, run `projectforge` or inspect `command -v forge` and
+`command -v projectforge`. Follow PATH guidance printed by uv, pipx, or Homebrew.
 
 ## Provider is missing or needs login
 

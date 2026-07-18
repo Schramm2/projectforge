@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import math
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -20,6 +21,7 @@ def append_scaffold_log(
     *,
     verify_report: VerifyReport | None = None,
     verification_requested: bool = False,
+    duration_seconds: float | None = None,
 ) -> None:
     """Append a JSON-lines entry to ~/.forge/scaffold.log."""
     backends_used = sorted({b for _, b in phase_backends})
@@ -37,11 +39,50 @@ def append_scaffold_log(
             else "not_run"
         ),
         "verification_requested": verification_requested,
+        "duration_seconds": (
+            round(duration_seconds, 3)
+            if duration_seconds is not None
+            and math.isfinite(duration_seconds)
+            and duration_seconds >= 0
+            else None
+        ),
         "timestamp": datetime.now(UTC).isoformat(),
     }
     FORGE_DIR.mkdir(parents=True, exist_ok=True)
     with SCAFFOLD_LOG_PATH.open("a") as f:
         f.write(json.dumps(entry) + "\n")
+
+
+def latest_scaffold_duration(
+    stack: str,
+    *,
+    log_path: Path | None = None,
+) -> float | None:
+    """Return the newest measured duration for ``stack`` from local history."""
+    path = log_path or SCAFFOLD_LOG_PATH
+    if not path.exists():
+        return None
+
+    try:
+        lines = path.read_text().splitlines()
+    except OSError:
+        return None
+
+    for line in reversed(lines):
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        duration = entry.get("duration_seconds") if isinstance(entry, dict) else None
+        if (
+            entry.get("stack") == stack
+            and isinstance(duration, (int, float))
+            and not isinstance(duration, bool)
+            and math.isfinite(duration)
+            and duration >= 0
+        ):
+            return float(duration)
+    return None
 
 
 def write_scaffold_manifest(

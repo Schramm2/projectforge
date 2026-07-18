@@ -88,7 +88,12 @@ from ubundiforge.runner import (
     run_post_scaffold_hook,
 )
 from ubundiforge.safety import check_for_secrets
-from ubundiforge.scaffold_log import SCAFFOLD_LOG_PATH, append_scaffold_log, write_scaffold_manifest
+from ubundiforge.scaffold_log import (
+    SCAFFOLD_LOG_PATH,
+    append_scaffold_log,
+    latest_scaffold_duration,
+    write_scaffold_manifest,
+)
 from ubundiforge.scaffold_options import (
     AUTH_PROVIDER_OPTIONS,
     CI_TEMPLATE_MODES,
@@ -137,6 +142,11 @@ _BACKEND_LOGIN_COMMANDS = {
     "claude": "claude auth login",
     "antigravity": "agy and complete Google Sign-In",
     "codex": "codex login",
+}
+_PROVIDER_QUOTA_NOTES = {
+    "claude": "Claude Code plan limits or configured API billing",
+    "antigravity": "Google account plan and Antigravity quota",
+    "codex": "ChatGPT/Codex plan limits or configured API billing",
 }
 _FORGE_RUNTIME_BOUNDARY = """
 
@@ -196,12 +206,10 @@ def doctor(
         installed_editors = [
             editor for editor, installed in environment["editors"].items() if installed
         ]
-        console.print(
-            status_line(
-                f"Editors: {', '.join(installed_editors) if installed_editors else 'none found'}",
-                accent="violet",
-            )
-        )
+        editor_label = ", ".join(installed_editors)
+        if not editor_label:
+            editor_label = "no editor CLI on PATH — set one with `projectforge --setup`"
+        console.print(status_line(f"Editors: {editor_label}", accent="violet"))
         for backend, provider in report["providers"].items():
             version = f" ({provider['version']})" if provider["version"] else ""
             console.print(
@@ -219,8 +227,13 @@ def doctor(
             console.print(muted(f"  model: {model_label}"))
             if provider.get("auth_mode"):
                 console.print(muted(f"  authentication mode: {provider['auth_mode']}"))
-            if provider.get("repair") != "No action required.":
-                console.print(muted(f"  repair: {provider['repair']}"))
+            if provider["readiness"] != "ready":
+                check = provider.get("check", {})
+                if check.get("command"):
+                    console.print(muted(f"  check: {check['command']}"))
+                if check.get("observed"):
+                    console.print(muted(f"  observed: {check['observed']}"))
+                console.print(muted(f"  next: {provider['repair']}"))
     exit_code = doctor_exit_code(report)
     if exit_code:
         raise typer.Exit(exit_code)
@@ -305,6 +318,7 @@ def _render_loaded_context(
     media_collection: str | None = None,
     media_asset_count: int = 0,
     convention_sources: tuple = (),
+    verbose: bool = False,
 ) -> None:
     """Render loaded scaffold context."""
     lines: list[Text] = []
@@ -313,9 +327,16 @@ def _render_loaded_context(
         lines.append(subtle(f"{backend} model: {configured_model or 'provider default'}"))
     lines.append(subtle(f"Approval mode: {approval_mode}"))
 
-    lines.append(subtle(f"Conventions: {len(conventions)} chars loaded"))
-    for source in convention_sources:
-        lines.append(muted(f"  {source.source_id}: {source.display_path} ({source.sha256})"))
+    source_label = "source" if len(convention_sources) == 1 else "sources"
+    lines.append(
+        subtle(
+            f"Conventions: {len(convention_sources)} {source_label}, "
+            f"{len(conventions):,} chars (hashes recorded)"
+        )
+    )
+    if verbose:
+        for source in convention_sources:
+            lines.append(muted(f"  {source.source_id}: {source.display_path} ({source.sha256})"))
     if claude_md_loaded:
         lines.append(subtle("CLAUDE.md starter loaded"))
     if design_template_label:
@@ -324,6 +345,50 @@ def _render_loaded_context(
         lines.append(subtle(f"Media: {media_asset_count} files from {media_collection}/"))
 
     console.print(make_panel(grouped_lines(lines), title="Scaffold Context", accent="aqua"))
+
+
+def _format_duration(seconds: float) -> str:
+    """Format a measured duration for compact preflight display."""
+    total_seconds = max(0, round(seconds))
+    minutes, remaining_seconds = divmod(total_seconds, 60)
+    if minutes:
+        return f"{minutes}m {remaining_seconds:02d}s"
+    return f"{remaining_seconds}s"
+
+
+def _provider_commitment_lines(
+    phase_backends: list[tuple[str, str]],
+    completed_phases: set[str],
+    *,
+    agents: bool,
+) -> list[Text]:
+    """Return numeric provider usage and cost caveats for execution preflight."""
+    phases_by_backend: dict[str, int] = {}
+    for phase, backend in phase_backends:
+        if phase not in completed_phases:
+            phases_by_backend[backend] = phases_by_backend.get(backend, 0) + 1
+
+    lines: list[Text] = []
+    for backend in sorted(phases_by_backend):
+        phase_count = phases_by_backend[backend]
+        if agents:
+            invocation_count = f"typically {phase_count * 4}-{phase_count * 8}"
+        else:
+            invocation_count = str(phase_count)
+        lines.append(
+            subtle(
+                f"{backend} usage: {invocation_count} provider CLI invocation(s); "
+                f"{_PROVIDER_QUOTA_NOTES[backend]}; rough cost: $0 on an included plan or "
+                "~$1-$20+ when usage-billed"
+            )
+        )
+    lines.append(
+        muted(
+            "These are order-of-magnitude planning ranges, not quotes; Forge cannot see "
+            "provider tokens, plan limits, or current rates."
+        )
+    )
+    return lines
 
 
 def _backend_help_line(backend: str, status: BackendStatus) -> Text:
@@ -1514,8 +1579,8 @@ def main(
     ] = None,
     verbose: Annotated[
         bool,
-        typer.Option("--verbose/--quiet", help="Show detailed execution info."),
-    ] = True,
+        typer.Option("--verbose/--quiet", help="Show detailed execution info and source hashes."),
+    ] = False,
     open_editor: Annotated[
         bool,
         typer.Option("--open/--no-open", help="Open project in editor after scaffolding."),
@@ -1848,6 +1913,7 @@ def main(
         media_collection=selected_collection,
         media_asset_count=media_asset_count,
         convention_sources=convention_bundle.contributions,
+        verbose=verbose,
     )
 
     # Check all user-supplied text for secrets before passing to AI
@@ -2028,51 +2094,63 @@ def main(
     minimum_minutes = max(1, execution_windows * 2)
     maximum_minutes = max(5, execution_windows * 15)
     remaining_provider_calls = len(phase_backends) - len(completed_phases)
-    provider_call_summary = (
-        f"at least {remaining_provider_calls}; multi-agent planning/tasks add calls"
-        if agents
-        else str(remaining_provider_calls)
+    if agents:
+        provider_call_summary = (
+            f"typically {remaining_provider_calls * 4}-{remaining_provider_calls * 8} "
+            "(planner + 2-6 tasks + reconciliation per remaining phase)"
+        )
+    else:
+        provider_call_summary = f"{remaining_provider_calls} (one per remaining phase)"
+
+    previous_duration = latest_scaffold_duration(answers["stack"])
+    history_summary = (
+        f"Last {answers['stack']} scaffold: {_format_duration(previous_duration)} "
+        "(local measurement)"
+        if previous_duration is not None
+        else f"Last {answers['stack']} scaffold: no measured duration yet"
+    )
+    preflight_lines = [
+        subtle(f"Workspace: {project_dir.resolve()}"),
+        subtle(f"Providers: {', '.join(selected_backends)}"),
+        subtle(f"Models: {model_summary}"),
+        subtle(f"Approval mode: {approval_mode}"),
+        subtle(f"Provider CLI invocations: {provider_call_summary}"),
+        subtle(
+            f"Planning range: about {minimum_minutes}-{maximum_minutes} minutes; "
+            "provider and network latency may vary"
+        ),
+        subtle(history_summary),
+        subtle(
+            "Strategy: thorough multi-agent planning and task execution"
+            if agents
+            else "Strategy: standard one-call-per-phase execution"
+        ),
+    ]
+    preflight_lines.extend(
+        _provider_commitment_lines(phase_backends, completed_phases, agents=bool(agents))
+    )
+    preflight_lines.extend(
+        [
+            subtle(
+                "Demo mode: generated startup should not require real service credentials"
+                if answers.get("demo_mode")
+                else "Demo mode: disabled; generated startup may require service credentials"
+            ),
+            subtle(
+                "Verification: enabled"
+                if verify
+                else "Verification: disabled; completion cannot be independently verified"
+            ),
+            muted(
+                "Unsafe mode disables provider approval boundaries."
+                if approval_mode == "unsafe"
+                else "Writes remain constrained by the selected provider's workspace mode."
+            ),
+        ]
     )
     console.print(
         make_panel(
-            grouped_lines(
-                [
-                    subtle(f"Workspace: {project_dir.resolve()}"),
-                    subtle(f"Providers: {', '.join(selected_backends)}"),
-                    subtle(f"Models: {model_summary}"),
-                    subtle(f"Approval mode: {approval_mode}"),
-                    subtle(f"Provider calls: {provider_call_summary}"),
-                    subtle(
-                        f"Planning range: about {minimum_minutes}-{maximum_minutes} minutes; "
-                        "provider and network latency may vary"
-                    ),
-                    subtle(
-                        "Strategy: thorough multi-agent planning and task execution"
-                        if agents
-                        else "Strategy: standard one-call-per-phase execution"
-                    ),
-                    subtle(
-                        "Demo mode: generated startup should not require real service credentials"
-                        if answers.get("demo_mode")
-                        else (
-                            "Demo mode: disabled; generated startup may require service credentials"
-                        )
-                    ),
-                    subtle(
-                        "Verification: enabled"
-                        if verify
-                        else "Verification: disabled; completion cannot be independently verified"
-                    ),
-                    muted(
-                        "Provider quota or billing may apply; Forge cannot predict provider cost."
-                    ),
-                    muted(
-                        "Unsafe mode disables provider approval boundaries."
-                        if approval_mode == "unsafe"
-                        else "Writes remain constrained by the selected provider's workspace mode."
-                    ),
-                ]
-            ),
+            grouped_lines(preflight_lines),
             title="Execution Preflight",
             accent="amber" if approval_mode == "unsafe" else "aqua",
         )
@@ -2479,16 +2557,17 @@ def main(
     )
 
     run_post_scaffold_hook(project_dir, answers)
+    elapsed = time.monotonic() - scaffold_start
     append_scaffold_log(
         answers,
         phase_backends,
         project_dir,
         verify_report=verify_report,
         verification_requested=verify,
+        duration_seconds=elapsed,
     )
     record_preferences(answers)
 
-    elapsed = time.monotonic() - scaffold_start
     render_dashboard(
         console=console,
         answers=answers,
