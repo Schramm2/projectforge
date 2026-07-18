@@ -171,7 +171,7 @@ Baseline gaps already proven:
 - [x] Realistic isolated Claude, Codex, and Gemini probes with evidence classification
 - [x] At least one authenticated end-to-end scaffold plus independent verification; see
   [the evidence record](production-readiness-evidence.md).
-- [ ] Final security/privacy, changed-files, docs, package, and temporary-artifact review
+- [x] Final security/privacy, changed-files, docs, package, and temporary-artifact review
 
 ## Version, PR, publication, and immutable verification
 
