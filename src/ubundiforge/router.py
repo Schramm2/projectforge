@@ -119,7 +119,7 @@ def pick_phase_backends(
             elif "claude" in available:
                 backend = "claude"
             elif available:
-                backend = next(iter(available))
+                backend = next(candidate for candidate in FALLBACK_ORDER if candidate in available)
             else:
                 backend = "claude"  # Will fail at install check later
 

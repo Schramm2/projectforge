@@ -13,6 +13,11 @@ All notable changes to this project will be documented in this file.
 - Legacy saved `gemini` backend selections migrate to `antigravity`; incompatible Gemini model
   overrides are dropped in favor of Antigravity's current provider default.
 
+### Fixed
+
+- Backend fallback now follows the declared `claude -> antigravity -> codex` order instead of
+  depending on unordered set iteration.
+
 ### Security
 
 - Antigravity safe and plan modes enable its terminal sandbox. The dangerous permission bypass is

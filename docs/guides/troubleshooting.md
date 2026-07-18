@@ -1,5 +1,8 @@
 # Troubleshooting
 
+This guide tracks the current unreleased source with Antigravity support. The published v0.5.0
+package uses Gemini CLI; use its bundled troubleshooting guide for that immutable release.
+
 Start with the credential-free diagnostic:
 
 ```bash
@@ -14,9 +17,10 @@ only when config is valid and at least one provider is verifiably ready.
 
 Check the install route:
 
-- GitHub/uv: run `uv tool list`, then reinstall the immutable release if needed.
+- Current checkout: run `uv sync --dev`, then use `./forge` from the repository root.
+- Published GitHub/uv package: run `uv tool list`, then reinstall the intended immutable release
+  if needed.
 - Homebrew: run `brew list projectforge` and `brew info schramm2/tap/projectforge`.
-- Repository checkout: run `uv sync --dev`, then use `./forge` from the repository root.
 
 ProjectForge is not published to PyPI. Follow any PATH guidance printed by `uv tool install` or
 Homebrew rather than installing a similarly named package from another channel.

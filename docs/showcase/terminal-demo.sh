@@ -7,6 +7,9 @@ if [[ -z "${FORGE_BACKEND:-}" ]]; then
 fi
 
 demo_root="${1:-/tmp/projectforge-terminal-demo}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/../.." && pwd)"
+forge_source="${FORGE_SOURCE:-${repo_root}}"
 project_name="hello-forge"
 project_dir="${demo_root}/${project_name}"
 tool_dir="${demo_root}/.uv-tools"
@@ -30,7 +33,7 @@ UV_TOOL_DIR="${tool_dir}" \
 UV_TOOL_BIN_DIR="${tool_bin_dir}" \
 UV_CACHE_DIR="${tool_cache_dir}" \
 uv tool install --python 3.12 --no-config \
-  https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz
+  "${forge_source}"
 "${forge_bin}" --version
 
 "${forge_bin}" --dry-run \

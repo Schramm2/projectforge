@@ -6,7 +6,9 @@ This document covers how Forge picks backends for each phase and how those phase
 
 - Routing is phase-based, not single-backend by default.
 - The router considers explicit `--use`, installed and ready backends, project-description keywords, and quality-memory scores.
-- Execution order is fixed: architecture first, verify last, with middle phases run in parallel when more than one exists.
+- Standard execution runs architecture first and verify last, with multiple middle phases in
+  parallel. `--agents` keeps the same phase order but runs phase windows sequentially while each
+  phase's dependency graph may execute independent agent tasks in parallel.
 
 ## Routing Logic
 
@@ -28,7 +30,7 @@ flowchart TD
 
     IdealMap --> Fallback{"Ideal backend available?"}
     Fallback -- Yes --> Routed["Use ideal backend"]
-    Fallback -- No --> FallbackPick["Fallback preference:<br/>claude, then first available backend"]
+    Fallback -- No --> FallbackPick["Fallback preference:<br/>claude -> antigravity -> codex"]
 
     Routed --> Quality{"Enough quality-memory data<br/>for this stack + phase?"}
     FallbackPick --> Quality
@@ -66,5 +68,8 @@ flowchart TD
 ## Notes
 
 - `merge_adjacent_phases()` reduces redundant prompt handoffs when the same backend owns neighboring phases.
-- Parallel work only applies to the middle window. Architecture and verify stay serialized to preserve dependency order.
+- In standard mode, phase-level parallel work applies only to the middle window. Architecture and
+  verify stay serialized to preserve dependency order.
+- In `--agents` mode, phase windows run sequentially; the orchestrator may run independent tasks
+  within the active phase in parallel before reconciliation.
 - If no usable backends are ready, Forge stops before any prompt is assembled or executed.

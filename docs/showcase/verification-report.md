@@ -1,5 +1,8 @@
 # Showcase Verification Report
 
+> Historical v0.4.1 evidence. This report preserves the commands and measured results from that
+> release; the maintained terminal demo script now defaults to the current checkout.
+
 Verified on 2026-07-18 from macOS with Python 3.12 and uv 0.9.22.
 
 ## Public identity and release channels
@@ -84,9 +87,10 @@ Measured result: install and formula test passed; the installed command reported
 
 ## Authenticated live scaffold
 
-The terminal proof used the isolated installer and scaffold flow represented by
+The terminal proof used the then-current isolated installer and scaffold flow represented by
 [terminal-demo.sh](terminal-demo.sh), with `FORGE_BACKEND=claude` and `FORGE_MODEL=haiku`. The
-current script also codifies the independent verification commands used after the captured run.
+maintained script still codifies the independent verification commands, but its default source may
+advance after this historical capture.
 ProjectForge used Claude Haiku 4.5 for all three phases and wrote the manifest at
 `2026-07-18T09:54:04.586177+00:00`.
 

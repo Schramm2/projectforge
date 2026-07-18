@@ -2,7 +2,13 @@
 
 This repo separates product docs, maintainer docs, and reference captures so contributors can find the right source quickly.
 
-Current product truth lives in `guides/`, `maintainers/`, and the code under `src/ubundiforge/`.
+Current source behavior is documented in `guides/`, the live maintainer runbooks and roadmap, and
+the code under `src/ubundiforge/`. Dated evidence, completed release plans, changelog entries, and
+provider prompt captures remain intentionally historical. Each historical document should state
+its evidence or release boundary rather than being rewritten to match current source.
+
+The current checkout contains unreleased Antigravity support. The published v0.5.0 release still
+uses Gemini CLI; its tag and bundled documentation are the authority for that immutable release.
 
 ## Guides
 

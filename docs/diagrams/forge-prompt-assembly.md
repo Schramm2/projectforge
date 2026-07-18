@@ -14,7 +14,7 @@ This document covers the data that flows into `build_phase_prompt()` and how For
 flowchart TD
     subgraph Inputs["Prompt inputs"]
         Answers["Answers payload<br/>name, stack, description,<br/>docker, services, auth, CI,<br/>demo mode, extra"]
-        ConventionsTree["Bundled conventions tree<br/>global, language, stack,<br/>prompt manifests"]
+        ConventionsTree["Bundled conventions tree<br/>global, language, stack,<br/>bundle and browse manifests"]
         ConventionBundle["Compiled convention bundle<br/>stack-aware prompt block"]
         ClaudeTemplate["CLAUDE.md template<br/>if available"]
         DesignTemplate["Loaded design template content<br/>plus selected label"]

@@ -1,7 +1,7 @@
 # Provider Compatibility
 
 Evidence date: 2026-07-18
-Forge baseline: 0.4.1 at `1691b2d`
+Forge baseline: current unreleased source after v0.5.0
 
 This ledger records what ProjectForge may safely assume about each supported AI CLI. Provider
 documentation changes independently of Forge, so runtime help/version/status output is evidence
@@ -204,5 +204,6 @@ retaining a redacted diagnostic summary:
   scoped permission rules in print mode.
 - Run bounded Claude and Codex failure probes for permission/model/network classification where
   they can be done without secrets or external side effects.
-- Complete at least one authenticated end-to-end Forge scaffold and independently verify every
-  generated check before publication.
+- Complete at least one authenticated end-to-end Antigravity-capable Forge scaffold and
+  independently verify every generated check before publishing a release that claims this provider
+  set.

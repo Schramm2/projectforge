@@ -1,7 +1,9 @@
 # Migrating from ProjectForge 0.4.1
 
-The next pre-1.0 release keeps the `projectforge` distribution, `forge` command, and
-`ubundiforge` Python namespace. Existing projects and user configuration remain usable.
+The current unreleased source after v0.5.0 keeps the `projectforge` distribution, `forge` command,
+and `ubundiforge` Python namespace. Existing projects and user configuration remain usable. The
+published v0.5.0 release still supports Gemini CLI; the Gemini-to-Antigravity migration described
+below applies when moving to the current source or a future release that includes it.
 
 ## Configuration
 
@@ -69,4 +71,5 @@ under `[tool.forge.verification]`, and writes `.forge/verification.json`. The da
 
 The Forge operator skill no longer hard-codes release or model catalogs. Agents are instructed to
 consult live help, `forge doctor --json`, safe preview/execution, and durable evidence. If you copied
-an older skill into another agent workspace, replace that copy from the current release archive.
+an older skill into another agent workspace, replace it from the current checkout or a future
+release that includes the Antigravity migration.
