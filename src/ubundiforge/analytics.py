@@ -6,7 +6,7 @@ from rich.console import Console
 from rich.text import Text
 
 from ubundiforge.quality import SIGNAL_KEYS
-from ubundiforge.ui import ACCENTS, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY, muted
+from ubundiforge.ui import ACCENTS, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY, muted, subtle
 
 
 def aggregate_stats(
@@ -21,7 +21,10 @@ def aggregate_stats(
     # Backend performance: {backend: {phase: success_rate}}
     backend_perf: dict[str, dict[str, float]] = {}
     by_backend_phase: dict[tuple[str, str], list[dict]] = {}
-    for q in quality_entries:
+    measured_quality = [
+        entry for entry in quality_entries if all(key in entry for key in SIGNAL_KEYS)
+    ]
+    for q in measured_quality:
         key = (q.get("backend", ""), q.get("phase", ""))
         by_backend_phase.setdefault(key, []).append(q)
 
@@ -32,18 +35,26 @@ def aggregate_stats(
         rate = successes / len(entries) if entries else 0.0
         backend_perf.setdefault(backend, {})[phase] = round(rate, 2)
 
-    # Overall success rate from quality signals
-    if quality_entries:
-        all_success = sum(1 for e in quality_entries if all(e.get(k, False) for k in SIGNAL_KEYS))
-        success_rate = round(all_success / len(quality_entries), 2)
+    # Overall success is scaffold-level verification evidence, not phase/task noise.
+    verification_statuses = [
+        entry.get("verification_status")
+        for entry in scaffold_entries
+        if entry.get("verification_status") in {"passed", "failed"}
+    ]
+    if verification_statuses:
+        success_rate = round(
+            verification_statuses.count("passed") / len(verification_statuses),
+            2,
+        )
     else:
-        success_rate = 0.0
+        success_rate = None
 
     recent = scaffold_entries[-5:] if scaffold_entries else []
 
     return {
         "total_scaffolds": total,
         "success_rate": success_rate,
+        "verified_scaffolds": len(verification_statuses),
         "stacks": stacks,
         "backend_performance": backend_perf,
         "recent": recent,
@@ -58,12 +69,23 @@ def render_stats(console: Console, stats: dict) -> None:
     console.print(header)
     console.print()
 
+    if stats["total_scaffolds"] == 0:
+        console.print(subtle("  No scaffolds recorded yet — run `forge` to create your first."))
+        console.print()
+        return
+
     # Top-level metrics
     metrics = Text("  ")
     metrics.append(str(stats["total_scaffolds"]), style=f"bold {ACCENTS['amber']}")
     metrics.append(" scaffolds  ", style=TEXT_MUTED)
-    metrics.append(f"{stats['success_rate']:.0%}", style=f"bold {ACCENTS['aqua']}")
-    metrics.append(" success rate", style=TEXT_MUTED)
+    if stats["success_rate"] is None:
+        metrics.append("verification not measured", style=TEXT_MUTED)
+    else:
+        metrics.append(f"{stats['success_rate']:.0%}", style=f"bold {ACCENTS['aqua']}")
+        metrics.append(
+            f" success rate ({stats['verified_scaffolds']} verified)",
+            style=TEXT_MUTED,
+        )
     console.print(metrics)
     console.print()
 

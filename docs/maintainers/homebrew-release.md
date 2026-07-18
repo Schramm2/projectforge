@@ -1,11 +1,11 @@
 # Homebrew Release
 
 Homebrew is a supported public installation route. The release workflow keeps this repository's
-formula synchronized with `Schramm2/homebrew-tap`; v0.5.0 has passed a clean source installation
-and `brew test`.
+formula synchronized with `Schramm2/homebrew-tap`; v0.5.0 passed a clean source installation and
+`brew test`, and v0.5.1 is the Antigravity-capable release.
 
-The checked-in formula remains on v0.5.0 until the current unreleased Antigravity-capable source is
-versioned and published. Do not describe source-only provider changes as available from Homebrew.
+The release tag is created before the workflow regenerates and commits the matching formula. Do not
+claim Homebrew availability until that synchronization step and the clean checks complete.
 
 The names are intentionally different:
 

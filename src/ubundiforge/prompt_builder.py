@@ -1460,8 +1460,24 @@ def build_verify_prompt_codex(answers: dict) -> str:
     stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
     extra = answers.get("extra", "").strip() or "None"
     demo = answers.get("demo_mode", False)
+    frontend_capable = answers["stack"] in {"nextjs", "both"}
+    project_parts = (
+        "architecture, frontend, tests, and configuration"
+        if frontend_capable
+        else "application code, tests, packaging, and configuration"
+    )
+    scope_targets = (
+        "application code, frontend code, tests, and configuration"
+        if frontend_capable
+        else "application code, tests, packaging, and configuration"
+    )
+    avoid_design = (
+        "- Do not change visual design except where required to fix a genuine bug."
+        if frontend_capable
+        else "- Do not broaden the public API or command surface while fixing integration bugs."
+    )
 
-    if demo:
+    if demo and frontend_capable:
         demo_block = """\
 - Ensure the project runs without real API keys or .env.local.
 - Auth providers must degrade gracefully with a visible banner instead of crashing.
@@ -1469,9 +1485,15 @@ def build_verify_prompt_codex(answers: dict) -> str:
 - External APIs must return mock responses when keys are missing.
 - Verify .env.example documents required and optional variables clearly."""
         startup_goal = "Start the project and confirm it renders visible content in demo mode."
+    elif demo:
+        demo_block = """\
+- Ensure the documented service, worker, CLI, or package checks run without real API keys.
+- Database and external API integrations must use documented local fakes or be safely disabled.
+- Verify .env.example documents required and optional variables clearly."""
+        startup_goal = "Run the documented startup or smoke command successfully in demo mode."
     else:
         demo_block = "- Verify .env.example documents all required variables."
-        startup_goal = "Start the project and confirm the normal development flow works."
+        startup_goal = "Run the documented startup or smoke command successfully."
 
     return f"""\
 You are a senior QA and integration engineer reviewing a scaffolded project \
@@ -1500,7 +1522,7 @@ before reporting.
 
 <dependency_checks>
 - Read CLAUDE.md, the package manager config, and scan the full project structure first.
-- Build a mental model of how architecture, frontend, tests, and configuration fit together.
+- Build a mental model of how {project_parts} fit together.
 - Use the documented dev commands and conventions as the source of truth.
 </dependency_checks>
 
@@ -1522,8 +1544,7 @@ before reporting.
 </instructions>
 
 <scope_boundaries>
-- You may modify application code, frontend code, tests, and configuration
-  as needed to fix integration issues.
+- You may modify {scope_targets} as needed to fix integration issues.
 - Keep fixes targeted. Do not add new product features or redesign the UI.
 </scope_boundaries>
 
@@ -1545,7 +1566,7 @@ Before finalizing:
 <avoid>
 - Do not refactor working code without a concrete integration reason.
 - Do not remove tests to make failures disappear.
-- Do not change visual design except where required to fix a genuine bug.
+{avoid_design}
 </avoid>
 
 <extra_instructions>
@@ -1562,8 +1583,9 @@ def build_verify_prompt(answers: dict) -> str:
     stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
     extra = answers.get("extra", "").strip() or "None"
     demo = answers.get("demo_mode", False)
+    frontend_capable = answers["stack"] in {"nextjs", "both"}
 
-    if demo:
+    if demo and frontend_capable:
         goal = (
             "Your job is to review the entire project, fix any issues, "
             "and ensure it runs out of the box without real API keys or secrets."
@@ -1581,6 +1603,19 @@ connection string is missing.
         quality_items = """\
 - The dev server starts without errors and without .env.local
 - The app renders visible content in the browser (not a crash page)"""
+    elif demo:
+        goal = (
+            "Your job is to review the entire project, fix any issues, and ensure its "
+            "documented service, worker, CLI, or package checks run without real secrets."
+        )
+        demo_instructions = """\
+5. Run the documented startup or smoke command without real API keys:
+   - Database and external API integrations must use local fakes or be safely disabled.
+   - Do not invent requirements outside this stack's metadata.
+6. Verify that .env.example documents all required and optional vars.
+7. Make a final git commit with all fixes."""
+        quality_items = """\
+- The documented startup or smoke command succeeds without real secrets"""
     else:
         goal = (
             "Your job is to review the entire project, fix any integration "
@@ -1589,8 +1624,11 @@ connection string is missing.
         demo_instructions = """\
 5. Verify that .env.example documents all required vars.
 6. Make a final git commit with all fixes."""
-        quality_items = """\
-- The dev server starts without errors (with .env.local configured)"""
+        quality_items = (
+            "- The dev server starts without errors (with .env.local configured)"
+            if frontend_capable
+            else "- The documented startup or smoke command succeeds"
+        )
 
     return f"""\
 A project has been scaffolded in the current directory by multiple AI tools. \
@@ -1614,8 +1652,9 @@ between phases (broken imports, missing dependencies, type errors).
 </instructions>
 
 <scope>
-You CAN modify any file in the project — application code, frontend, tests, \
-config. This is the integration and QA phase.
+You CAN modify any file needed for integration — application code, tests, \
+configuration{", and frontend code" if frontend_capable else ""}. This is the integration \
+and QA phase.
 </scope>
 
 <quality_gate>
@@ -1639,8 +1678,24 @@ def build_verify_prompt_best(answers: dict) -> str:
     stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
     extra = answers.get("extra", "").strip() or "None"
     demo = answers.get("demo_mode", False)
+    frontend_capable = answers["stack"] in {"nextjs", "both"}
+    project_parts = (
+        "architecture, frontend, and tests"
+        if frontend_capable
+        else "application code, tests, and packaging"
+    )
+    scope_targets = (
+        "application code, frontend components, tests, configuration, and styles"
+        if frontend_capable
+        else "application code, tests, packaging, and configuration"
+    )
+    design_guard = (
+        "- Do not change the project's visual design or styling."
+        if frontend_capable
+        else "- Do not broaden the public API or command surface."
+    )
 
-    if demo:
+    if demo and frontend_capable:
         goal = (
             "Your job is to integrate everything, fix cross-phase issues, "
             "and ensure the project runs out of the box in a demo state "
@@ -1662,6 +1717,19 @@ optional.
         quality_items = """\
 - Dev server starts without errors and without .env.local present
 - The app renders visible, meaningful content (not a crash or blank page)"""
+    elif demo:
+        goal = (
+            "Your job is to integrate everything, fix cross-phase issues, and ensure the "
+            "documented service, worker, CLI, or package checks run without real secrets."
+        )
+        demo_instructions = """\
+5. Run the documented startup or smoke command without real API keys:
+   - Database and external API integrations must use local fakes or be safely disabled.
+   - Do not invent requirements outside this stack's metadata.
+6. Verify .env.example lists all vars with comments marking required vs optional.
+7. Make a final git commit with all integration fixes."""
+        quality_items = """\
+- The documented startup or smoke command succeeds without real secrets"""
     else:
         goal = (
             "Your job is to integrate everything, fix cross-phase issues, "
@@ -1670,13 +1738,16 @@ optional.
         demo_instructions = """\
 5. Verify .env.example lists all required vars.
 6. Make a final git commit with all integration fixes."""
-        quality_items = """\
-- Dev server starts without errors (with .env.local configured)"""
+        quality_items = (
+            "- Dev server starts without errors (with .env.local configured)"
+            if frontend_capable
+            else "- The documented startup or smoke command succeeds"
+        )
 
     return f"""\
 You are a senior QA engineer reviewing a freshly scaffolded project. Multiple \
-AI tools built different parts of this project — architecture, frontend, and \
-tests were each created by a different tool. {goal}
+AI tools built different parts of this project — {project_parts} may each \
+have been created by a different tool. {goal}
 
 <project>
 <name>{answers["name"]}</name>
@@ -1702,9 +1773,8 @@ references to files that were renamed or moved).
 </instructions>
 
 <scope>
-You have full permission to modify ANY file: application code, frontend \
-components, tests, configuration, styles. This is the integration phase — \
-fix whatever is broken across phase boundaries.
+You have full permission to modify {scope_targets}. This is the integration \
+phase — fix whatever is broken across phase boundaries.
 </scope>
 
 <quality_criteria>
@@ -1721,7 +1791,7 @@ Before finishing, verify ALL of these pass:
 - Do not add new features or refactor working code. Only fix what is broken.
 - Do not remove tests that were created by the testing phase. Fix them \
 instead, or add a skip with a clear reason.
-- Do not change the project's visual design or styling.
+{design_guard}
 - Keep fixes minimal and targeted.
 </avoid>
 

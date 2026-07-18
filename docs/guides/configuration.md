@@ -1,7 +1,9 @@
 # Configuration
 
 ProjectForge keeps user-owned configuration under `~/.forge/` and project evidence under each
-generated project's `.forge/` directory.
+generated project's `.forge/` directory. Set `FORGE_HOME` to override the user-data directory for
+isolated automation or ephemeral environments; Forge's own tests use this boundary and never write
+to the developer's real home directory.
 
 ## User config
 
@@ -154,6 +156,10 @@ Forge's provider-output redaction boundary.
   name, demo-mode value, and timestamp. It does not store the absolute target path.
 - `~/.forge/quality.jsonl` stores local verification quality signals used for routing.
 - `~/.forge/preferences.json` stores local answer frequencies used for interactive defaults.
+
+Run `forge stats --repair` once after upgrading if older development tests polluted local history.
+Recognizable pytest entries are moved—not deleted—to a timestamped directory under
+`~/.forge/quarantine/`, then stats are recalculated from the remaining evidence.
 
 Forge does not transmit these local analytics. Back up or move `~/.forge/` before uninstalling if
 you want to retain them. See [Security and Privacy](security-privacy.md) for the complete boundary.

@@ -1,9 +1,8 @@
 # Migrating from ProjectForge 0.4.1
 
-The current unreleased source after v0.5.0 keeps the `projectforge` distribution, `forge` command,
-and `ubundiforge` Python namespace. Existing projects and user configuration remain usable. The
-published v0.5.0 release still supports Gemini CLI; the Gemini-to-Antigravity migration described
-below applies when moving to the current source or a future release that includes it.
+ProjectForge v0.5.1 keeps the `projectforge` distribution, `forge` command, and `ubundiforge`
+Python namespace. Existing projects and user configuration remain usable. The
+Gemini-to-Antigravity migration described below applies when upgrading from v0.5.0 or earlier.
 
 ## Configuration
 

@@ -3,6 +3,7 @@
 import json
 import logging
 from datetime import UTC, datetime
+from pathlib import Path
 
 from ubundiforge.conventions import FORGE_DIR
 from ubundiforge.verify import VerifyReport
@@ -39,8 +40,16 @@ def append_quality_signal(
     stack: str,
     phase_backends: list[tuple[str, str]],
     verify_report: VerifyReport | None,
+    project_dir: Path | None = None,
 ) -> None:
-    """Append quality signal entries to ~/.forge/quality.jsonl (one per phase)."""
+    """Append measured verification signals to quality.jsonl, one per phase.
+
+    A skipped verification is unknown, not a failure, so it is not recorded as
+    quality evidence and cannot lower future routing scores.
+    """
+    if verify_report is None:
+        return
+
     signals = _extract_signals(verify_report)
     timestamp = datetime.now(UTC).isoformat()
 
@@ -48,9 +57,12 @@ def append_quality_signal(
     with QUALITY_LOG_PATH.open("a") as f:
         for phase, backend in phase_backends:
             entry = {
+                "type": "scaffold_phase",
                 "stack": stack,
                 "backend": backend,
                 "phase": phase,
+                "project": project_dir.name if project_dir is not None else None,
+                "verification_passed": verify_report.all_passed,
                 "timestamp": timestamp,
                 **signals,
             }
@@ -94,6 +106,8 @@ def compute_backend_scores(
     """
     by_backend: dict[str, list[dict]] = {}
     for s in signals:
+        if not all(key in s for key in SIGNAL_KEYS):
+            continue
         if s.get("stack") == stack and s.get("phase") == phase:
             backend = s.get("backend", "")
             by_backend.setdefault(backend, []).append(s)

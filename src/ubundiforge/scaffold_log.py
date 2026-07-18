@@ -8,6 +8,7 @@ from pathlib import Path
 from ubundiforge import __version__
 from ubundiforge.convention_models import ConventionContribution
 from ubundiforge.conventions import FORGE_DIR
+from ubundiforge.verify import VerifyReport
 
 SCAFFOLD_LOG_PATH = FORGE_DIR / "scaffold.log"
 
@@ -16,6 +17,9 @@ def append_scaffold_log(
     answers: dict,
     phase_backends: list[tuple[str, str]],
     project_dir: Path,
+    *,
+    verify_report: VerifyReport | None = None,
+    verification_requested: bool = False,
 ) -> None:
     """Append a JSON-lines entry to ~/.forge/scaffold.log."""
     backends_used = sorted({b for _, b in phase_backends})
@@ -25,6 +29,14 @@ def append_scaffold_log(
         "backends": backends_used,
         "directory": project_dir.name,
         "demo_mode": answers.get("demo_mode", False),
+        "verification_status": (
+            "passed"
+            if verify_report is not None and verify_report.all_passed
+            else "failed"
+            if verify_report is not None
+            else "not_run"
+        ),
+        "verification_requested": verification_requested,
         "timestamp": datetime.now(UTC).isoformat(),
     }
     FORGE_DIR.mkdir(parents=True, exist_ok=True)

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-18
+
+### Added
+
+- `FORGE_HOME` isolates user data for automation, and `forge stats --repair` quarantines
+  recognizable legacy pytest artifacts without deleting them.
+- The README now opens with an outcome-first walkthrough of the scaffold and verification flow.
+
 ### Changed
 
 - Replaced the retired Gemini CLI backend with Google Antigravity CLI (`agy`) across routing,
@@ -12,11 +20,17 @@ All notable changes to this project will be documented in this file.
   inference prompt or storing provider output.
 - Legacy saved `gemini` backend selections migrate to `antigravity`; incompatible Gemini model
   overrides are dropped in favor of Antigravity's current provider default.
+- Verification quality is recorded only when verification ran, and stats report scaffold-level
+  verification outcomes instead of treating skipped checks or agent-task records as failures.
+- Verify-and-fix prompts now specialize frontend and non-frontend stacks independently.
 
 ### Fixed
 
 - Backend fallback now follows the declared `claude -> antigravity -> codex` order instead of
   depending on unordered set iteration.
+- The pytest suite now redirects config, history, preferences, hooks, and quality memory to a fresh
+  temporary Forge home for every test.
+- Empty stats now explain how to create the first scaffold instead of presenting a 0% success rate.
 
 ### Security
 
@@ -186,6 +200,7 @@ See [the migration guide](docs/guides/migrating-from-0.4.1.md) for details.
 - pipx support for isolated global installs.
 - MIT license.
 
+[0.5.1]: https://github.com/Schramm2/projectforge/releases/tag/v0.5.1
 [0.5.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.5.0
 [0.4.1]: https://github.com/Schramm2/projectforge/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.4.0

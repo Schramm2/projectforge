@@ -7,8 +7,8 @@ the code under `src/ubundiforge/`. Dated evidence, completed release plans, chan
 provider prompt captures remain intentionally historical. Each historical document should state
 its evidence or release boundary rather than being rewritten to match current source.
 
-The current checkout contains unreleased Antigravity support. The published v0.5.0 release still
-uses Gemini CLI; its tag and bundled documentation are the authority for that immutable release.
+ProjectForge v0.5.1 includes the Antigravity provider migration. Older tags and their bundled
+documentation remain the authority for the immutable Gemini-backed releases.
 
 ## Guides
 

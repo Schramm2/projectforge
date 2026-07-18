@@ -1,7 +1,7 @@
 # Troubleshooting
 
-This guide tracks the current unreleased source with Antigravity support. The published v0.5.0
-package uses Gemini CLI; use its bundled troubleshooting guide for that immutable release.
+This guide documents ProjectForge v0.5.1 with Antigravity support. Older Gemini-backed releases
+retain their own bundled troubleshooting guidance.
 
 Start with the credential-free diagnostic:
 

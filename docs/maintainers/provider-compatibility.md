@@ -1,7 +1,7 @@
 # Provider Compatibility
 
 Evidence date: 2026-07-18
-Forge baseline: current unreleased source after v0.5.0
+Forge baseline: v0.5.1 release source
 
 This ledger records what ProjectForge may safely assume about each supported AI CLI. Provider
 documentation changes independently of Forge, so runtime help/version/status output is evidence
