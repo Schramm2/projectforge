@@ -5,7 +5,12 @@ from types import SimpleNamespace
 
 from rich.console import Console
 
-from projectforge.prompts import _ask_execution_mode, _ask_project_basics, collect_answers
+from projectforge.prompts import (
+    _ask_execution_mode,
+    _ask_project_basics,
+    _ask_project_context,
+    collect_answers,
+)
 
 
 def test_execution_mode_labels_standard_as_the_actual_default(monkeypatch):
@@ -58,9 +63,59 @@ def test_missing_docker_message_explains_recovery(monkeypatch):
     assert "Install Docker and restart Forge" in output.getvalue()
 
 
+def test_project_context_requires_selection_before_loading_nearby_files(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    readme = tmp_path / "README.md"
+    product = tmp_path / "PRODUCT.md"
+    readme.write_text("# Selected project context")
+    product.write_text("# Not selected")
+    text_answers = iter(
+        [
+            "Support coordinators",
+            "A coordinator can assign one shift.",
+            "Use the existing identity provider.",
+            "Workday API",
+            "Payroll processing",
+        ]
+    )
+    confirm_answers = iter([True, True])
+
+    monkeypatch.setattr(
+        "projectforge.prompts.prompt_text",
+        lambda *args, **kwargs: SimpleNamespace(ask=lambda: next(text_answers)),
+    )
+    monkeypatch.setattr(
+        "projectforge.prompts.prompt_confirm",
+        lambda *args, **kwargs: SimpleNamespace(ask=lambda: next(confirm_answers)),
+    )
+    monkeypatch.setattr(
+        "projectforge.prompts.prompt_checkbox",
+        lambda *args, **kwargs: SimpleNamespace(ask=lambda: [readme]),
+    )
+    monkeypatch.setattr(
+        "projectforge.prompts.discover_context_files",
+        lambda: (readme, product),
+    )
+    answers = {"project_brief": {}, "context_sources": []}
+
+    _ask_project_context(answers)
+
+    assert answers["project_brief"]["audience"] == "Support coordinators"
+    assert answers["project_brief"]["non_goals"] == "Payroll processing"
+    assert [source.path for source in answers["context_sources"]] == ["README.md"]
+    assert "Not selected" not in answers["context_sources"][0].content
+
+
 def test_collect_answers_allows_review_edit_before_scaffold(monkeypatch):
-    calls = {"basics": 0, "appearance": 0, "integrations": 0, "demo": 0, "execution": 0}
-    actions = iter(["basics", "scaffold"])
+    calls = {
+        "basics": 0,
+        "context": 0,
+        "appearance": 0,
+        "integrations": 0,
+        "demo": 0,
+        "execution": 0,
+    }
+    actions = iter(["context", "basics", "scaffold"])
 
     def _fake_basics(answers, *, docker_available):
         calls["basics"] += 1
@@ -71,6 +126,17 @@ def test_collect_answers_allows_review_edit_before_scaffold(monkeypatch):
         answers["stack"] = "fastapi"
         answers["description"] = "A test scaffold"
         answers["docker"] = False
+
+    def _fake_context(answers):
+        calls["context"] += 1
+        answers["project_brief"] = {
+            "audience": "Support teams",
+            "first_success": "Create one schedule",
+            "constraints": "",
+            "existing_systems": "",
+            "non_goals": "",
+        }
+        answers["context_sources"] = []
 
     def _fake_appearance(answers):
         calls["appearance"] += 1
@@ -93,6 +159,7 @@ def test_collect_answers_allows_review_edit_before_scaffold(monkeypatch):
         answers["agents"] = False
 
     monkeypatch.setattr("projectforge.prompts._ask_project_basics", _fake_basics)
+    monkeypatch.setattr("projectforge.prompts._ask_project_context", _fake_context)
     monkeypatch.setattr("projectforge.prompts._ask_design_and_media", _fake_appearance)
     monkeypatch.setattr("projectforge.prompts._ask_customizations", _fake_integrations)
     monkeypatch.setattr("projectforge.prompts._ask_demo_mode", _fake_demo)
@@ -103,4 +170,11 @@ def test_collect_answers_allows_review_edit_before_scaffold(monkeypatch):
     answers = collect_answers(docker_available=True)
 
     assert answers["name"] == "corrected-name"
-    assert calls == {"basics": 2, "appearance": 1, "integrations": 1, "demo": 1, "execution": 1}
+    assert calls == {
+        "basics": 2,
+        "context": 2,
+        "appearance": 1,
+        "integrations": 1,
+        "demo": 1,
+        "execution": 1,
+    }

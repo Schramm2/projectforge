@@ -73,6 +73,7 @@ from projectforge.media_assets import (
     target_asset_dir,
 )
 from projectforge.preferences import record_preferences
+from projectforge.project_context import extract_project_context_block
 from projectforge.prompt_builder import build_phase_prompt
 from projectforge.prompts import collect_answers
 from projectforge.quality import append_quality_signal, compute_backend_scores, read_quality_signals
@@ -357,6 +358,9 @@ def _render_loaded_context(
     media_collection: str | None = None,
     media_asset_count: int = 0,
     convention_sources: tuple = (),
+    conventions_profile: str = "default",
+    project_brief_added: bool = False,
+    project_context_files: int = 0,
     verbose: bool = False,
 ) -> None:
     """Render loaded scaffold context."""
@@ -366,6 +370,8 @@ def _render_loaded_context(
         lines.append(subtle(f"{backend} model: {configured_model or 'provider default'}"))
     lines.append(subtle(f"Approval mode: {approval_mode}"))
 
+    profile_label = "Forge defaults" if conventions_profile == "default" else conventions_profile
+    lines.append(subtle(f"Convention profile: {profile_label}"))
     source_label = "source" if len(convention_sources) == 1 else "sources"
     lines.append(
         subtle(
@@ -376,6 +382,10 @@ def _render_loaded_context(
     if verbose:
         for source in convention_sources:
             lines.append(muted(f"  {source.source_id}: {source.display_path} ({source.sha256})"))
+    brief_label = "added" if project_brief_added else "not added"
+    lines.append(
+        subtle(f"Project brief: {brief_label}; nearby context: {project_context_files} selected")
+    )
     if claude_md_loaded:
         lines.append(subtle("CLAUDE.md starter loaded"))
     if design_template_label:
@@ -1464,6 +1474,38 @@ def replay(
             )
         )
 
+    context_snapshot = ""
+    context_snapshot_path = project_dir / ".forge" / "context-snapshot.md"
+    if context_snapshot_path.exists():
+        try:
+            context_snapshot = extract_project_context_block(context_snapshot_path.read_text())
+        except OSError as exc:
+            console.print(
+                status_line(
+                    "Forge could not read the saved project context. Restore it from a trusted "
+                    "backup, or remove it and accept that replay results may differ.",
+                    accent="amber",
+                )
+            )
+            raise typer.Exit(1) from exc
+        if not context_snapshot:
+            console.print(
+                status_line(
+                    "Forge could not find valid project context in the saved snapshot. Restore "
+                    "it from a trusted backup, or remove it and accept that replay may differ.",
+                    accent="amber",
+                )
+            )
+            raise typer.Exit(1)
+    elif dna.get("context_hash"):
+        console.print(
+            status_line(
+                "The original scaffold used selected project context, but its local snapshot is "
+                "missing. Replay will continue without that context and may differ.",
+                accent="amber",
+            )
+        )
+
     # Reconstruct answers from manifest
     answers = {
         "name": name,
@@ -1473,6 +1515,8 @@ def replay(
         "design_template": dna.get("design_template"),
         "auth_provider": dna.get("auth_provider"),
         "demo_mode": dna.get("demo_mode", False),
+        "project_brief": dna.get("project_brief") or {},
+        "project_context_snapshot": context_snapshot,
         "extra": "",
         "services": [],
     }
@@ -2090,6 +2134,9 @@ def main(
         media_collection=selected_collection,
         media_asset_count=media_asset_count,
         convention_sources=convention_bundle.contributions,
+        conventions_profile=conventions_profile,
+        project_brief_added=any((answers.get("project_brief") or {}).values()),
+        project_context_files=len(answers.get("context_sources", [])),
         verbose=verbose,
     )
 
@@ -2102,6 +2149,9 @@ def main(
     svc_list = answers.get("services", [])
     if svc_list:
         fields_to_scan["services"] = " ".join(svc_list)
+    for key, value in (answers.get("project_brief") or {}).items():
+        if isinstance(value, str) and value:
+            fields_to_scan[f"project brief {key}"] = value
 
     for field_name, text in fields_to_scan.items():
         if not text:

@@ -23,7 +23,8 @@ atomically with user-only permissions, and rejects unknown keys.
 | `conventions_profile` | Selected user convention profile name. |
 
 Do not place credentials, provider identity, or arbitrary extra keys in this file. Provider login
-belongs to the provider CLI. Re-run setup to change normal preferences:
+belongs to the provider CLI. Re-run setup to change normal preferences. Setup keeps the selected convention profile unless you
+choose another convention option:
 
 ```bash
 forge --setup
@@ -48,6 +49,11 @@ because Antigravity model display names are not compatibility-guaranteed. See
 [Migrating from 0.4.1](migrating-from-0.4.1.md).
 
 ## Convention profiles and precedence
+
+First-run setup offers three useful starting points: bundled defaults, an explicit import of nearby
+instruction files, or a short interview that writes a reusable profile. Nearby discovery is bounded
+to `AGENTS.md`, `CLAUDE.md`, and `.github/copilot-instructions.md` in the directory where setup runs;
+it does not recursively scan the repository.
 
 Effective convention order is deterministic, from lowest to highest precedence:
 
@@ -92,12 +98,20 @@ exact execution-contract match.
 
 Written after provider phases complete. It records Forge version, requested project facts, routing,
 provider-default versus explicit model behavior, approval mode, design/media/auth selections, demo
-mode, effective convention hash, ordered convention sources, and timestamp.
+mode, project brief, selected-context source hashes, effective convention hash, ordered convention
+sources, and timestamp. Selected file content stays out of this JSON record.
 
 ### `.forge/conventions-snapshot.md`
 
 The exact effective convention content used for replay. It can contain private organization or
 personal guidance; do not paste it into public issues or external messages by default.
+
+### `.forge/context-snapshot.md`
+
+The exact project brief and nearby Markdown content the user approved for the provider prompt.
+Forge writes this file only when project context was supplied. The scaffold manifest records source
+paths and hashes without copying selected file content into JSON. Treat the snapshot as potentially
+private.
 
 ### `.forge/verification.json`
 
