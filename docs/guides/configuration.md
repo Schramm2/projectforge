@@ -153,7 +153,8 @@ Forge's provider-output redaction boundary.
 ## Local history
 
 - `~/.forge/scaffold.log` is append-only JSONL with project name, stack, providers, target directory
-  name, demo-mode value, and timestamp. It does not store the absolute target path.
+  name, demo-mode value, verification status/request, measured total duration when available, and
+  timestamp. It does not store the absolute target path.
 - `~/.forge/quality.jsonl` stores local verification quality signals used for routing.
 - `~/.forge/preferences.json` stores local answer frequencies used for interactive defaults.
 

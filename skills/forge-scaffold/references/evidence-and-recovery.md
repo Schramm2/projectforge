@@ -43,7 +43,9 @@ For a failed recorded check:
 - Network: preserve partial output and check connectivity/proxy before retrying.
 - Permission denied: retain safe mode; adjust a scoped provider policy or ask before unsafe mode.
 - Timeout: preserve partial output and rerun only the failed command/phase with a justified limit.
-- Unknown: report provider, exit, redacted tail, target, and the exact safe retry path.
+- Unknown: report the bounded failure category, exit, target, and exact safe retry path. Forge does
+  not retain or echo the captured provider tail; use provider-owned local diagnostics when the
+  bounded message is insufficient.
 
 For a scaffold phase failure, fix the classified provider problem and repeat the original command
 with `--resume`. Resume validates name, stack, routing, prompt hashes, and approval mode, preserves

@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+These entries describe changes on `main` after v0.6.0. The package version remains `0.6.0` until
+the next release is prepared.
+
+### Added
+
+- A complete D2 product-diagram set and static landing page covering the user journey, product
+  boundary, input flow, routing, prompt assembly, runtime pipeline, project lifecycle, and trust
+  boundaries.
+- A maintained inventory of user-visible failure paths and their recovery-safe wording.
+
+### Changed
+
+- Renamed the canonical Python import namespace from `ubundiforge` to `projectforge` across the
+  source tree, tests, launchers, workflows, packaging, and maintainer commands. The PyPI
+  distribution remains `matt-projectforge`, and the installed commands remain `projectforge` and
+  the compatibility alias `forge`.
+- Provider, filesystem, setup, convention, verification, replay, resume, editor, Git, media, and
+  hook failures now favor bounded recovery guidance over raw exceptions, provider output, local
+  paths, or hook failure streams.
+- Failure paths preserve completed project work and distinguish required scaffold records from
+  optional local evidence so non-critical record failures do not erase a successful scaffold.
+
 ## [0.6.0] - 2026-07-18
 
 ### Added
@@ -221,6 +243,7 @@ See [the migration guide](docs/guides/migrating-from-0.4.1.md) for details.
 - pipx support for isolated global installs.
 - MIT license.
 
+[Unreleased]: https://github.com/Schramm2/projectforge/compare/v0.6.0...HEAD
 [0.6.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.6.0
 [0.5.1]: https://github.com/Schramm2/projectforge/releases/tag/v0.5.1
 [0.5.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.5.0

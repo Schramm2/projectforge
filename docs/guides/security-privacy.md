@@ -19,6 +19,11 @@ Normal doctor checks make no model call. For Antigravity, Forge runs `agy models
 authenticated model-catalog request, not an inference prompt. Forge uses only its exit status and
 whether a non-empty catalog was returned, and does not retain catalog output or account identity.
 
+During live execution, Forge uses provider output transiently to derive bounded activity summaries
+and failure categories. It does not persist or echo raw provider output, stack traces, or captured
+failure tails. A failing post-scaffold hook also suppresses both output streams and points you back
+to the local hook for diagnosis; successful hook output is still shown in the terminal.
+
 ## Execution modes
 
 - `--approval-mode safe` is the default. It maps to each provider's bounded workspace-write mode.

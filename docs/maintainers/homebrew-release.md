@@ -1,8 +1,9 @@
 # Homebrew Release
 
 Homebrew is a supported public installation route. The release workflow keeps this repository's
-formula synchronized with `Schramm2/homebrew-tap`; v0.5.0 passed a clean source installation and
-`brew test`, and v0.5.1 is the Antigravity-capable release.
+formula synchronized with `Schramm2/homebrew-tap`. The checked-in formula is the v0.6.0 release
+baseline; current `main` contains unreleased changes after v0.6.0 and must not be described as a
+new Homebrew release until the normal publication and clean-install checks pass.
 
 The release tag is created before the workflow regenerates and commits the matching formula. Do not
 claim Homebrew availability until that synchronization step and the clean checks complete.
@@ -11,7 +12,7 @@ The public naming contract is:
 
 - product and Homebrew formula: `projectforge` / ProjectForge
 - PyPI distribution: `matt-projectforge` (required by PyPI name-similarity policy)
-- preferred executable from the next release: `projectforge`
+- preferred executable: `projectforge`
 - compatibility executable: `forge` (may collide with Foundry's Ethereum CLI)
 - canonical Python import namespace: `projectforge`
 

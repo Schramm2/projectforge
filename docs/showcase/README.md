@@ -33,7 +33,8 @@ This directory ties portfolio claims to reproducible commands and measured resul
   current unreleased source.
 - Live scaffold quality and runtime depend on the external AI CLI and its authentication.
 - `--demo` controls generated application credentials; it does not authenticate the AI CLI.
-- PyPI is deliberately unpublished and is not an install route.
+- The historical v0.4.1 report predates the PyPI workflow and does not prove availability of any
+  current PyPI release; verify release channels independently.
 - The canonical project destination remains
   <https://github.com/Schramm2/projectforge>; portfolio evidence is available at the Vercel case
   study URL recorded in the report.

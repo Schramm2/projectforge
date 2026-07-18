@@ -3,6 +3,9 @@
 Evidence date: 2026-07-18
 Forge baseline: v0.5.1 release source
 
+Current-source note: `main` contains unreleased changes after v0.6.0. The provider probes below
+remain dated evidence; only the failure-presentation notes describe the newer source behavior.
+
 This ledger records what ProjectForge may safely assume about each supported AI CLI. Provider
 documentation changes independently of Forge, so runtime help/version/status output is evidence
 only for the tested version. Account identity and credential values are deliberately excluded.
@@ -69,8 +72,9 @@ boolean/unknown state and a non-identifying auth-method label.
   execution. Forge must capability-detect the version it invokes.
 - `--no-session-persistence` avoids saving print-mode sessions and is appropriate for Forge runs
   unless resume behavior is deliberately implemented through provider sessions.
-- The current runtime help describes failures through non-zero exits. Forge must classify stderr
-  and retain a redacted tail rather than assuming every non-zero exit means authentication.
+- The current runtime help describes failures through non-zero exits. Forge classifies captured
+  output transiently and presents a bounded category and recovery step; it does not echo or
+  persist the captured provider tail.
 
 Known limitation: a safe non-interactive write run still needs a permission mode that can complete
 without an interactive approval prompt. Forge must test and document the effective workspace
@@ -107,8 +111,9 @@ present; Forge should use the exit code plus a non-identifying mode classificati
   recommends `workspace-write` for unattended local work that remains inside the workspace.
 - Global `--ask-for-approval` values are `untrusted`, `on-request`, and `never`. Current
   non-interactive behavior needs runtime validation in combination with the selected sandbox.
-- `--json` emits JSONL progress and `--output-last-message` writes the final response, enabling
-  inspectable redacted failure handling.
+- `--json` emits JSONL progress and `--output-last-message` writes the final response. Forge's
+  current adapter does not persist those streams; it derives bounded activity and failure
+  categories from transient process output.
 - `--model` overrides the configured model. If no model is configured, the CLI uses a recommended
   model; Forge defaults to omission.
 - `--full-auto` is deprecated in current official docs in favor of explicit
@@ -180,22 +185,25 @@ failure and independently verifies generated output rather than silently escalat
 - All probes above were version/help/status-only. They made no model calls and recorded no account
   identifier, credential, token, or provider response body.
 
-## Failure taxonomy
+## Readiness and execution failure vocabulary
 
-Forge should map provider output and exit behavior into these stable user-facing classes while
-retaining a redacted diagnostic summary:
+Forge maps provider output and exit behavior into stable user-facing classes without echoing or
+persisting the captured output:
 
 | Class | Evidence | Recovery |
 | --- | --- | --- |
-| Missing binary | Executable lookup fails | Show official install link/command, then rerun doctor |
-| Unauthenticated | Documented status is false/non-zero or provider explicitly requests login | Launch or show provider-owned auth flow, then rerun doctor |
-| Check inconclusive | A bounded status command times out or returns an unclassified error | Check connectivity/keyring access and rerun the provider-owned status command |
-| Unavailable model | Provider rejects explicit model/alias | Remove the override or choose a provider-supported alias |
-| Quota/rate limit | Provider emits a rate/quota class response | Preserve output; wait, change provider, or review plan/billing |
-| Network | DNS, connection, TLS, or provider-unreachable failure | Check connectivity/proxy and retry without changing project output |
-| Permission denied | Provider approval/policy/sandbox refusal | Keep the safe mode; adjust scoped policy or explicitly choose unsafe mode |
-| Timeout | Forge deadline expires and process is terminated | Preserve output and phase state; resume/retry with a documented timeout |
-| Unknown provider failure | Non-zero exit not matched above | Show provider, exit, redacted tail, workspace, and rerun guidance |
+| `missing_binary` | Executable lookup fails | Run `forge doctor` for setup steps, then retry with `--resume` |
+| `authentication` | Provider output indicates missing or invalid sign-in | Run `forge doctor`, complete its provider-owned sign-in step, then retry with `--resume` |
+| `model` | Provider rejects an explicit model | Remove `--model` to use the provider default, then retry with `--resume` |
+| `quota` | Provider output indicates a usage, rate, credit, or billing limit | Preserve the partial project, wait for access to return, then retry with `--resume` |
+| `network` | Provider output indicates DNS, connection, proxy, or reachability failure | Check the connection and proxy, run `forge doctor`, then retry with `--resume` |
+| `permission` | Provider approval, sandbox, or workspace policy blocks the step | Keep safe mode, review scoped workspace access, then retry with `--resume` |
+| `timeout` | Forge terminates a phase after its deadline | Preserve the partial project and retry the incomplete work with `--resume` |
+| `unknown` | Non-zero exit does not match a known pattern | Preserve completed work, run `forge doctor`, then retry with `--resume` |
+
+Doctor readiness uses a separate status vocabulary. In particular, `check_inconclusive` means the
+bounded provider-owned status check did not prove ready or signed out; it is not an execution
+failure category and must not be treated as successful readiness.
 
 ## Remaining live evidence
 
