@@ -31,9 +31,9 @@ does not depend on a custom portfolio domain.
 - [x] Complete provider, safety, conventions, resume, verification, docs, CI, package, and skill
   production-readiness work on a reviewed feature branch.
 - [x] Pass pre-publication gates and an authenticated end-to-end scaffold on the release candidate.
-- [ ] Merge the ready PR after hosted CI passes.
-- [ ] Publish and verify the GitHub release and synchronized Homebrew formula.
-- [ ] Repeat immutable uv and clean Homebrew installation checks against v0.5.0.
+- [x] Merge the ready PR after hosted CI passes.
+- [x] Publish and verify the GitHub release and synchronized Homebrew formula.
+- [x] Repeat immutable uv and clean Homebrew installation checks against v0.5.0.
 
 ## Supported install routes
 
