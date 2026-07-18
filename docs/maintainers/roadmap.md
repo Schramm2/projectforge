@@ -2,6 +2,9 @@
 
 Live roadmap for expanding Forge into a production-grade project scaffolder. Organized by theme, not strict priority.
 
+Current source status: unreleased changes after v0.6.0. The source version remains `0.6.0` until
+the next release is prepared.
+
 Items marked with [DONE] are implemented in the current repository. Planned items are intentionally
 aspirational; example commands below describe direction, not guaranteed current CLI flags. Use
 live `forge --help` and the [production-readiness plan](production-readiness-plan.md) for release
@@ -175,6 +178,9 @@ truth.
   blanket bypass requires `--approval-mode unsafe --allow-unsafe`.
 - [DONE] **Credential-free diagnostics**: `forge doctor` reports config, environment, provider
   readiness, model behavior, and repair without account identity.
+- [DONE] **Privacy-safe failure presentation**: Provider and local-tool errors map to bounded
+  recovery guidance without persisting or echoing raw provider tails, hook failure streams, stack
+  traces, or machine paths.
 
 ---
 
@@ -210,8 +216,10 @@ truth.
 
 ## Deployment & Distribution
 
-ProjectForge v0.6.0 adds trusted PyPI publishing under the `matt-projectforge` distribution name
-and a collision-free `projectforge` command while retaining the public Homebrew tap.
+ProjectForge v0.6.0 added trusted-publishing automation under the `matt-projectforge` distribution
+name and a collision-free `projectforge` command while retaining the public Homebrew tap. Current
+unreleased source after v0.6.0 also aligns the Python namespace to `projectforge`; channel
+availability remains a per-release verification fact.
 
 The current workflow:
 1. User runs `uv tool install matt-projectforge`, `pipx install matt-projectforge`, or

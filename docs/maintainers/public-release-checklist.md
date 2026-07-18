@@ -23,11 +23,11 @@ ProjectForge's public identity is settled:
 - [x] Scan the public tree and evidence capture for company identity, credentials, and private
   machine paths.
 
-PyPI trusted publishing is configured in the release workflow for the next version. Complete the
-one-time pending-publisher/environment setup in the
-[PyPI release runbook](pypi-release.md), explicitly approve the connected-system publication, and
-do not describe a version as available there until clean uv and pipx installs pass. The GitHub
-homepage remains blank by choice; the repository does not depend on a custom portfolio domain.
+PyPI trusted publishing is configured in the release workflow. For any release, verify the
+publisher/environment setup in the [PyPI release runbook](pypi-release.md), explicitly approve the
+connected-system publication, and do not describe a version as available there until clean uv and
+pipx installs pass. The GitHub homepage remains blank by choice; the repository does not depend on
+a custom portfolio domain.
 
 ## v0.5.0 release status
 
@@ -39,13 +39,17 @@ homepage remains blank by choice; the repository does not depend on a custom por
 - [x] Publish and verify the GitHub release and synchronized Homebrew formula.
 - [x] Repeat immutable uv and clean Homebrew installation checks against v0.5.0.
 
-## Next-release install routes (after publication verification)
+## Current release install routes (verify for the version being published)
 
 ```bash
 uv tool install matt-projectforge
 pipx install matt-projectforge
 brew install --build-from-source schramm2/tap/projectforge
 ```
+
+Current `main` contains unreleased changes after v0.6.0, including the `projectforge` Python
+namespace. Keep those changes under `[Unreleased]` until the version, tag, artifacts, and all three
+installation routes have passed the release gates below.
 
 ## Release verification
 

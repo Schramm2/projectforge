@@ -7,9 +7,10 @@ the code under `src/projectforge/`. Dated evidence, completed release plans, cha
 provider prompt captures remain intentionally historical. Each historical document should state
 its evidence or release boundary rather than being rewritten to match current source.
 
-ProjectForge v0.6.0 includes PyPI publishing, the collision-free command alias, and the P1 product
-audit improvements. Older tags and their bundled
-documentation remain the authority for the immutable Gemini-backed releases.
+Current `main` contains unreleased changes after v0.6.0. It uses the `projectforge` Python
+namespace, privacy-safe recovery guidance across user-visible failure paths, and the product
+diagram/site surfaces listed below. The source version remains `0.6.0` until release preparation.
+Older tags and their bundled documentation remain the authority for those immutable releases.
 
 ## Guides
 
@@ -30,13 +31,16 @@ documentation remain the authority for the immutable Gemini-backed releases.
 - [maintainers/public-release-checklist.md](maintainers/public-release-checklist.md) — final public identity and privacy checklist
 - [maintainers/roadmap.md](maintainers/roadmap.md) — product roadmap and future work
 - [maintainers/provider-compatibility.md](maintainers/provider-compatibility.md) — dated official sources and runtime provider evidence
+- [maintainers/product-audit-2026-07.md](maintainers/product-audit-2026-07.md) — historical product and user-experience audit
 - [maintainers/production-readiness-plan.md](maintainers/production-readiness-plan.md) — release gates and evidence status
 - [maintainers/production-readiness-evidence.md](maintainers/production-readiness-evidence.md) — dated authenticated scaffold and provider evidence
 - [maintainers/skill-behavioral-evidence.md](maintainers/skill-behavioral-evidence.md) — shipped skill RED/GREEN forward tests
+- [maintainers/user-visible-error-inventory.csv](maintainers/user-visible-error-inventory.csv) — current user-visible failure-path audit
 
 ## Reference
 
 - [reference/prompts/](reference/prompts/) — provider-specific prompting reference material
+- [reference/antigravity-cli.md](reference/antigravity-cli.md) — dated Antigravity CLI contract capture
 - [claude-md-template.md](claude-md-template.md) — project-level `CLAUDE.md` authoring template
 - [reference/README.md](reference/README.md) — how to use reference snapshots safely
 

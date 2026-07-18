@@ -20,7 +20,9 @@ requested, which conventions and providers were used, and whether verification a
 > `forge` as a compatibility alias. Use `projectforge` if Foundry's Ethereum `forge` is already on
 > your PATH; shell command names cannot disambiguate the two tools.
 
-> This README documents ProjectForge v0.6.0.
+> **Source status:** this README documents unreleased changes on `main` after v0.6.0. The source
+> version still reports `0.6.0` until the next release is prepared; use the documentation bundled
+> with an immutable release for that release's exact behavior.
 
 ## What you get
 
@@ -38,6 +40,8 @@ requested, which conventions and providers were used, and whether verification a
 - Convention layers are deterministic and recorded with source hashes.
 - Blanket provider bypass requires two explicit unsafe flags.
 - Atomic progress, failure classification, and resume contracts preserve partial work safely.
+- Provider and local-tool failures are converted into bounded, privacy-safe recovery guidance
+  instead of echoing untrusted output, stack traces, or machine paths.
 - `.forge/` records distinguish “provider finished” from “generated project verified.”
 
 ## Supported stacks
@@ -63,7 +67,8 @@ See [the stack guide](docs/guides/stacks.md) for generated structures and comman
 
 ## Use the current source
 
-The Antigravity behavior documented below is available from the current repository checkout:
+The unreleased post-v0.6.0 behavior documented below is available from the current repository
+checkout:
 
 ```bash
 git clone https://github.com/Schramm2/projectforge.git
@@ -315,8 +320,9 @@ uv run pytest
 uv build
 ```
 
-The canonical Python import namespace is `projectforge`. See [AGENTS.md](AGENTS.md) and the
-maintainer docs before changing release behavior.
+The canonical Python import namespace in current source is `projectforge`; `ubundiforge` was the
+v0.6.0-and-earlier source namespace and is not present on `main`. See [AGENTS.md](AGENTS.md) and
+the maintainer docs before changing release behavior.
 
 ## License
 

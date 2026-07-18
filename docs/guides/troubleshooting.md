@@ -1,7 +1,8 @@
 # Troubleshooting
 
-This guide documents ProjectForge v0.6.0 with Antigravity support. Older Gemini-backed releases
-retain their own bundled troubleshooting guidance.
+This guide documents unreleased changes on `main` after ProjectForge v0.6.0, including the
+Antigravity provider and privacy-safe failure handling. Older releases retain their own bundled
+troubleshooting guidance.
 
 Start with the credential-free diagnostic:
 
@@ -83,6 +84,11 @@ are rejected; do not put provider credentials in Forge config.
 
 Forge classifies missing binary, authentication, unavailable model, quota/rate limit, network,
 permission, timeout, and unknown failures. Preserve the partial project and `.forge/progress.json`.
+
+Current source classifies provider output transiently but does not echo or persist the captured
+provider tail. The displayed category and remediation are intentionally bounded. If those are not
+enough, run the provider-owned diagnostic named by `forge doctor` locally; review its output on
+your machine rather than attaching it to a public issue.
 
 1. Follow the redacted remediation shown for the category.
 2. Rerun `forge doctor` for install/auth/network readiness when applicable.
