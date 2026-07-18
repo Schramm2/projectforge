@@ -180,8 +180,8 @@ Baseline gaps already proven:
 - [x] Update version sources, classifiers, changelog, migration guide, release notes, formula inputs,
   and immutable install references consistently.
 - [x] Make intentional scoped commits on `feat/production-readiness`.
-- [ ] Push the branch and open a ready PR.
-- [ ] Wait for CI and resolve every failure.
+- [x] Push the branch and open a ready PR.
+- [x] Wait for CI and resolve every failure.
 - [ ] Merge through the hosted workflow only after required evidence and authorization gates pass.
 - [ ] Verify the release workflow creates the tag and GitHub release and syncs the Homebrew tap.
 - [ ] Verify release notes and all hosted workflows.
