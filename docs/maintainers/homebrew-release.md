@@ -1,8 +1,8 @@
 # Homebrew Release
 
-Homebrew support is staged but not currently a public installation route. The source repository
-contains a `projectforge` formula and generator; `Schramm2/homebrew-tap` still needs the matching
-formula and clean-environment verification before user docs may recommend it.
+Homebrew is a supported public installation route. The release workflow keeps this repository's
+formula synchronized with `Schramm2/homebrew-tap`; v0.4.1 has passed a clean source installation
+and `brew test`.
 
 The names are intentionally different:
 
@@ -21,8 +21,7 @@ The names are intentionally different:
 ## Workflow prerequisites
 
 - `HOMEBREW_TAP_TOKEN` can write to `Schramm2/homebrew-tap`.
-- `HOMEBREW_TAP_REPO` is unset (the workflow defaults to `Schramm2/homebrew-tap`) or contains that
-  exact repository.
+- `HOMEBREW_TAP_REPO` is unset, allowing the workflow default, or contains that exact repository.
 - GitHub Actions can write release tags, releases, and the generated formula back to this repo.
 
 ## Normal release
@@ -33,7 +32,8 @@ The names are intentionally different:
 4. Run the dry-run smoke command from `.github/workflows/release-homebrew.yml`.
 5. Commit and push the release through the repository's normal reviewed branch flow.
 6. Confirm the `Release Homebrew` workflow created the tag and GitHub release, regenerated the
-   formula, and synced it to `Schramm2/homebrew-tap`.
+   formula, and synchronized it to `Schramm2/homebrew-tap`.
+7. Repeat the clean installation checks below before updating public documentation.
 
 If the tag exists but formula synchronization failed, manually run the workflow with
 `sync_only=true`. That mode skips tag and release creation.
@@ -54,30 +54,25 @@ uv run python scripts/generate_homebrew_formula.py \
   --source-sha256 "${SOURCE_SHA256}"
 ```
 
-Review and commit the formula in this repository. The required cross-repository handoff is:
+Review and commit the source formula. The workflow synchronizes it to:
 
 ```text
-Source: Formula/projectforge.rb
-Target: Schramm2/homebrew-tap/Formula/projectforge.rb
-Retire after compatibility review: any superseded formula for this command
+Schramm2/homebrew-tap/Formula/projectforge.rb
 ```
 
-This repository does not authorize that tap edit by itself.
+Retire a superseded formula only after confirming that the new formula preserves the supported
+command and no supported users depend on the old package name.
 
-## Verification before public documentation
-
-After the tap change is published, use a clean environment to run:
+## Clean verification
 
 ```bash
-brew install --build-from-source Schramm2/homebrew-tap/projectforge
-brew test Schramm2/homebrew-tap/projectforge
+brew install --build-from-source schramm2/tap/projectforge
+brew test schramm2/tap/projectforge
 forge --version
 forge --help
 forge --dry-run --name brew-smoke --stack python-cli \
   --description "Homebrew smoke test" --no-docker --no-open --no-verify
 ```
-
-Only then may README and getting-started documentation describe Homebrew as supported.
 
 The checked-in formula must always use a real release archive and its measured checksum. The
 generator requires that checksum explicitly so a version bump cannot silently reuse an older one.

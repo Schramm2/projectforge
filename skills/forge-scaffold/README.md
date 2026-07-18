@@ -6,7 +6,7 @@ Portable skill for AI agents that need to use Forge professionally. Updated for 
 
 - Access to this repository
 - Python 3.12+
-- `uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1` or `uv sync --dev` (repo-local)
+- `uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz` or `uv sync --dev` (repo-local)
 - At least one installed AI backend CLI:
   - `claude`
   - `gemini`
@@ -31,11 +31,18 @@ At minimum, the agent should read:
 **Supported public install:**
 
 ```bash
-uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1
+uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz
 forge --version
 ```
 
-ProjectForge is not currently published to PyPI or a supported Homebrew tap.
+Homebrew is also supported:
+
+```bash
+brew install --build-from-source schramm2/tap/projectforge
+forge --version
+```
+
+ProjectForge is not currently published to PyPI.
 
 **Repo-local mode:**
 
@@ -96,7 +103,7 @@ This detects installed backends, lets you choose default models, and writes Forg
 ## Troubleshooting
 
 **`forge` command not found**
-- Install from GitHub: `uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1`
+- Install from GitHub: `uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz`
 - Or use repo-local: `uv sync --dev && ./forge --version`
 
 **Forge says no AI backend is installed**
