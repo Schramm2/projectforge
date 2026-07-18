@@ -318,11 +318,14 @@ uv run python scripts/check_docs.py
 uv run ruff check src/projectforge tests
 uv run pytest
 uv build
+uv run python scripts/clean_user_harness.py verify
 ```
 
 The canonical Python import namespace in current source is `projectforge`; `ubundiforge` was the
 v0.6.0-and-earlier source namespace and is not present on `main`. See [AGENTS.md](AGENTS.md) and
-the maintainer docs before changing release behavior.
+the maintainer docs before changing release behavior. Use the
+[clean-user harness](docs/maintainers/clean-user-testing.md) to reproduce installation, first-run,
+and provider-readiness issues without touching real user state.
 
 ## License
 

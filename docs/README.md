@@ -27,6 +27,7 @@ Older tags and their bundled documentation remain the authority for those immuta
 - [maintainers/admin-playbook.md](maintainers/admin-playbook.md) — repo maintenance, stack changes, and release flow
 - [maintainers/adding-a-stack.md](maintainers/adding-a-stack.md) — concrete implementation checklist for new stacks
 - [maintainers/homebrew-release.md](maintainers/homebrew-release.md) — formula and tap release notes
+- [maintainers/clean-user-testing.md](maintainers/clean-user-testing.md) — isolated install, first-run, and provider-readiness harness
 - [maintainers/pypi-release.md](maintainers/pypi-release.md) — trusted-publishing setup and verification
 - [maintainers/public-release-checklist.md](maintainers/public-release-checklist.md) — final public identity and privacy checklist
 - [maintainers/roadmap.md](maintainers/roadmap.md) — product roadmap and future work

@@ -13,6 +13,7 @@ uv run ruff check src/projectforge tests
 uv run pytest
 uv build
 uv run python scripts/inspect_artifacts.py
+uv run python scripts/clean_user_harness.py verify
 ```
 
 ## Repo layout
@@ -33,7 +34,9 @@ uv run python scripts/inspect_artifacts.py
 1. Make the smallest coherent change that solves the problem.
 2. Keep docs in sync when behavior, flags, stacks, or release steps change.
 3. Prefer adding or updating tests alongside product changes.
-4. Run the relevant checks above before asking for review.
+4. Use the [clean-user harness](docs/maintainers/clean-user-testing.md) for install, setup, doctor,
+   provider-readiness, and command-entry-point changes.
+5. Run the relevant checks above before asking for review.
 
 ## Documentation standards
 
