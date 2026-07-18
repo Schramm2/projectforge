@@ -1,0 +1,6 @@
+interface:
+  display_name: "ProjectForge Operator"
+  short_description: "Safely scaffold and verify projects with Forge"
+  default_prompt: "Use $forge-scaffold to preview, safely run, and verify a ProjectForge scaffold."
+policy:
+  allow_implicit_invocation: true

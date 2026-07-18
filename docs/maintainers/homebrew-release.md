@@ -28,10 +28,12 @@ The names are intentionally different:
 
 1. Bump the version in `pyproject.toml` and `src/ubundiforge/__init__.py`.
 2. Update `CHANGELOG.md` and refresh `uv.lock` if dependencies changed.
-3. Run `uv run pytest`, `uv run ruff check src/ubundiforge tests`, and `uv build`.
+3. Run the safety scan, documentation and skill validators, Ruff, pytest, `uv build`, and artifact
+   inspection from the production-readiness checklist.
 4. Run the dry-run smoke command from `.github/workflows/release-homebrew.yml`.
 5. Commit and push the release through the repository's normal reviewed branch flow.
-6. Confirm the `Release Homebrew` workflow created the tag and GitHub release, regenerated the
+6. Confirm the workflow's tap repository/token preflight passed before tag creation, then confirm
+   `Release Homebrew` created the tag and GitHub release, regenerated the
    formula, and synchronized it to `Schramm2/homebrew-tap`.
 7. Repeat the clean installation checks below before updating public documentation.
 
@@ -76,3 +78,5 @@ forge --dry-run --name brew-smoke --stack python-cli \
 
 The checked-in formula must always use a real release archive and its measured checksum. The
 generator requires that checksum explicitly so a version bump cannot silently reuse an older one.
+The workflow must verify tap publication authorization before creating a tag or GitHub release; a
+missing cross-repository credential is a stop-before-publish condition, not a partial-release mode.

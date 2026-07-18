@@ -1,11 +1,17 @@
-"""Loads bundled convention bundles plus narrow legacy compatibility fallbacks."""
+"""Load deterministic bundled, profile, user-wide, and project convention layers."""
 
+import hashlib
 import re
 from pathlib import Path
 
 from .convention_compiler import compile_bundle as _compile_bundle
-from .convention_models import CompiledBundle
+from .convention_models import (
+    CompiledBundle,
+    ConventionContribution,
+    ConventionValidationError,
+)
 from .convention_registry import build_registry as _build_registry
+from .safety import check_for_secrets
 
 _PLACEHOLDER_LOCAL_EXACT_LINES = {
     "todo",
@@ -37,6 +43,7 @@ BUNDLED_CONVENTIONS_DIR = resolve_bundled_conventions_dir()
 
 FORGE_DIR = Path.home() / ".forge"
 CONVENTIONS_PATH = FORGE_DIR / "conventions.md"
+PROFILES_DIR = FORGE_DIR / "profiles"
 CLAUDE_MD_TEMPLATE_PATH = Path(__file__).parent / "templates" / "claude-md-template.md"
 
 MIN_CONVENTIONS_LENGTH = 50
@@ -98,6 +105,80 @@ def load_bundled_conventions(stack: str | None = None) -> tuple[str, list[str]]:
     return bundle.prompt_block, list(bundle.warnings)
 
 
+def _display_path(path: Path) -> str:
+    try:
+        return f"./{path.resolve().relative_to(Path.cwd().resolve()).as_posix()}"
+    except ValueError:
+        pass
+    try:
+        return f"~/{path.resolve().relative_to(Path.home().resolve()).as_posix()}"
+    except ValueError:
+        return str(path)
+
+
+def _file_contribution(source_id: str, path: Path) -> ConventionContribution:
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    return ConventionContribution(
+        source_id=source_id,
+        display_path=_display_path(path),
+        sha256=f"sha256:{digest}",
+    )
+
+
+def load_conventions_bundle(
+    stack: str | None = None,
+    *,
+    profile: str = "default",
+) -> CompiledBundle:
+    """Compose effective conventions in deterministic low-to-high precedence order."""
+    if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]*", profile):
+        raise ConventionValidationError(f"Invalid conventions profile: {profile}")
+
+    bundled = compile_bundle(build_registry(), stack=stack)
+    content_parts = [bundled.prompt_block] if bundled.prompt_block.strip() else []
+    contributions = list(bundled.contributions)
+    warnings = list(bundled.warnings)
+
+    profile_path = PROFILES_DIR / f"{profile}.md"
+    layer_paths = (
+        (f"profile:{profile}", profile_path),
+        ("user-wide", CONVENTIONS_PATH),
+        ("project-local", LOCAL_CONVENTIONS_PATH),
+    )
+    for source_id, path in layer_paths:
+        if not path.exists():
+            continue
+        content, layer_warnings = _load_conventions_file(path)
+        secret_types = check_for_secrets(content)
+        if secret_types:
+            raise ConventionValidationError(
+                f"Convention source contains credential-like content: {source_id} "
+                f"({', '.join(secret_types)})."
+            )
+        if source_id == "user-wide" and content.strip() == LEGACY_DEFAULT_CONVENTIONS.strip():
+            warnings.append(
+                "Ignoring the legacy generated user-wide conventions mirror; bundled rules apply."
+            )
+            continue
+        if _looks_placeholder_local_conventions(content):
+            warnings.append(f"Ignoring placeholder conventions from {_display_path(path)}.")
+            continue
+        if content.strip():
+            content_parts.append(content.strip())
+            contributions.append(_file_contribution(source_id, path))
+            warnings.extend(layer_warnings)
+            if source_id == "project-local":
+                warnings.insert(0, f"Using local conventions from {path}")
+
+    return CompiledBundle(
+        bundle_id=stack or "default",
+        prompt_block="\n\n".join(content_parts).strip(),
+        sources=tuple((*bundled.sources, *(path for _, path in layer_paths if path.exists()))),
+        warnings=tuple(warnings),
+        contributions=tuple(contributions),
+    )
+
+
 def _load_conventions_file(path: Path) -> tuple[str, list[str]]:
     warnings: list[str] = []
     content = path.read_text()
@@ -131,26 +212,21 @@ def _load_local_conventions(path: Path) -> tuple[str, list[str]]:
     return content, warnings
 
 
-def load_conventions(stack: str | None = None) -> tuple[str, list[str]]:
+def load_conventions(
+    stack: str | None = None,
+    *,
+    profile: str = "default",
+) -> tuple[str, list[str]]:
     """Load bundled conventions first and use legacy files only as a compatibility fallback."""
+
+    if stack is not None:
+        bundle = load_conventions_bundle(stack, profile=profile)
+        return bundle.prompt_block, list(bundle.warnings)
 
     if LOCAL_CONVENTIONS_PATH.exists():
         local_content = LOCAL_CONVENTIONS_PATH.read_text()
-        if stack is None or not _looks_placeholder_local_conventions(local_content):
+        if not _looks_placeholder_local_conventions(local_content):
             return _load_local_conventions(LOCAL_CONVENTIONS_PATH)
-
-    if stack is not None:
-        bundle_text, bundle_warnings = load_bundled_conventions(stack)
-        warnings = list(bundle_warnings)
-        if LOCAL_CONVENTIONS_PATH.exists():
-            warnings.insert(
-                0,
-                (
-                    "Ignoring placeholder local conventions from "
-                    f"{LOCAL_CONVENTIONS_PATH}; using bundled stack conventions."
-                ),
-            )
-        return bundle_text, warnings
 
     warnings: list[str] = []
 

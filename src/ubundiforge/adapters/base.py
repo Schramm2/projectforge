@@ -10,6 +10,7 @@ from pathlib import Path
 from queue import Empty, Queue
 from threading import Thread
 
+from ubundiforge.execution_policy import build_provider_command
 from ubundiforge.protocol import AgentResult, AgentTask, DecompositionPlan, ProgressEvent
 from ubundiforge.subprocess_utils import PHASE_TIMEOUT, sanitize_progress_line
 
@@ -23,8 +24,18 @@ class CLIAdapterBase:
     ProgressEvents.
     """
 
-    def __init__(self, conventions: str = "") -> None:
+    backend: str = ""
+
+    def __init__(
+        self,
+        conventions: str = "",
+        *,
+        approval_mode: str = "safe",
+        allow_unsafe: bool = False,
+    ) -> None:
         self.conventions = conventions
+        self.approval_mode = approval_mode
+        self.allow_unsafe = allow_unsafe
         self.phase_brief: str = ""  # Full phase prompt — set by orchestrator
 
     # ------------------------------------------------------------------
@@ -164,4 +175,10 @@ class CLIAdapterBase:
         raise NotImplementedError
 
     def build_cmd(self, prompt: str, model: str | None = None) -> list[str]:
-        raise NotImplementedError
+        return build_provider_command(
+            self.backend,
+            prompt,
+            model,
+            approval_mode=self.approval_mode,
+            allow_unsafe=self.allow_unsafe,
+        )

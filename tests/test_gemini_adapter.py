@@ -38,7 +38,7 @@ class TestGeminiAdapterBuildCmd:
         cmd = adapter.build_cmd("some prompt")
         assert cmd[0] == "gemini"
         assert "-p" in cmd
-        assert "-y" in cmd
+        assert cmd[cmd.index("--approval-mode") + 1] == "auto_edit"
 
     def test_prompt_is_included(self):
         adapter = GeminiAdapter()
@@ -57,10 +57,11 @@ class TestGeminiAdapterBuildCmd:
         idx = cmd.index("--model")
         assert cmd[idx + 1] == "gemini-2.0-flash"
 
-    def test_has_auto_approve_flag(self):
+    def test_does_not_use_yolo_by_default(self):
         adapter = GeminiAdapter()
         cmd = adapter.build_cmd("irrelevant")
-        assert "-y" in cmd
+        assert "-y" not in cmd
+        assert "yolo" not in cmd
 
 
 # ---------------------------------------------------------------------------

@@ -1,41 +1,25 @@
 # Getting Started
 
-## Prerequisites
+## 1. Install ProjectForge
 
-- **Python 3.12+** installed and on your PATH.
-- **uv** installed from the [official installation guide](https://docs.astral.sh/uv/getting-started/installation/).
-- **At least one AI CLI tool** installed:
-  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude`)
-  - [Gemini CLI](https://github.com/google-gemini/gemini-cli) (`gemini`)
-  - [Codex](https://github.com/openai/codex) (`codex`)
-
-Forge will detect which tools are available and route to the best one automatically.
-
-## Installation
-
-### uv
+ProjectForge supports Python 3.12 and 3.13 on macOS and Linux. Install `uv` from its
+[official guide](https://docs.astral.sh/uv/getting-started/installation/), then install the
+immutable release:
 
 ```bash
-uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz
+uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.0.tar.gz
 forge --version
 forge --help
 ```
 
-This installs the `projectforge` distribution from an immutable release and exposes the `forge`
-command. ProjectForge is not currently published to PyPI.
-
-### Homebrew
+Homebrew is also supported:
 
 ```bash
-brew install --build-from-source schramm2/tap/projectforge
+brew install schramm2/tap/projectforge
 forge --version
-forge --help
 ```
 
-The public tap is synchronized by the release workflow and verified with `brew test` before it is
-documented as supported.
-
-### Development checkout
+ProjectForge is not published to PyPI. For repository development:
 
 ```bash
 git clone https://github.com/Schramm2/projectforge.git
@@ -44,12 +28,28 @@ uv sync --dev
 ./forge --version
 ```
 
-The distribution is `projectforge`, the command is `forge`, and the Python import namespace
-remains `ubundiforge` as a compatibility constraint.
+## 2. Install and authenticate one provider
 
-## Verify before generating
+Choose at least one provider. Follow its current official installation and authentication guide:
 
-Prompt inspection does not require an authenticated AI backend and does not create a project:
+- [Claude Code setup](https://code.claude.com/docs/en/setup), then `claude auth login`.
+- [Codex CLI](https://github.com/openai/codex), then `codex login`.
+- [Gemini CLI installation](https://geminicli.com/docs/get-started/installation/) and
+  [authentication](https://geminicli.com/docs/get-started/authentication/).
+
+Forge does not collect credentials or account identity. Confirm readiness without a model call:
+
+```bash
+forge doctor
+forge doctor --json
+```
+
+One `ready` provider is enough. An installed Gemini CLI remains `preflight_required` because the
+provider exposes no deterministic credential-status command. After authenticating in Gemini's own
+CLI, run `forge doctor --preflight gemini`. This makes one read-only model call in a temporary
+sandbox, may consume quota, and stores only a version-bound readiness timestamp for 24 hours.
+
+## 3. Preview with zero provider calls
 
 ```bash
 forge --dry-run \
@@ -57,110 +57,94 @@ forge --dry-run \
   --stack python-cli \
   --description "A tiny greeting CLI" \
   --no-docker \
-  --no-open \
-  --no-verify
+  --no-open
 ```
 
-## First run
+`--dry-run` does not create a project, run a provider planner, or make a model call. Review target,
+stack, options, routing, models, safe approval mode, convention source hashes, warnings, and prompt
+content. Preview does not prove provider readiness or generated-project behavior.
 
-Running `forge` for the first time launches the setup wizard. It checks for:
-
-- **AI backends** -- which of claude, gemini, and codex are installed, and whether Forge can confirm they are ready to use.
-- **Editor** -- your preferred editor for opening projects after scaffolding.
-- **Git** -- whether git is installed (required for initializing new projects).
-- **Git identity** -- whether `user.name` and `user.email` are configured for initial commits.
-- **Docker** -- whether Docker is available (optional, used for stacks that default to containerized dev).
-
-Results are saved to `~/.forge/config.json`. You can re-run the wizard at any time with:
+## 4. Run the same scaffold safely
 
 ```bash
-forge --setup
-```
-
-After setup completes on first run, Forge gives you a short handoff instead of immediately dropping you into a scaffold. You can:
-
-- create a project now
-- review setup again
-- exit and come back later
-
-## Your first scaffold
-
-1. Run `forge` with no arguments.
-2. Enter a project name (e.g., `my-app`).
-3. Choose a stack from the list (e.g., Next.js + React).
-4. Add a short description of what the project does.
-5. Accept the remaining defaults or customize auth, CI, Docker, design template, and media options.
-6. Review your choices. Forge shows a summary screen where you can edit basics, design/media, integrations, or demo mode before generation starts.
-7. Watch it build. During execution you will see:
-   - A **phase timeline** showing which phases are completed, active, and pending
-   - An **activity feed** with checkmarks scrolling through what the AI is doing
-   - A **file tree** rendered between phases showing what was created
-8. When all phases finish, Forge shows a **post-scaffold dashboard** with health check results, file/line counts, and next steps.
-
-When complete, Forge will:
-- Initialize a git repository in the new project directory.
-- Write a `.forge/scaffold.json` manifest and conventions snapshot for provenance.
-- Generate a `.forge/card.svg` project card and inject a badge into the README.
-- Run verification checks if enabled (lint, typecheck, tests, build, health).
-- Play a completion sound if enabled (`"sound": true` in `~/.forge/config.json`).
-- Open the project in your editor (if configured).
-
-For a small non-interactive verification scaffold:
-
-```bash
-forge --name hello-forge \
+forge \
+  --name hello-forge \
   --stack python-cli \
   --description "A tiny greeting CLI" \
   --no-docker \
+  --approval-mode safe \
   --no-open \
   --verify
 ```
 
-Live generation sends the assembled prompt and conventions to the selected AI CLI and requires
-that CLI to be authenticated. Demo mode controls whether the generated app needs service
-credentials; it does not replace AI CLI authentication.
+The preflight panel states the target workspace, provider and model behavior, remaining provider
+calls, a qualified time range, execution strategy, demo/verification limits, and possible provider
+quota or billing. Live generation sends the assembled brief, effective conventions, and selected
+context to the chosen provider CLI. Safe mode keeps writes inside the provider's selected workspace
+boundary; it still allows project edits and commands required to scaffold.
 
-If the target directory already exists, Forge will offer safer choices instead of only asking to overwrite it. You can rename the project, overwrite the directory, or cancel.
+Demo mode is on by default so the generated project should start without real service credentials.
+The provider CLI itself still requires authentication.
 
-After 3+ scaffolds, Forge learns your preferences and offers to pre-fill dominant choices ("Your usual setup: ...") with a single confirm prompt.
-
-## Non-interactive mode
-
-For CI pipelines or scripting, pass all options as flags:
-
-```bash
-forge --name my-api --stack fastapi --description "REST API for inventory management" --no-docker
-```
-
-Use `--dry-run` to preview the assembled prompt without executing anything:
+The interactive equivalent is simply:
 
 ```bash
-forge --name my-api --stack fastapi --description "REST API" --dry-run
+forge
 ```
 
-Use `--use` if you want to force a single backend for the entire scaffold:
+The first interactive run opens setup, then lets you create a project, revisit setup, or exit. The
+questionnaire ends at a review screen before provider execution.
+
+## 5. Read the evidence
+
+After a successful run, inspect:
+
+- `.forge/progress.json` for phase status, attempts, and durations;
+- `.forge/scaffold.json` for routing, approval mode, models, and convention hashes;
+- `.forge/conventions-snapshot.md` for exact replay input; and
+- `.forge/verification.json` for commands, timeouts, exits, endpoints, and remediation.
+
+`Project Ready` means required verification passed. `Project Created` means verification was not
+run or was incomplete. Independently rerun recorded project commands when delivery confidence
+matters.
+
+## Failure recovery
+
+If a provider phase fails, preserve the target. Fix the classified login, model, quota, network,
+permission, or timeout problem and repeat the original command with `--resume`. Forge validates the
+recorded contract and skips completed phases.
+
+If a verification check fails, run the exact command and working directory recorded in
+`.forge/verification.json`; do not regenerate a project just to hide a failed check.
+
+See [Troubleshooting](troubleshooting.md) for provider-specific recovery.
+
+## Upgrade and 0.4.1 migration
+
+Read [Migrating from 0.4.1](migrating-from-0.4.1.md) for config normalization, conventions profile
+precedence, safe provider modes, new manifests, and resume compatibility.
 
 ```bash
-forge --use codex --name my-api --stack fastapi --description "REST API" --dry-run
+uv tool upgrade projectforge
+# or
+brew upgrade schramm2/tap/projectforge
 ```
 
-## Beyond scaffolding
-
-Once you have projects, Forge keeps working:
+## Uninstall
 
 ```bash
-forge stats              # See your scaffold history and backend performance
-forge check              # Audit any project against organization conventions
-forge check --fix        # Auto-generate missing CLAUDE.md, .env.example, agent_docs/
-forge evolve auth        # Add authentication to an existing Forge project
-forge evolve stripe      # Add Stripe billing
-forge replay --diff      # Reproduce a past scaffold and compare against current state
+uv tool uninstall projectforge
+# or
+brew uninstall projectforge
 ```
 
-Run these from inside a Forge-scaffolded project (one that has `.forge/scaffold.json`).
+Package removal does not delete user-owned files under `~/.forge/`. Move or back up that directory
+separately before removing it if you want to retain profiles or local scaffold history.
 
-## What's next
+## Next steps
 
-- [configuration.md](configuration.md) -- Customize config files, conventions, hooks, and media assets.
-- [stacks.md](stacks.md) -- Detailed reference for every supported stack.
-- [troubleshooting.md](troubleshooting.md) -- Common issues and how to fix them.
+- [Configuration](configuration.md) — profiles, precedence, config recovery, hooks, and evidence.
+- [Stacks](stacks.md) — generated structures and commands.
+- [Security and Privacy](security-privacy.md) — provider, workspace, local-data, and unsafe-mode
+  boundaries.
+- [Troubleshooting](troubleshooting.md) — diagnostic and recovery flows.

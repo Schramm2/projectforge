@@ -15,7 +15,14 @@ from ubundiforge.subprocess_utils import progress_summary_for_line as _progress_
 
 def test_claude_cmd_basic():
     cmd = _build_cmd("claude", "do stuff")
-    assert cmd == ["claude", "-p", "--dangerously-skip-permissions", "do stuff"]
+    assert cmd == [
+        "claude",
+        "-p",
+        "--permission-mode",
+        "acceptEdits",
+        "--no-session-persistence",
+        "do stuff",
+    ]
 
 
 def test_claude_cmd_with_model():
@@ -23,7 +30,9 @@ def test_claude_cmd_with_model():
     assert cmd == [
         "claude",
         "-p",
-        "--dangerously-skip-permissions",
+        "--permission-mode",
+        "acceptEdits",
+        "--no-session-persistence",
         "--model",
         "opus",
         "do stuff",
@@ -32,20 +41,39 @@ def test_claude_cmd_with_model():
 
 def test_gemini_cmd_basic():
     cmd = _build_cmd("gemini", "do stuff")
-    assert cmd == ["gemini", "-p", "do stuff", "-y"]
+    assert cmd == [
+        "gemini",
+        "-p",
+        "do stuff",
+        "--approval-mode",
+        "auto_edit",
+        "--sandbox",
+    ]
 
 
 def test_gemini_cmd_with_model():
     cmd = _build_cmd("gemini", "do stuff", model="flash")
-    assert cmd == ["gemini", "-p", "do stuff", "-y", "--model", "flash"]
+    assert cmd == [
+        "gemini",
+        "-p",
+        "do stuff",
+        "--approval-mode",
+        "auto_edit",
+        "--sandbox",
+        "--model",
+        "flash",
+    ]
 
 
 def test_codex_cmd_basic():
     cmd = _build_cmd("codex", "do stuff")
     assert cmd == [
         "codex",
+        "--ask-for-approval",
+        "never",
+        "--sandbox",
+        "workspace-write",
         "exec",
-        "--dangerously-bypass-approvals-and-sandbox",
         "do stuff",
     ]
 
@@ -54,8 +82,11 @@ def test_codex_cmd_with_model():
     cmd = _build_cmd("codex", "do stuff", model="o3")
     assert cmd == [
         "codex",
+        "--ask-for-approval",
+        "never",
+        "--sandbox",
+        "workspace-write",
         "exec",
-        "--dangerously-bypass-approvals-and-sandbox",
         "--model",
         "o3",
         "do stuff",
@@ -106,6 +137,15 @@ def test_progress_summary_for_line_maps_common_backend_output_to_clean_loader_co
         _progress_summary_for_line("Starting dev server on localhost:3000", current)
         == "Starting the app locally"
     )
+
+
+def test_progress_output_redacts_credential_shaped_values():
+    from ubundiforge.subprocess_utils import sanitize_progress_line
+
+    clean = sanitize_progress_line("clone failed: ghp_abcdefghijklmnopqrstuvwxyz1234567890")
+
+    assert "ghp_" not in clean
+    assert "REDACTED" in clean
 
 
 def test_progress_summary_for_line_uses_clean_fallback_for_non_noisy_updates():
