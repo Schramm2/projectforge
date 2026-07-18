@@ -48,6 +48,20 @@ def test_doctor_report_is_deterministic_and_excludes_provider_detail(monkeypatch
         "mode": "provider_default",
         "value": None,
     }
+    assert report["providers"]["codex"]["capabilities"] == {
+        "deterministic_status": True,
+        "default_model": "provider_default",
+        "approval_modes": {
+            "safe": "workspace-write",
+            "plan": "read-only",
+            "unsafe": "bypass approvals and sandbox",
+        },
+        "unsafe_requires_consent": True,
+    }
+    assert report["providers"]["gemini"]["capabilities"]["deterministic_status"] is False
+    assert report["providers"]["gemini"]["install_url"] == (
+        "https://geminicli.com/docs/get-started/installation/"
+    )
     assert "codex login" not in report["providers"]["codex"]["repair"]
     assert "authentication" in report["providers"]["gemini"]["repair"].lower()
     assert report["config"] == {"status": "valid"}

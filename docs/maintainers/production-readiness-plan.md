@@ -55,7 +55,7 @@ Baseline gaps already proven:
 
 ## Provider compatibility and doctor
 
-- [ ] Add a reusable provider capability/readiness model with explicit installation,
+- [x] Add a reusable provider capability/readiness model with explicit installation,
   authentication, readiness, version, model behavior, permission support, and repair guidance.
 - [x] Implement `forge doctor` with polished human output.
 - [x] Implement `forge doctor --json` with stable, secret-free machine-readable output.
@@ -155,7 +155,7 @@ Baseline gaps already proven:
 - [x] Verify internal links and practical official external links.
 - [x] Expand CI to the supported Python and OS matrix or narrow the documented support claim.
 - [x] Inspect wheel/sdist contents, metadata, bundled conventions, and skill packaging.
-- [ ] Test isolated source and wheel installs.
+- [x] Test isolated source and wheel installs.
 
 ## Release gates
 
@@ -193,8 +193,8 @@ Baseline gaps already proven:
 | Provider/channel | Status | Evidence or blocker |
 | --- | --- | --- |
 | Claude Code | Partial | v2.1.214 installed; documented/runtime status reports authenticated; no production-readiness live scaffold yet |
-| Codex CLI | Partial | v0.144.0 installed; documented/runtime status exits 0 and reports ChatGPT auth; installed patch is behind the current GitHub release observed on 2026-07-18 |
-| Gemini CLI | Unavailable locally | No `gemini` binary; official docs expose no deterministic auth-status command; stable npx probe and safe preflight remain |
+| Codex CLI | Partial | v0.144.0 installed and authenticated; official latest v0.144.5 version/help surface passed in an isolated npm probe; authenticated bounded-write evidence remains |
+| Gemini CLI | Unavailable for live use | Official v0.51.0 version/help surface passed through the no-install route; no global binary, deterministic auth status, authenticated preflight, or model call is available |
 | GitHub release | Not started | Current latest is v0.4.1; publication must wait for all gates |
 | Homebrew tap | Not started | Current v0.4.1 formula is synchronized; next release requires workflow and clean-install proof |
 

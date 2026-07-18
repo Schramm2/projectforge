@@ -14,6 +14,7 @@ from ubundiforge.config import (
     _run_status_command,
     get_backend_statuses,
 )
+from ubundiforge.provider_capabilities import PROVIDER_CAPABILITIES
 from ubundiforge.setup import CONFIG_PATH, _normalize_forge_config
 
 _VERSION_COMMANDS = {
@@ -22,11 +23,6 @@ _VERSION_COMMANDS = {
     "codex": ["codex", "--version"],
 }
 _EDITOR_COMMANDS = ("cursor", "code", "antigravity", "windsurf", "zed")
-_PROVIDER_INSTALL_URLS = {
-    "claude": "https://code.claude.com/docs/en/setup",
-    "gemini": "https://geminicli.com/docs/get-started/installation/",
-    "codex": "https://github.com/openai/codex",
-}
 
 
 def get_backend_version(backend: str) -> str | None:
@@ -98,7 +94,7 @@ def _provider_repair(backend: str, status: BackendStatus) -> str:
         return "No action required."
     if not status.installed:
         return (
-            f"Install from {_PROVIDER_INSTALL_URLS[backend]}, authenticate there, "
+            f"Install from {PROVIDER_CAPABILITIES[backend].install_url}, authenticate there, "
             "then rerun forge doctor."
         )
     if status.ready is False:
@@ -119,16 +115,19 @@ def build_doctor_report() -> dict:
     providers: dict[str, dict] = {}
     for backend in SUPPORTED_BACKENDS:
         status = statuses[backend]
+        capability = PROVIDER_CAPABILITIES[backend]
         providers[backend] = {
             "installed": status.installed,
             "readiness": _readiness_label(status),
             "version": get_backend_version(backend) if status.installed else None,
             "auth_mode": status.auth_mode or None,
             "login_command": status.login_command or None,
+            "install_url": capability.install_url,
             "model_behavior": {
                 "mode": "override" if backend in backend_models else "provider_default",
                 "value": backend_models.get(backend),
             },
+            "capabilities": capability.diagnostic_payload(),
             "repair": _provider_repair(backend, status),
         }
 

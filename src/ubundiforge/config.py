@@ -7,6 +7,8 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 
+from ubundiforge.provider_preflight import load_valid_preflight
+
 SUPPORTED_BACKENDS = ("claude", "gemini", "codex")
 
 
@@ -166,9 +168,17 @@ def _check_gemini_status() -> BackendStatus:
     version_result = _run_status_command(["gemini", "--version"])
     if version_result and version_result.returncode == 0:
         version = (version_result.stdout or version_result.stderr).strip()
+        version_line = version.splitlines()[0][:160] if version else "unknown"
+        if load_valid_preflight("gemini", version=version_line):
+            return BackendStatus(
+                installed=True,
+                ready=True,
+                detail="Gemini readiness was explicitly verified within the last 24 hours.",
+                auth_mode="verified_preflight",
+            )
         detail = "Gemini CLI responded to --version."
         if version:
-            detail = f"Gemini CLI responded successfully ({version.splitlines()[0]})."
+            detail = f"Gemini CLI responded successfully ({version_line})."
         return BackendStatus(
             installed=True,
             ready=None,

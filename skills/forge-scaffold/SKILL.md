@@ -74,8 +74,10 @@ Read the relevant subcommand help immediately before using a non-scaffold branch
 4. Review the preview for target, stack, requested inclusions/exclusions, phase routing, provider
    default versus model override, approval mode, convention source order/hashes, warnings, and any
    unexpected service or sensitive context.
-5. If the user requested an approval gate, return the preview assessment and wait. Otherwise,
-   continue only when the request already authorizes a live scaffold and the preflight is safe.
+5. If the user requested an approval gate, return the preview assessment and wait. For Gemini, use
+   `doctor --preflight gemini` only when the request authorizes a model call; it may consume quota.
+   Otherwise, continue only when the request already authorizes a live scaffold and the preflight
+   is safe.
 6. Recheck `doctor --json` and target collision immediately before execution.
 7. Run the matching live command with `--approval-mode safe`, `--no-open`, and verification enabled.
    Keep the previewed requirements unchanged.

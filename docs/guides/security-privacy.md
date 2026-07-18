@@ -15,6 +15,11 @@ Forge does not collect provider credentials or account identity. Provider login 
 provider-owned CLI. `forge doctor` reports only readiness and a non-identifying authentication mode
 when the provider exposes one.
 
+Normal doctor checks make no model call. The deliberately separate
+`forge doctor --preflight gemini` command makes one read-only sandboxed model call because Gemini
+has no deterministic status API. Its 24-hour proof contains only provider name, CLI version, and
+timestamp in `~/.forge/provider-preflight.json` with owner-only file permissions.
+
 ## Execution modes
 
 - `--approval-mode safe` is the default. It maps to each provider's bounded workspace-write mode.
@@ -42,8 +47,9 @@ Generated projects may contain:
 - `.forge/verification.json` — redacted commands, exits, timeouts, endpoints, and remediation; and
 - `.forge/card.svg` — the generated project card.
 
-`~/.forge/scaffold.log`, quality signals, and preferences stay local. The scaffold log records only
-the target directory name, not its absolute path. Forge redacts credential-shaped values from
+`~/.forge/scaffold.log`, quality signals, preferences, and provider preflight timestamps stay
+local. The scaffold log records only the target directory name, not its absolute path. Forge
+redacts credential-shaped values from
 progress and durable verification evidence, but secret scanning is defense in depth: never put
 credentials in descriptions, extra instructions, conventions, exported prompts, or generated
 fixtures.

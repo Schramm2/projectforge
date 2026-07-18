@@ -72,6 +72,47 @@ def test_doctor_human_output_includes_model_behavior_and_repair(monkeypatch):
     assert "claude auth login" in result.stdout
 
 
+def test_doctor_preflight_is_explicit_and_rebuilds_report(monkeypatch):
+    calls: list[str] = []
+    report = {
+        "schema_version": 1,
+        "projectforge_version": __version__,
+        "status": "ready",
+        "config": {"status": "valid"},
+        "environment": {
+            "python": {"version": "3.12.1", "supported": True},
+            "git": {"installed": True, "version": "git version 2.50.0"},
+            "docker": {"installed": False, "version": None},
+            "editors": {},
+        },
+        "providers": {},
+    }
+    monkeypatch.setattr(
+        "ubundiforge.cli.run_gemini_preflight",
+        lambda: SimpleNamespace(success=True, detail="Gemini readiness verified."),
+    )
+
+    def fake_report():
+        calls.append("report")
+        return report
+
+    monkeypatch.setattr("ubundiforge.cli.build_doctor_report", fake_report)
+
+    result = runner.invoke(app, ["doctor", "--preflight", "gemini"])
+
+    assert result.exit_code == 0
+    assert "model call" in result.stdout.lower()
+    assert "readiness verified" in result.stdout.lower()
+    assert calls == ["report"]
+
+
+def test_doctor_rejects_preflight_for_provider_with_status_api():
+    result = runner.invoke(app, ["doctor", "--preflight", "claude"])
+
+    assert result.exit_code == 2
+    assert "gemini" in result.output.lower()
+
+
 def test_live_unsafe_mode_requires_explicit_cli_consent():
     result = runner.invoke(
         app,
@@ -154,6 +195,8 @@ def test_dry_run_skips_setup_and_missing_backend_checks(monkeypatch):
     assert "<project>" in result.stdout
     assert "<stack>Python API (FastAPI)</stack>" in result.stdout
     assert "Use strict typing." in result.stdout
+    assert "Approval mode: safe" in result.stdout
+    assert "model: provider default" in result.stdout
 
 
 def test_dry_run_agents_never_starts_provider_processes(monkeypatch):

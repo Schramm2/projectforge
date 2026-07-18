@@ -35,9 +35,16 @@ Then rerun `forge doctor`. Forge never asks you to paste a credential.
 ## Gemini says `preflight_required`
 
 Gemini CLI does not expose a deterministic credential-status command. Forge therefore does not
-mark it ready from installation or `--version`. Authenticate through Gemini's own flow. A future
-explicit minimal preflight can consume provider quota, so it must be deliberate; use another
-`ready` provider in the meantime.
+mark it ready from installation or `--version`. Authenticate through Gemini's own flow, then run:
+
+```bash
+forge doctor --preflight gemini
+```
+
+This explicit command makes one read-only model call in a temporary sandbox and may consume quota.
+On success, Forge stores only the CLI version and verification timestamp for 24 hours in
+`~/.forge/provider-preflight.json`; it never stores provider output, identity, or credentials. Use
+another ready provider if you do not want a model call.
 
 ## Config is corrupted
 
