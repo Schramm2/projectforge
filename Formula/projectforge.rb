@@ -3,8 +3,8 @@ class Projectforge < Formula
 
   desc "Scaffold projects with AI coding tools and shared conventions"
   homepage "https://github.com/Schramm2/projectforge"
-  url "https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.1.tar.gz"
-  sha256 "708b0dbf2217bae68e8b75c5f46ce788d8b86204f7b40be97f98b5afc5feb2d8"
+  url "https://github.com/Schramm2/projectforge/archive/refs/tags/v0.6.0.tar.gz"
+  sha256 "aff734cf11ba70805218cd6b447ae842e96eeb68000521c720c69125f8e09497"
   license "MIT"
   head "https://github.com/Schramm2/projectforge.git", branch: "main"
 
@@ -77,10 +77,11 @@ class Projectforge < Formula
   end
 
   test do
-    command = "#{bin}/forge --dry-run --name brew-smoke --stack fastapi " \
+    command = "#{bin}/projectforge --dry-run --name brew-smoke --stack fastapi " \
               "--description 'Homebrew smoke test' --no-docker --no-open --no-verify"
     output = shell_output(command)
     assert_match "Homebrew smoke test", output
     assert_match "Routing Plan", output
+    assert_match "projectforge", shell_output("#{bin}/forge --version")
   end
 end
