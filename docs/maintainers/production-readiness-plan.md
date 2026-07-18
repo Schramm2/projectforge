@@ -104,9 +104,9 @@ Baseline gaps already proven:
   yolo execution.
 - [x] Map safe modes to current provider capabilities and scope writes to the target workspace.
 - [x] Print target workspace, selected provider, model behavior, and effective mode before running.
-- [ ] Refuse combinations where bounded execution cannot be guaranteed without explicit consent.
+- [x] Refuse combinations where bounded execution cannot be guaranteed without explicit consent.
 - [x] Share command construction between standard and orchestrated adapters.
-- [ ] Add tests for defaults, migration, consent, non-interactive runs, boundaries, redaction, and
+- [x] Add tests for defaults, migration, consent, non-interactive runs, boundaries, redaction, and
   unsupported combinations.
 - [ ] Document provider trust boundaries, data sent, local writes, recovery, and the unsafe escape
   hatch in user language.
@@ -117,14 +117,14 @@ Baseline gaps already proven:
 - [x] Make stack verification commands reflect the generated project layout and actual metadata.
 - [x] Record commands, working directories, timeouts, skipped reasons, exit codes, and concise
   remediation in verification reports.
-- [ ] Make health probes configurable and report every attempted endpoint and timeout honestly.
+- [x] Make health probes configurable and report every attempted endpoint and timeout honestly.
 - [x] Ensure dashboard status and independently executed checks agree.
-- [ ] Preserve partial project output after provider failure and write phase progress for resume.
-- [ ] Add actionable retry/resume/rerun guidance without overwriting successful work.
-- [ ] State duration, provider-call count, cost possibility, quick/thorough behavior, and demo-mode
+- [x] Preserve partial project output after provider failure and write phase progress for resume.
+- [x] Add actionable retry/resume/rerun guidance without overwriting successful work.
+- [x] State duration, provider-call count, cost possibility, quick/thorough behavior, and demo-mode
   limits before execution.
-- [ ] Redact prompts, progress, errors, logs, manifests, analytics, and diagnostics.
-- [ ] Add failed-phase, timeout, quota, permission, redaction, resume, verification, and successful
+- [x] Redact prompts, progress, errors, logs, manifests, analytics, and diagnostics.
+- [x] Add failed-phase, timeout, quota, permission, redaction, resume, verification, and successful
   scaffold acceptance coverage.
 
 ## Shipped skill RED -> GREEN

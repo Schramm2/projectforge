@@ -28,6 +28,7 @@ class CheckResult:
     command: str = ""
     cwd: str = ""
     timeout_seconds: int | None = None
+    request_timeout_seconds: int | None = None
     exit_code: int | None = None
     remediation: str = ""
     attempted_endpoints: tuple[str, ...] = ()
@@ -58,6 +59,9 @@ _INSTALL_COMMANDS: dict[str, str] = {
 # Stacks whose dev_commands include a run/backend_run command on a port
 _HEALTH_PORT_RE = re.compile(r"--port\s+(\d+)")
 _DEFAULT_HEALTH_PORT = 8000
+_DEFAULT_HEALTH_ENDPOINTS = ("/health", "/ready")
+_DEFAULT_HEALTH_STARTUP_TIMEOUT = 12
+_DEFAULT_HEALTH_REQUEST_TIMEOUT = 3
 
 
 def _load_pyproject(project_dir: Path) -> dict | None:
@@ -129,6 +133,41 @@ def _effective_dev_commands(stack: str, project_dir: Path) -> dict[str, str]:
     else:
         commands.pop("test", None)
     return commands
+
+
+def _health_settings(project_dir: Path) -> tuple[tuple[str, ...], int, int]:
+    """Read bounded localhost-only health settings from generated metadata."""
+    defaults = (
+        _DEFAULT_HEALTH_ENDPOINTS,
+        _DEFAULT_HEALTH_STARTUP_TIMEOUT,
+        _DEFAULT_HEALTH_REQUEST_TIMEOUT,
+    )
+    pyproject = _load_pyproject(project_dir)
+    if pyproject is None:
+        return defaults
+    config = pyproject.get("tool", {}).get("forge", {}).get("verification", {})
+    if not isinstance(config, dict):
+        return defaults
+    endpoints = config.get("health_endpoints", list(_DEFAULT_HEALTH_ENDPOINTS))
+    startup_timeout = config.get("health_startup_timeout", _DEFAULT_HEALTH_STARTUP_TIMEOUT)
+    request_timeout = config.get("health_request_timeout", _DEFAULT_HEALTH_REQUEST_TIMEOUT)
+    if (
+        not isinstance(endpoints, list)
+        or not 1 <= len(endpoints) <= 8
+        or not all(
+            isinstance(endpoint, str)
+            and re.fullmatch(r"/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*", endpoint) is not None
+            for endpoint in endpoints
+        )
+        or isinstance(startup_timeout, bool)
+        or not isinstance(startup_timeout, int)
+        or not 1 <= startup_timeout <= 120
+        or isinstance(request_timeout, bool)
+        or not isinstance(request_timeout, int)
+        or not 1 <= request_timeout <= 30
+    ):
+        return defaults
+    return tuple(endpoints), startup_timeout, request_timeout
 
 
 def _run_check(
@@ -204,9 +243,7 @@ def _install_deps(stack: str, project_dir: Path) -> CheckResult:
         return CheckResult(name="install", passed=True)
 
     install_cmd = (
-        _python_install_command(project_dir)
-        if pkg_mgr == "uv"
-        else _INSTALL_COMMANDS.get(pkg_mgr)
+        _python_install_command(project_dir) if pkg_mgr == "uv" else _INSTALL_COMMANDS.get(pkg_mgr)
     )
     if not install_cmd:
         return CheckResult(name="install", passed=False, detail=f"no install cmd for {pkg_mgr}")
@@ -223,9 +260,9 @@ def _check_health(
     project_dir: Path,
     run_cmd: str,
     *,
-    endpoints: tuple[str, ...] = ("/health", "/ready"),
-    startup_timeout: int = 12,
-    request_timeout: int = 3,
+    endpoints: tuple[str, ...] = _DEFAULT_HEALTH_ENDPOINTS,
+    startup_timeout: int = _DEFAULT_HEALTH_STARTUP_TIMEOUT,
+    request_timeout: int = _DEFAULT_HEALTH_REQUEST_TIMEOUT,
 ) -> CheckResult:
     """Start the server, poll configured endpoints, then stop it."""
     port = _extract_port(run_cmd)
@@ -236,6 +273,7 @@ def _check_health(
         "command": run_cmd,
         "cwd": str(project_dir),
         "timeout_seconds": startup_timeout,
+        "request_timeout_seconds": request_timeout,
     }
     try:
         process = subprocess.Popen(
@@ -357,7 +395,14 @@ def verify_scaffold(
     # 3. Health check for backend stacks
     run_cmd = dev.get("run") or dev.get("backend_run")
     if run_cmd:
-        health_result = _check_health(project_dir, run_cmd)
+        endpoints, startup_timeout, request_timeout = _health_settings(project_dir)
+        health_result = _check_health(
+            project_dir,
+            run_cmd,
+            endpoints=endpoints,
+            startup_timeout=startup_timeout,
+            request_timeout=request_timeout,
+        )
         report.checks.append(health_result)
 
     return report
@@ -375,6 +420,10 @@ def _portable_cwd(cwd: str, project_dir: Path) -> str:
 
 def write_verification_report(report: VerifyReport, project_dir: Path) -> Path:
     """Persist a privacy-safe, reproducible verification evidence report."""
+
+    def _safe(value: str) -> str:
+        return redact_secrets(value) if value else ""
+
     payload = {
         "schema_version": 1,
         "all_passed": report.all_passed,
@@ -383,13 +432,14 @@ def write_verification_report(report: VerifyReport, project_dir: Path) -> Path:
                 "name": check.name,
                 "passed": check.passed,
                 "skipped": check.skipped,
-                "detail": check.detail,
-                "command": check.command,
+                "detail": _safe(check.detail),
+                "command": _safe(check.command),
                 "cwd": _portable_cwd(check.cwd, project_dir),
                 "timeout_seconds": check.timeout_seconds,
+                "request_timeout_seconds": check.request_timeout_seconds,
                 "exit_code": check.exit_code,
-                "remediation": check.remediation,
-                "attempted_endpoints": list(check.attempted_endpoints),
+                "remediation": _safe(check.remediation),
+                "attempted_endpoints": [_safe(endpoint) for endpoint in check.attempted_endpoints],
                 "duration_seconds": round(check.duration_seconds, 3),
             }
             for check in report.checks

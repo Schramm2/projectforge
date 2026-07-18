@@ -55,6 +55,7 @@ from ubundiforge.design_templates import (
 from ubundiforge.doctor import build_doctor_report, doctor_exit_code
 from ubundiforge.evolutions import build_evolve_prompt, get_capabilities, get_capability
 from ubundiforge.execution_policy import validate_approval_mode
+from ubundiforge.execution_state import ProgressContractError, initialize_progress, mark_phase
 from ubundiforge.logo import print_logo
 from ubundiforge.media_assets import (
     MEDIA_DIR,
@@ -135,6 +136,12 @@ _BACKEND_LOGIN_COMMANDS = {
     "claude": "claude auth login",
     "codex": "codex login",
 }
+_FORGE_RUNTIME_BOUNDARY = """
+
+<forge_runtime_boundary>
+Do not read, edit, delete, or replace `.forge/progress.json`; ProjectForge owns that runtime
+evidence file. Preserve existing project output from earlier phases.
+</forge_runtime_boundary>"""
 
 
 @app.command()
@@ -281,9 +288,7 @@ def _render_loaded_context(
 
     lines.append(subtle(f"Conventions: {len(conventions)} chars loaded"))
     for source in convention_sources:
-        lines.append(
-            muted(f"  {source.source_id}: {source.display_path} ({source.sha256})")
-        )
+        lines.append(muted(f"  {source.source_id}: {source.display_path} ({source.sha256})"))
     if claude_md_loaded:
         lines.append(subtle("CLAUDE.md starter loaded"))
     if design_template_label:
@@ -325,9 +330,9 @@ def _render_phase_failure(backend: str, label: str, returncode: int) -> None:
     """Render helpful follow-up guidance when a scaffold phase fails."""
     lines: list[Text] = [
         subtle(f"{label} failed with {backend} (exit {returncode})."),
-        subtle("Re-run with --quiet to suppress subprocess output."),
-        subtle("Use --dry-run to inspect the assembled prompt before trying again."),
-        muted("You can also force a different backend with --use if another one is ready."),
+        subtle("Partial project output and .forge/progress.json were preserved."),
+        subtle("Fix the reported provider issue, then repeat the same command with --resume."),
+        muted("Resume verifies the original contract and does not rerun completed phases."),
     ]
     console.print(make_panel(grouped_lines(lines), title="Execution", accent="amber"))
 
@@ -419,6 +424,7 @@ def _has_explicit_scaffold_request(**kwargs: object) -> bool:
             bool(kwargs.get("ci_actions")),
             bool(kwargs.get("media")),
             bool(kwargs.get("no_media")),
+            bool(kwargs.get("resume")),
         ]
     )
 
@@ -701,9 +707,7 @@ def conventions_inspect(
         return
     console.print(status_line(f"Profile: {profile}; bundle: {bundle.bundle_id}", accent="aqua"))
     for source in bundle.contributions:
-        console.print(
-            muted(f"{source.source_id}: {source.display_path} ({source.sha256})")
-        )
+        console.print(muted(f"{source.source_id}: {source.display_path} ({source.sha256})"))
     for warning in bundle.warnings:
         console.print(status_line(f"Warning: {warning}", accent="amber"))
 
@@ -1465,6 +1469,13 @@ def main(
         bool,
         typer.Option("--verify/--no-verify", help="Run post-scaffold verification checks."),
     ] = True,
+    resume: Annotated[
+        bool,
+        typer.Option(
+            "--resume",
+            help="Resume failure; preserve completed phases.",
+        ),
+    ] = False,
     export: Annotated[
         str | None,
         typer.Option("--export", help="Export assembled prompt to a file."),
@@ -1475,6 +1486,9 @@ def main(
         return
 
     prompt_only = dry_run or bool(export)
+    if resume and prompt_only:
+        console.print(status_line("--resume cannot be combined with --dry-run or --export."))
+        raise typer.Exit(1)
     try:
         validate_approval_mode(
             approval_mode,
@@ -1499,6 +1513,7 @@ def main(
         ci_actions=ci_actions,
         media=media,
         no_media=no_media,
+        resume=resume,
     )
 
     if version:
@@ -1810,7 +1825,16 @@ def main(
     # Skip directory resolution in prompt-only mode to avoid side effects.
     base_dir = Path(forge_config.get("projects_dir") or Path.cwd())
     project_dir = base_dir / answers["name"]
-    if not prompt_only:
+    if resume:
+        if not project_dir.is_dir():
+            console.print(
+                status_line(
+                    "Resume target does not exist. Repeat the original project name and options.",
+                    accent="amber",
+                )
+            )
+            raise typer.Exit(1)
+    elif not prompt_only:
         project_dir = _resolve_project_dir(base_dir, answers)
 
     # Build prompts for each individual phase
@@ -1824,6 +1848,7 @@ def main(
             backend=backend,
             claude_md_template=claude_md_template,
         )
+        prompt += _FORGE_RUNTIME_BOUNDARY
         phase_prompts.append((phase, backend, prompt))
 
     # Also build merged prompts for dry-run/export (preserves existing behavior)
@@ -1837,6 +1862,7 @@ def main(
             backend=backend,
             claude_md_template=claude_md_template,
         )
+        prompt += _FORGE_RUNTIME_BOUNDARY
         merged_prompts.append((phases, backend, prompt))
 
     # Dry run / export: show all phase prompts
@@ -1906,6 +1932,29 @@ def main(
 
         raise typer.Exit()
 
+    try:
+        progress_state = initialize_progress(
+            project_dir,
+            name=answers["name"],
+            stack=answers["stack"],
+            approval_mode=approval_mode,
+            phase_prompts=phase_prompts,
+            resume=resume,
+        )
+    except ProgressContractError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+    completed_phases = {
+        phase["phase"] for phase in progress_state["phases"] if phase.get("status") == "completed"
+    }
+    if resume:
+        console.print(
+            status_line(
+                f"Resume validated: preserving {len(completed_phases)} completed phase(s).",
+                accent="aqua",
+            )
+        )
+
     if verbose:
         total_chars = sum(len(prompt) for _, _, prompt in phase_prompts)
         n = len(phase_prompts)
@@ -1921,6 +1970,16 @@ def main(
         f"{backend}={model or backend_models.get(backend) or 'provider default'}"
         for backend in selected_backends
     )
+    execution_windows = len(serial_first) + len(serial_last)
+    execution_windows += 1 if can_parallel else len(parallel_middle)
+    minimum_minutes = max(1, execution_windows * 2)
+    maximum_minutes = max(5, execution_windows * 15)
+    remaining_provider_calls = len(phase_backends) - len(completed_phases)
+    provider_call_summary = (
+        f"at least {remaining_provider_calls}; multi-agent planning/tasks add calls"
+        if agents
+        else str(remaining_provider_calls)
+    )
     console.print(
         make_panel(
             grouped_lines(
@@ -1929,6 +1988,31 @@ def main(
                     subtle(f"Providers: {', '.join(selected_backends)}"),
                     subtle(f"Models: {model_summary}"),
                     subtle(f"Approval mode: {approval_mode}"),
+                    subtle(f"Provider calls: {provider_call_summary}"),
+                    subtle(
+                        f"Planning range: about {minimum_minutes}-{maximum_minutes} minutes; "
+                        "provider and network latency may vary"
+                    ),
+                    subtle(
+                        "Strategy: thorough multi-agent planning and task execution"
+                        if agents
+                        else "Strategy: standard one-call-per-phase execution"
+                    ),
+                    subtle(
+                        "Demo mode: generated startup should not require real service credentials"
+                        if answers.get("demo_mode")
+                        else (
+                            "Demo mode: disabled; generated startup may require service credentials"
+                        )
+                    ),
+                    subtle(
+                        "Verification: enabled"
+                        if verify
+                        else "Verification: disabled; completion cannot be independently verified"
+                    ),
+                    muted(
+                        "Provider quota or billing may apply; Forge cannot predict provider cost."
+                    ),
                     muted(
                         "Unsafe mode disables provider approval boundaries."
                         if approval_mode == "unsafe"
@@ -1962,7 +2046,7 @@ def main(
         phase_context.append(
             {
                 "label": PHASE_LABELS.get(phase, phase),
-                "status": "pending",
+                "status": "completed" if phase in completed_phases else "pending",
                 "elapsed": 0.0,
                 "accent": BACKEND_ACCENTS.get(backend, "violet"),
             }
@@ -1979,6 +2063,10 @@ def main(
     # Step 1: Run architecture (serial)
     for phase, backend in serial_first:
         label = PHASE_LABELS.get(phase, phase)
+        if phase in completed_phases:
+            console.print(status_line(f"Preserved completed phase: {label}", accent="aqua"))
+            step += 1
+            continue
         console.print()
         console.print(
             make_step_panel(step, total_phases, label, detail=f"backend: {backend}", accent="aqua")
@@ -1988,6 +2076,7 @@ def main(
         phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
         phase_context[phase_idx]["status"] = "active"
         phase_start = time.monotonic()
+        mark_phase(project_dir, phase, status="running")
         if agents:
             from ubundiforge.orchestrator import run_phase_orchestrated
 
@@ -2019,22 +2108,52 @@ def main(
                 allow_unsafe=allow_unsafe,
             )
         phase_context[phase_idx]["status"] = "completed"
-        phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
+        phase_elapsed = time.monotonic() - phase_start
+        phase_context[phase_idx]["elapsed"] = phase_elapsed
         if returncode != 0:
+            phase_context[phase_idx]["status"] = "failed"
+            mark_phase(
+                project_dir,
+                phase,
+                status="failed",
+                duration_seconds=phase_elapsed,
+                exit_code=returncode,
+                failure_category=getattr(returncode, "failure_category", "unknown"),
+            )
             _render_phase_failure(backend, label, returncode)
             raise typer.Exit(returncode)
+        mark_phase(
+            project_dir, phase, status="completed", duration_seconds=phase_elapsed, exit_code=0
+        )
         console.print()
         console.print(make_file_tree(project_dir))
         step += 1
 
     # Step 2: Run middle phases (parallel if multiple, serial if single)
     if parallel_middle:
+        remaining_middle = [
+            (phase, backend) for phase, backend in parallel_middle if phase not in completed_phases
+        ]
+        if not agents:
+            for phase, _backend in parallel_middle:
+                if phase in completed_phases:
+                    console.print(
+                        status_line(
+                            f"Preserved completed phase: {PHASE_LABELS.get(phase, phase)}",
+                            accent="aqua",
+                        )
+                    )
+                    step += 1
         if agents:
             # Orchestrator handles its own internal parallelism — run sequentially here
             from ubundiforge.orchestrator import run_phase_orchestrated
 
             for phase, backend in parallel_middle:
                 label = PHASE_LABELS.get(phase, phase)
+                if phase in completed_phases:
+                    console.print(status_line(f"Preserved completed phase: {label}", accent="aqua"))
+                    step += 1
+                    continue
                 console.print()
                 console.print(
                     make_step_panel(
@@ -2046,6 +2165,7 @@ def main(
                 phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
                 phase_context[phase_idx]["status"] = "active"
                 phase_start = time.monotonic()
+                mark_phase(project_dir, phase, status="running")
                 returncode, _phase_stats = run_phase_orchestrated(
                     phase=phase,
                     backend=backend,
@@ -2061,16 +2181,33 @@ def main(
                 _any_orchestrated = True
                 for key in ("planned", "completed", "failed"):
                     _agent_stats[key] += _phase_stats.get(key, 0)
-                phase_context[phase_idx]["status"] = "completed"
-                phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
+                phase_elapsed = time.monotonic() - phase_start
+                phase_context[phase_idx]["elapsed"] = phase_elapsed
                 if returncode != 0:
+                    phase_context[phase_idx]["status"] = "failed"
+                    mark_phase(
+                        project_dir,
+                        phase,
+                        status="failed",
+                        duration_seconds=phase_elapsed,
+                        exit_code=returncode,
+                        failure_category=getattr(returncode, "failure_category", "unknown"),
+                    )
                     _render_phase_failure(backend, label, returncode)
                     raise typer.Exit(returncode)
+                phase_context[phase_idx]["status"] = "completed"
+                mark_phase(
+                    project_dir,
+                    phase,
+                    status="completed",
+                    duration_seconds=phase_elapsed,
+                    exit_code=0,
+                )
                 console.print()
                 console.print(make_file_tree(project_dir))
                 step += 1
-        elif can_parallel:
-            labels = " + ".join(f"{PHASE_LABELS.get(p, p)} ({b})" for p, b in parallel_middle)
+        elif len(remaining_middle) > 1:
+            labels = " + ".join(f"{PHASE_LABELS.get(p, p)} ({b})" for p, b in remaining_middle)
             console.print()
             console.print(
                 make_step_panel(
@@ -2083,12 +2220,18 @@ def main(
             )
 
             parallel_args = []
-            for phase, backend in parallel_middle:
+            label_to_phase: dict[str, str] = {}
+            for phase, backend in remaining_middle:
                 phase_prompt = next(p for ph, _, p in phase_prompts if ph == phase)
                 effective_model = model or backend_models.get(backend)
+                label = PHASE_LABELS.get(phase, phase)
+                label_to_phase[label] = phase
+                phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
+                phase_context[phase_idx]["status"] = "active"
+                mark_phase(project_dir, phase, status="running")
                 parallel_args.append(
                     {
-                        "label": PHASE_LABELS.get(phase, phase),
+                        "label": label,
                         "backend": backend,
                         "prompt": phase_prompt,
                         "model": effective_model,
@@ -2097,16 +2240,42 @@ def main(
                     }
                 )
 
+            parallel_started = time.monotonic()
             results = run_ai_parallel(parallel_args, project_dir, verbose=verbose)
+            parallel_elapsed = time.monotonic() - parallel_started
+            failed_results: list[tuple[str, int]] = []
             for label, returncode in results:
+                phase = label_to_phase[label]
+                phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
                 if returncode != 0:
+                    phase_context[phase_idx]["status"] = "failed"
+                    mark_phase(
+                        project_dir,
+                        phase,
+                        status="failed",
+                        duration_seconds=parallel_elapsed,
+                        exit_code=returncode,
+                        failure_category=getattr(returncode, "failure_category", "unknown"),
+                    )
+                    failed_results.append((label, returncode))
+                else:
+                    phase_context[phase_idx]["status"] = "completed"
+                    mark_phase(
+                        project_dir,
+                        phase,
+                        status="completed",
+                        duration_seconds=parallel_elapsed,
+                        exit_code=0,
+                    )
+            if failed_results:
+                for label, returncode in failed_results:
                     _render_phase_failure("parallel backend", label, returncode)
-                    raise typer.Exit(returncode)
+                raise typer.Exit(failed_results[0][1])
             console.print()
             console.print(make_file_tree(project_dir))
-            step += len(parallel_middle)
+            step += len(remaining_middle)
         else:
-            for phase, backend in parallel_middle:
+            for phase, backend in remaining_middle:
                 label = PHASE_LABELS.get(phase, phase)
                 console.print()
                 console.print(
@@ -2119,6 +2288,7 @@ def main(
                 phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
                 phase_context[phase_idx]["status"] = "active"
                 phase_start = time.monotonic()
+                mark_phase(project_dir, phase, status="running")
                 returncode = run_ai(
                     backend,
                     phase_prompt,
@@ -2130,11 +2300,28 @@ def main(
                     approval_mode=approval_mode,
                     allow_unsafe=allow_unsafe,
                 )
-                phase_context[phase_idx]["status"] = "completed"
-                phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
+                phase_elapsed = time.monotonic() - phase_start
+                phase_context[phase_idx]["elapsed"] = phase_elapsed
                 if returncode != 0:
+                    phase_context[phase_idx]["status"] = "failed"
+                    mark_phase(
+                        project_dir,
+                        phase,
+                        status="failed",
+                        duration_seconds=phase_elapsed,
+                        exit_code=returncode,
+                        failure_category=getattr(returncode, "failure_category", "unknown"),
+                    )
                     _render_phase_failure(backend, label, returncode)
                     raise typer.Exit(returncode)
+                phase_context[phase_idx]["status"] = "completed"
+                mark_phase(
+                    project_dir,
+                    phase,
+                    status="completed",
+                    duration_seconds=phase_elapsed,
+                    exit_code=0,
+                )
                 console.print()
                 console.print(make_file_tree(project_dir))
                 step += 1
@@ -2142,6 +2329,10 @@ def main(
     # Step 3: Run verify (serial)
     for phase, backend in serial_last:
         label = PHASE_LABELS.get(phase, phase)
+        if phase in completed_phases:
+            console.print(status_line(f"Preserved completed phase: {label}", accent="aqua"))
+            step += 1
+            continue
         console.print()
         console.print(
             make_step_panel(step, total_phases, label, detail=f"backend: {backend}", accent="plum")
@@ -2151,6 +2342,7 @@ def main(
         phase_idx = next(i for i, (p, _) in enumerate(phase_backends) if p == phase)
         phase_context[phase_idx]["status"] = "active"
         phase_start = time.monotonic()
+        mark_phase(project_dir, phase, status="running")
         if agents:
             from ubundiforge.orchestrator import run_phase_orchestrated
 
@@ -2181,11 +2373,28 @@ def main(
                 approval_mode=approval_mode,
                 allow_unsafe=allow_unsafe,
             )
-        phase_context[phase_idx]["status"] = "completed"
-        phase_context[phase_idx]["elapsed"] = time.monotonic() - phase_start
+        phase_elapsed = time.monotonic() - phase_start
+        phase_context[phase_idx]["elapsed"] = phase_elapsed
         if returncode != 0:
+            phase_context[phase_idx]["status"] = "failed"
+            mark_phase(
+                project_dir,
+                phase,
+                status="failed",
+                duration_seconds=phase_elapsed,
+                exit_code=returncode,
+                failure_category=getattr(returncode, "failure_category", "unknown"),
+            )
             _render_phase_failure(backend, label, returncode)
             raise typer.Exit(returncode)
+        phase_context[phase_idx]["status"] = "completed"
+        mark_phase(
+            project_dir,
+            phase,
+            status="completed",
+            duration_seconds=phase_elapsed,
+            exit_code=0,
+        )
         console.print()
         console.print(make_file_tree(project_dir))
         step += 1

@@ -3,6 +3,7 @@
 import subprocess
 from unittest.mock import MagicMock, patch
 
+import pytest
 from rich.console import Console
 
 from ubundiforge.verify import (
@@ -10,6 +11,7 @@ from ubundiforge.verify import (
     VerifyReport,
     _check_health,
     _extract_port,
+    _health_settings,
     _install_deps,
     _run_check,
     print_report,
@@ -94,7 +96,41 @@ def test_health_result_records_configured_endpoint_and_command(
     assert result.passed is True
     assert result.command == "uvicorn app:app --port 8123"
     assert result.cwd == str(tmp_path)
+    assert result.timeout_seconds == 12
+    assert result.request_timeout_seconds == 3
     assert result.attempted_endpoints == ("http://localhost:8123/status",)
+
+
+def test_health_settings_uses_safe_generated_project_metadata(tmp_path):
+    (tmp_path / "pyproject.toml").write_text(
+        """[project]
+name = "atlas"
+version = "0.1.0"
+
+[tool.forge.verification]
+health_endpoints = ["/healthz", "/readyz"]
+health_startup_timeout = 20
+health_request_timeout = 4
+"""
+    )
+
+    assert _health_settings(tmp_path) == (("/healthz", "/readyz"), 20, 4)
+
+
+@pytest.mark.parametrize(
+    "toml_body",
+    [
+        'health_endpoints = ["http://example.com/steal"]',
+        'health_endpoints = ["/health"]\nhealth_startup_timeout = 0',
+        'health_endpoints = ["/health"]\nhealth_request_timeout = 31',
+    ],
+)
+def test_health_settings_rejects_unsafe_generated_metadata(tmp_path, toml_body):
+    (tmp_path / "pyproject.toml").write_text(
+        f'[project]\nname = "atlas"\nversion = "0.1.0"\n\n[tool.forge.verification]\n{toml_body}\n'
+    )
+
+    assert _health_settings(tmp_path) == (("/health", "/ready"), 12, 3)
 
 
 # --- _run_check ---
@@ -282,3 +318,27 @@ def test_write_verification_report_persists_reproducible_command_metadata(tmp_pa
     assert payload["checks"][0]["cwd"] == "."
     assert payload["checks"][0]["command"] == "uv run pytest -q"
     assert payload["checks"][0]["exit_code"] == 1
+    assert payload["checks"][0]["request_timeout_seconds"] is None
+
+
+def test_write_verification_report_defensively_redacts_all_text_fields(tmp_path):
+    token = "ghp_abcdefghijklmnopqrstuvwxyz1234567890"
+    report = VerifyReport(
+        checks=[
+            CheckResult(
+                name="test",
+                passed=False,
+                detail=f"failed with {token}",
+                command=f"tool --token {token}",
+                cwd=str(tmp_path),
+                remediation=f"remove {token}",
+                attempted_endpoints=(f"http://localhost:8000/{token}",),
+            )
+        ]
+    )
+
+    output_path = write_verification_report(report, tmp_path)
+    raw = output_path.read_text()
+
+    assert token not in raw
+    assert "REDACTED" in raw
