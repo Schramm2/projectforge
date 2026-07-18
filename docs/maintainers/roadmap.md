@@ -210,12 +210,12 @@ truth.
 
 ## Deployment & Distribution
 
-The v0.5.1 package is available from its immutable GitHub release through uv and from the public
-Homebrew tap. It replaces Gemini with Antigravity; PyPI remains an optional future channel.
+ProjectForge v0.6.0 adds trusted PyPI publishing under the `matt-projectforge` distribution name
+and a collision-free `projectforge` command while retaining the public Homebrew tap.
 
 The current workflow:
-1. User runs `uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.1.tar.gz`
-   or `brew install --build-from-source schramm2/tap/projectforge`
+1. User runs `uv tool install matt-projectforge`, `pipx install matt-projectforge`, or
+   `brew install --build-from-source schramm2/tap/projectforge`
 2. Runs `forge` from any directory
 3. Setup wizard runs on first use (detects tools, configures preferences)
 4. Projects scaffold into their configured directory with organization conventions baked in
@@ -225,7 +225,9 @@ Steps to ship:
 - [DONE] **Publish and verify Homebrew**: `Formula/projectforge.rb` is synchronized into `Schramm2/homebrew-tap`; clean install, formula test, version, help, and dry-run checks passed for the release channel.
 - [DONE] **Homebrew release automation**: `.github/workflows/release-homebrew.yml` tags releases, regenerates the formula, and synchronizes the public tap.
 - [DONE] **Buildable package metadata**: `pyproject.toml` is set up for versioned source/wheel builds.
-- **Publish releases to PyPI**: optional later, if Forge needs a Python package distribution channel.
+- [READY TO PUBLISH] **Publish releases to PyPI**: the `matt-projectforge` pending publisher,
+  protected `pypi` environment, trusted-publishing automation, and release runbook are in place;
+  clean uv/pipx installs remain the post-publication gate before marking the channel done.
 - Transfer repo to a shared organization when ready
 - **Auto-update**: `forge update` pulls the latest version.
 - **Docker image**: Run Forge itself in a container with all three AI CLIs pre-installed.

@@ -1,6 +1,6 @@
 # ProjectForge
 
-Run `forge --name atlas --stack fastapi --description "Customer support API" --verify` and get a
+Run `projectforge --name atlas --stack fastapi --description "Customer support API" --verify` and get a
 working starter repository shaped by your conventions—not just a pile of generated files.
 ProjectForge scaffolds Python and TypeScript projects through Claude Code, Google Antigravity CLI,
 or Codex CLI, then installs, checks, and verifies the result.
@@ -16,8 +16,11 @@ requested, which conventions and providers were used, and whether verification a
 
 ![ProjectForge terminal scaffold walkthrough](assets/terminal-demo.svg)
 
-> This README documents ProjectForge v0.5.1, including the Antigravity provider migration and
-> the trust-surface fixes listed in the changelog.
+> **Command name:** current source installs `projectforge` as the preferred command and keeps
+> `forge` as a compatibility alias. Use `projectforge` if Foundry's Ethereum `forge` is already on
+> your PATH; shell command names cannot disambiguate the two tools.
+
+> This README documents ProjectForge v0.6.0.
 
 ## What you get
 
@@ -74,23 +77,27 @@ Run `./forge` from the checkout anywhere this guide shows `forge`.
 
 ## Install the latest published release
 
-The immutable v0.5.1 release supports Claude Code, Google Antigravity CLI, and Codex CLI:
+Install the PyPI distribution with uv or pipx:
 
 ```bash
-uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.1.tar.gz
-forge --version
-forge --help
+uv tool install matt-projectforge
+# or
+pipx install matt-projectforge
+projectforge --version
+projectforge --help
 ```
 
 Or install from the supported Homebrew tap:
 
 ```bash
 brew install schramm2/tap/projectforge
-forge --version
+projectforge --version
 ```
 
-ProjectForge is not published to PyPI. The distribution and Homebrew formula are named
-`projectforge`; the installed command is `forge`.
+ProjectForge is the product, repository, and Homebrew formula name. PyPI required the distinct
+`matt-projectforge` distribution name because `projectforge` was too similar to an existing
+project. `projectforge` is the preferred command, `forge` remains a short compatibility alias, and
+`ubundiforge` remains only the Python import namespace for compatibility.
 
 ## Install and authenticate a provider
 
@@ -130,8 +137,8 @@ forge --dry-run \
 ```
 
 Review the target, phase routing, provider-default versus overridden models, approval mode,
-convention source order and hashes, and prompt content. An exported prompt can contain private
-conventions; treat it as sensitive.
+convention-source summary, and prompt content. Add `--verbose` to display full source paths and
+hashes. An exported prompt can contain private conventions; treat it as sensitive.
 
 ## Run safely
 
@@ -149,8 +156,9 @@ forge \
 ```
 
 `safe` is the default. Before the first call, Forge shows the workspace, providers, model behavior,
-remaining provider calls, a qualified duration range, execution strategy, demo and verification
-limits, and possible provider quota or billing. Live execution sends the assembled brief,
+remaining provider CLI invocations, a numeric duration range, the last measured duration for the
+same stack, per-provider quota context, a rough cost range, execution strategy, and demo and
+verification limits. Live execution sends the assembled brief,
 conventions, and selected context to the provider. The provider may edit the target workspace,
 install dependencies, run commands, use allowed network access, and consume quota.
 
@@ -269,7 +277,7 @@ unsafe mode. Report vulnerabilities through [SECURITY.md](SECURITY.md); use
 See [the 0.4.1 migration guide](docs/guides/migrating-from-0.4.1.md) before upgrading.
 
 ```bash
-uv tool upgrade projectforge
+uv tool upgrade matt-projectforge
 # or
 brew upgrade schramm2/tap/projectforge
 ```
@@ -277,7 +285,7 @@ brew upgrade schramm2/tap/projectforge
 Uninstall the application with the matching package manager:
 
 ```bash
-uv tool uninstall projectforge
+uv tool uninstall matt-projectforge
 # or
 brew uninstall projectforge
 ```
@@ -292,6 +300,7 @@ them up or move that directory separately if you no longer need them.
 - [Stacks](docs/guides/stacks.md)
 - [Troubleshooting](docs/guides/troubleshooting.md)
 - [Provider compatibility evidence](docs/maintainers/provider-compatibility.md)
+- [PyPI release runbook](docs/maintainers/pypi-release.md)
 - [Documentation map](docs/README.md)
 
 ## Development

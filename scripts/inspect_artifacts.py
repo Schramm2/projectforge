@@ -11,6 +11,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
+DISTRIBUTION_NAME = "matt-projectforge"
+DISTRIBUTION_FILE_STEM = DISTRIBUTION_NAME.replace("-", "_")
 
 
 def _one(pattern: str) -> Path:
@@ -36,8 +38,19 @@ def inspect_wheel(path: Path) -> None:
         metadata_name = next((name for name in names if name.endswith(".dist-info/METADATA")), None)
         if metadata_name is None:
             raise SystemExit("Wheel is missing distribution metadata")
+        entry_points_name = next(
+            (name for name in names if name.endswith(".dist-info/entry_points.txt")),
+            None,
+        )
+        if entry_points_name is None:
+            raise SystemExit("Wheel is missing console entry points")
+        entry_points = archive.read(entry_points_name).decode()
+        for command in ("projectforge", "forge"):
+            expected = f"{command} = ubundiforge.__main__:main"
+            if expected not in entry_points:
+                raise SystemExit(f"Wheel is missing the {command} command alias")
         metadata = email.message_from_bytes(archive.read(metadata_name))
-        if metadata["Name"] != "projectforge":
+        if metadata["Name"] != DISTRIBUTION_NAME:
             raise SystemExit(f"Unexpected wheel distribution name: {metadata['Name']}")
         if not metadata["Version"]:
             raise SystemExit("Wheel metadata has no version")
@@ -55,6 +68,7 @@ def inspect_sdist(path: Path) -> None:
         "/LICENSE",
         "/docs/guides/getting-started.md",
         "/docs/guides/migrating-from-0.4.1.md",
+        "/docs/maintainers/pypi-release.md",
         "/skills/forge-scaffold/SKILL.md",
         "/skills/forge-scaffold/agents/openai.yaml",
     }
@@ -67,8 +81,8 @@ def inspect_sdist(path: Path) -> None:
 
 def main() -> int:
     version = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
-    wheel = _one(f"projectforge-{version}-*.whl")
-    sdist = _one(f"projectforge-{version}.tar.gz")
+    wheel = _one(f"{DISTRIBUTION_FILE_STEM}-{version}-*.whl")
+    sdist = _one(f"{DISTRIBUTION_FILE_STEM}-{version}.tar.gz")
     inspect_wheel(wheel)
     inspect_sdist(sdist)
     print(f"Artifacts valid: {wheel.name}, {sdist.name}")

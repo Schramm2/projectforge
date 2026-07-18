@@ -375,12 +375,12 @@ def _ask_execution_mode(answers: dict) -> None:
         "Execution mode",
         choices=[
             questionary.Choice(
-                "Multi-agent (recommended): parallel subagents per phase, higher quality",
-                value="agents",
+                "Standard (default): one provider invocation per phase, faster and predictable",
+                value="standard",
             ),
             questionary.Choice(
-                "Standard: single sequential execution, faster but less thorough",
-                value="standard",
+                "Multi-agent: parallel subagents per phase, more thorough but slower and costlier",
+                value="agents",
             ),
         ],
         default=default_value,

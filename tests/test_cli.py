@@ -1,6 +1,7 @@
 """Tests for CLI execution paths."""
 
 import json
+from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -9,9 +10,14 @@ from rich.console import Console
 from typer.testing import CliRunner
 
 from ubundiforge import __version__
-from ubundiforge.cli import app
+from ubundiforge.cli import (
+    _format_duration,
+    _provider_commitment_lines,
+    _render_loaded_context,
+    app,
+)
 from ubundiforge.config import BackendStatus
-from ubundiforge.convention_models import ConventionValidationError
+from ubundiforge.convention_models import ConventionContribution, ConventionValidationError
 from ubundiforge.setup import run_setup
 
 runner = CliRunner()
@@ -23,6 +29,63 @@ def test_version_output_uses_public_project_name():
     assert result.exit_code == 0
     assert result.stdout.strip() == f"projectforge {__version__}"
     assert "ubundiforge" not in result.stdout.lower()
+
+
+def test_scaffold_context_hides_hashes_unless_verbose(monkeypatch):
+    output = StringIO()
+    monkeypatch.setattr(
+        "ubundiforge.cli.console",
+        Console(file=output, force_terminal=False, color_system=None, width=120),
+    )
+    source = ConventionContribution(
+        source_id="bundled:global/shared",
+        display_path="bundled:global/shared.md",
+        sha256="sha256:secret-detail",
+    )
+
+    _render_loaded_context(
+        {"claude"},
+        {},
+        model_override=None,
+        approval_mode="safe",
+        conventions="x" * 9800,
+        claude_md_loaded=False,
+        design_template_label=None,
+        convention_sources=(source,),
+    )
+
+    assert "Conventions: 1 source, 9,800 chars (hashes recorded)" in output.getvalue()
+    assert "sha256:secret-detail" not in output.getvalue()
+
+    output.seek(0)
+    output.truncate(0)
+    _render_loaded_context(
+        {"claude"},
+        {},
+        model_override=None,
+        approval_mode="safe",
+        conventions="x" * 9800,
+        claude_md_loaded=False,
+        design_template_label=None,
+        convention_sources=(source,),
+        verbose=True,
+    )
+
+    assert "sha256:secret-detail" in output.getvalue()
+
+
+def test_preflight_commitment_helpers_quantify_time_calls_and_cost():
+    lines = _provider_commitment_lines(
+        [("architecture", "claude"), ("tests", "codex"), ("verify", "claude")],
+        {"architecture"},
+        agents=True,
+    )
+    output = "\n".join(line.plain for line in lines)
+
+    assert _format_duration(400) == "6m 40s"
+    assert "claude usage: typically 4-8" in output
+    assert "codex usage: typically 4-8" in output
+    assert "$1-$20+" in output
 
 
 def test_stats_empty_shows_first_scaffold_guidance():
@@ -108,6 +171,10 @@ def test_doctor_human_output_includes_model_behavior_and_repair(monkeypatch):
                 "version": "2.1.214",
                 "auth_mode": None,
                 "model_behavior": {"mode": "provider_default", "value": None},
+                "check": {
+                    "command": "claude auth status",
+                    "observed": "Authentication is required.",
+                },
                 "repair": "Run claude auth login, then rerun forge doctor.",
             }
         },
@@ -117,8 +184,12 @@ def test_doctor_human_output_includes_model_behavior_and_repair(monkeypatch):
     result = runner.invoke(app, ["doctor"])
 
     assert result.exit_code == 1
+    assert "no editor CLI on PATH" in result.stdout
+    assert "projectforge --setup" in result.stdout
     assert "model: provider default" in result.stdout
-    assert "claude auth login" in result.stdout
+    assert "check: claude auth status" in result.stdout
+    assert "observed: Authentication is required." in result.stdout
+    assert "next: Run claude auth login" in result.stdout
 
 
 def test_doctor_help_promises_auth_check_without_model_calls():

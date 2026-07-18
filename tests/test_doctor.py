@@ -3,7 +3,7 @@
 import json
 
 from ubundiforge.config import BackendStatus
-from ubundiforge.doctor import build_doctor_report, doctor_exit_code
+from ubundiforge.doctor import _provider_check, build_doctor_report, doctor_exit_code
 
 
 def test_doctor_report_is_deterministic_and_excludes_provider_detail(monkeypatch, tmp_path):
@@ -62,12 +62,33 @@ def test_doctor_report_is_deterministic_and_excludes_provider_detail(monkeypatch
     assert report["providers"]["antigravity"]["install_url"] == (
         "https://antigravity.google/docs/cli-install"
     )
+    assert report["providers"]["antigravity"]["check"] == {
+        "command": "agy --version; agy models",
+        "observed": "The readiness check did not return a recognized authentication result.",
+    }
+    assert report["providers"]["claude"]["check"] == {
+        "command": "PATH lookup for `claude`",
+        "observed": "No `claude` executable was found on PATH.",
+    }
     assert "codex login" not in report["providers"]["codex"]["repair"]
     assert "google sign-in" in report["providers"]["antigravity"]["repair"].lower()
     assert report["config"] == {"status": "valid"}
     assert report["environment"]["python"]["supported"] is True
     assert "secret@example.com" not in serialized
     assert "do-not-print" not in serialized
+
+
+def test_doctor_reports_only_antigravity_version_command_when_models_was_not_run():
+    check = _provider_check(
+        "antigravity",
+        BackendStatus(
+            installed=True,
+            ready=None,
+            detail="Antigravity is installed, but Forge could not run its version check.",
+        ),
+    )
+
+    assert check["command"] == "agy --version"
 
 
 def test_doctor_reports_advanced_model_override_without_other_config(monkeypatch, tmp_path):
@@ -122,6 +143,35 @@ def test_doctor_gives_antigravity_browser_and_ssh_login_guidance(monkeypatch, tm
     assert "browser" in repair
     assert "SSH URL" in repair
     assert "/exit" in repair
+
+
+def test_doctor_inconclusive_codex_has_exact_check_and_next_step(monkeypatch, tmp_path):
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({"preferred_editor": "code"}))
+    monkeypatch.setattr("ubundiforge.doctor.CONFIG_PATH", config_path)
+    monkeypatch.setattr(
+        "ubundiforge.doctor.get_backend_statuses",
+        lambda: {
+            "claude": BackendStatus(installed=False, ready=False),
+            "antigravity": BackendStatus(installed=False, ready=False),
+            "codex": BackendStatus(
+                installed=True,
+                ready=None,
+                detail="Codex login status exited without a recognized result.",
+            ),
+        },
+    )
+    monkeypatch.setattr("ubundiforge.doctor.get_backend_version", lambda backend: None)
+    monkeypatch.setattr("ubundiforge.doctor.build_environment_report", lambda: {})
+
+    provider = build_doctor_report()["providers"]["codex"]
+
+    assert provider["check"]["command"] == "codex login status"
+    assert provider["check"]["observed"] == (
+        "The readiness check did not return a recognized authentication result."
+    )
+    assert "codex login status" in provider["repair"]
+    assert "codex login" in provider["repair"]
 
 
 def test_doctor_exit_code_requires_valid_config_and_ready_provider():

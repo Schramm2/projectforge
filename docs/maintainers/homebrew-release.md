@@ -7,11 +7,13 @@ formula synchronized with `Schramm2/homebrew-tap`; v0.5.0 passed a clean source 
 The release tag is created before the workflow regenerates and commits the matching formula. Do not
 claim Homebrew availability until that synchronization step and the clean checks complete.
 
-The names are intentionally different:
+The public naming contract is:
 
-- distribution and Homebrew formula: `projectforge`
-- installed executable: `forge`
-- Python import namespace: `ubundiforge` for compatibility
+- product and Homebrew formula: `projectforge` / ProjectForge
+- PyPI distribution: `matt-projectforge` (required by PyPI name-similarity policy)
+- preferred executable from the next release: `projectforge`
+- compatibility executable: `forge` (may collide with Foundry's Ethereum CLI)
+- Python import namespace: `ubundiforge` for compatibility only
 
 ## Repository layout
 
@@ -37,7 +39,7 @@ The names are intentionally different:
 5. Commit and push the release through the repository's normal reviewed branch flow.
 6. Confirm the workflow's tap token passed a provider-owned push-permission check before tag
    creation, then confirm
-   `Release Homebrew` created the tag and GitHub release, regenerated the
+   `Release ProjectForge` created the tag and GitHub release, regenerated the
    formula, and synchronized it to `Schramm2/homebrew-tap`.
 7. Repeat the clean installation checks below before updating public documentation.
 
@@ -76,9 +78,10 @@ command and no supported users depend on the old package name.
 ```bash
 brew install --build-from-source schramm2/tap/projectforge
 brew test schramm2/tap/projectforge
-forge --version
-forge --help
-forge --dry-run --name brew-smoke --stack python-cli \
+projectforge --version
+projectforge --help
+forge --version  # compatibility alias
+projectforge --dry-run --name brew-smoke --stack python-cli \
   --description "Homebrew smoke test" --no-docker --no-open --no-verify
 ```
 

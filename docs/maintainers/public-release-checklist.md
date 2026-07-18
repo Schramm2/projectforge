@@ -3,9 +3,11 @@
 ProjectForge's public identity is settled:
 
 - repository: `Schramm2/projectforge`
-- distribution and Homebrew formula: `projectforge`
-- command: `forge`
-- Python import namespace: `ubundiforge` (compatibility constraint)
+- PyPI distribution: `matt-projectforge` (PyPI rejected `projectforge` as too similar)
+- Homebrew formula: `projectforge`
+- preferred command: `projectforge`
+- compatibility command: `forge` (collides with Foundry's Ethereum CLI)
+- Python import namespace: `ubundiforge` (compatibility constraint; not public branding)
 - canonical destination: <https://github.com/Schramm2/projectforge>
 
 ## v0.4.1 release status
@@ -21,9 +23,11 @@ ProjectForge's public identity is settled:
 - [x] Scan the public tree and evidence capture for company identity, credentials, and private
   machine paths.
 
-PyPI remains deliberately unpublished. Do not document it as an install route until a future
-release publishes and verifies it. The GitHub homepage remains blank by choice; the repository
-does not depend on a custom portfolio domain.
+PyPI trusted publishing is configured in the release workflow for the next version. Complete the
+one-time pending-publisher/environment setup in the
+[PyPI release runbook](pypi-release.md), explicitly approve the connected-system publication, and
+do not describe a version as available there until clean uv and pipx installs pass. The GitHub
+homepage remains blank by choice; the repository does not depend on a custom portfolio domain.
 
 ## v0.5.0 release status
 
@@ -35,10 +39,11 @@ does not depend on a custom portfolio domain.
 - [x] Publish and verify the GitHub release and synchronized Homebrew formula.
 - [x] Repeat immutable uv and clean Homebrew installation checks against v0.5.0.
 
-## Supported install routes
+## Next-release install routes (after publication verification)
 
 ```bash
-uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.0.tar.gz
+uv tool install matt-projectforge
+pipx install matt-projectforge
 brew install --build-from-source schramm2/tap/projectforge
 ```
 
@@ -48,8 +53,9 @@ brew install --build-from-source schramm2/tap/projectforge
 - Run `uv run ruff check src/ubundiforge tests`.
 - Run `uv run pytest` and investigate any change from the recorded baseline.
 - Run `uv build` and inspect wheel/sdist metadata.
-- Repeat both public install routes in clean environments.
-- Verify `forge --version`, `forge --help`, and the showcase dry run.
+- Repeat the PyPI uv, PyPI pipx, and Homebrew install routes in clean environments.
+- Verify `projectforge --version`, `projectforge --help`, the `forge` compatibility alias, and the
+  showcase dry run.
 - Run the live scaffold script only with an approved, authenticated backend.
 - Scan the final diff and tracked files for placeholders, stale identities, credentials, and
   machine-local paths.

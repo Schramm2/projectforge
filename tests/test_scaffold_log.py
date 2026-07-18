@@ -3,7 +3,11 @@
 import json
 
 from ubundiforge.convention_models import ConventionContribution
-from ubundiforge.scaffold_log import append_scaffold_log, write_scaffold_manifest
+from ubundiforge.scaffold_log import (
+    append_scaffold_log,
+    latest_scaffold_duration,
+    write_scaffold_manifest,
+)
 from ubundiforge.verify import CheckResult, VerifyReport
 
 
@@ -41,11 +45,13 @@ def test_append_scaffold_log_records_successful_verification(tmp_path, monkeypat
         tmp_path / "verified",
         verify_report=report,
         verification_requested=True,
+        duration_seconds=400.25,
     )
 
     entry = json.loads(log_path.read_text())
     assert entry["verification_status"] == "passed"
     assert entry["verification_requested"] is True
+    assert entry["duration_seconds"] == 400.25
 
 
 def test_append_scaffold_log_appends(tmp_path, monkeypatch):
@@ -61,6 +67,22 @@ def test_append_scaffold_log_appends(tmp_path, monkeypatch):
     assert len(lines) == 2
     assert json.loads(lines[0])["name"] == "alpha"
     assert json.loads(lines[1])["name"] == "beta"
+
+
+def test_latest_scaffold_duration_uses_newest_valid_stack_measurement(tmp_path):
+    log_path = tmp_path / "scaffold.log"
+    log_path.write_text(
+        "not-json\n"
+        + json.dumps({"stack": "fastapi", "duration_seconds": 500})
+        + "\n"
+        + json.dumps({"stack": "nextjs", "duration_seconds": 20})
+        + "\n"
+        + json.dumps({"stack": "fastapi", "duration_seconds": 400.4})
+        + "\n"
+    )
+
+    assert latest_scaffold_duration("fastapi", log_path=log_path) == 400.4
+    assert latest_scaffold_duration("python-cli", log_path=log_path) is None
 
 
 def test_write_scaffold_manifest(tmp_path):

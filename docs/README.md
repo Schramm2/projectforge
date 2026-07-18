@@ -7,7 +7,8 @@ the code under `src/ubundiforge/`. Dated evidence, completed release plans, chan
 provider prompt captures remain intentionally historical. Each historical document should state
 its evidence or release boundary rather than being rewritten to match current source.
 
-ProjectForge v0.5.1 includes the Antigravity provider migration. Older tags and their bundled
+ProjectForge v0.6.0 includes PyPI publishing, the collision-free command alias, and the P1 product
+audit improvements. Older tags and their bundled
 documentation remain the authority for the immutable Gemini-backed releases.
 
 ## Guides
@@ -25,6 +26,7 @@ documentation remain the authority for the immutable Gemini-backed releases.
 - [maintainers/admin-playbook.md](maintainers/admin-playbook.md) — repo maintenance, stack changes, and release flow
 - [maintainers/adding-a-stack.md](maintainers/adding-a-stack.md) — concrete implementation checklist for new stacks
 - [maintainers/homebrew-release.md](maintainers/homebrew-release.md) — formula and tap release notes
+- [maintainers/pypi-release.md](maintainers/pypi-release.md) — trusted-publishing setup and verification
 - [maintainers/public-release-checklist.md](maintainers/public-release-checklist.md) — final public identity and privacy checklist
 - [maintainers/roadmap.md](maintainers/roadmap.md) — product roadmap and future work
 - [maintainers/provider-compatibility.md](maintainers/provider-compatibility.md) — dated official sources and runtime provider evidence

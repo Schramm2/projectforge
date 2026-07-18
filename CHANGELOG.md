@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-18
+
+### Added
+
+- Releases publish to PyPI as `matt-projectforge` through a gated trusted-publishing job, with a
+  maintainer runbook and clean uv/pipx verification steps.
+- The execution preflight now shows per-provider CLI invocation estimates, quota context, a rough
+  numeric cost range, and the last locally measured duration for the selected stack.
+- The `projectforge` executable is now the preferred collision-free alias; `forge` remains for
+  compatibility and its collision with Foundry is documented.
+
+### Changed
+
+- Scaffold Context summarizes convention source count and size by default; full source hashes now
+  require `--verbose` and remain recorded in `.forge/scaffold.json`.
+- Interactive execution choices now identify Standard as the actual default and quantify the extra
+  multi-agent invocation overhead instead of recommending a non-default choice.
+- Doctor diagnostics now report each non-ready provider's exact check, credential-safe observation,
+  and concrete next step, and describe missing editors as a PATH/setup issue.
+- Successful scaffold history records total duration for stack-specific future estimates.
+
 ## [0.5.1] - 2026-07-18
 
 ### Added
@@ -200,6 +221,7 @@ See [the migration guide](docs/guides/migrating-from-0.4.1.md) for details.
 - pipx support for isolated global installs.
 - MIT license.
 
+[0.6.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.6.0
 [0.5.1]: https://github.com/Schramm2/projectforge/releases/tag/v0.5.1
 [0.5.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.5.0
 [0.4.1]: https://github.com/Schramm2/projectforge/releases/tag/v0.4.1

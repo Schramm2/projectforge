@@ -1,6 +1,10 @@
 # Getting Started
 
-> This guide documents ProjectForge v0.5.1 and its Claude, Antigravity, and Codex provider set.
+> This guide documents ProjectForge v0.6.0 with the Claude, Antigravity, and Codex provider set.
+>
+> Current source installs `projectforge` as the preferred collision-free command and keeps `forge`
+> as a compatibility alias. Foundry also installs a command named `forge`; use `projectforge` when
+> both products are installed.
 
 ## 1. Use the current source
 
@@ -18,14 +22,17 @@ uv sync --dev
 
 Use `./forge` from the repository root anywhere the examples below show `forge`.
 
-The latest published release is available through its immutable archive or Homebrew:
+Install the published PyPI distribution or use Homebrew:
 
 ```bash
-uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.1.tar.gz
+uv tool install matt-projectforge
+# or: pipx install matt-projectforge
 # or: brew install schramm2/tap/projectforge
 ```
 
-ProjectForge is not published to PyPI.
+PyPI required the distinct `matt-projectforge` distribution name because `projectforge` was too
+similar to an existing project. All installation routes provide the preferred `projectforge`
+command and the `forge` compatibility alias.
 
 ## 2. Install and authenticate one provider
 
@@ -60,8 +67,9 @@ forge --dry-run \
 ```
 
 `--dry-run` does not create a project, run a provider planner, or make a model call. Review target,
-stack, options, routing, models, safe approval mode, convention source hashes, warnings, and prompt
-content. Preview does not prove provider readiness or generated-project behavior.
+stack, options, routing, models, safe approval mode, convention source summary, warnings, and
+prompt content. Add `--verbose` for full convention source paths and hashes. Preview does not prove
+provider readiness or generated-project behavior.
 
 ## 4. Run the same scaffold safely
 
@@ -77,8 +85,9 @@ forge \
 ```
 
 The preflight panel states the target workspace, provider and model behavior, remaining provider
-calls, a qualified time range, execution strategy, demo/verification limits, and possible provider
-quota or billing. Live generation sends the assembled brief, effective conventions, and selected
+CLI invocations, a numeric time range, the last local duration for the same stack, per-provider
+quota context, a rough cost range, execution strategy, and demo/verification limits. Live
+generation sends the assembled brief, effective conventions, and selected
 context to the chosen provider CLI. Safe mode uses each provider's bounded execution controls.
 Antigravity auto-accepts workspace edits and enables its terminal sandbox; print mode may deny
 commands that are not already permitted by Antigravity's scoped policy.
@@ -129,7 +138,7 @@ git pull --ff-only
 uv sync --dev
 ```
 
-For the published package, use `uv tool upgrade projectforge` or
+For the published package, use `uv tool upgrade matt-projectforge` or
 `brew upgrade schramm2/tap/projectforge` and follow that release's bundled documentation.
 
 ## Uninstall
@@ -138,7 +147,7 @@ For the current-source route, leave the repository environment and remove the ch
 your normal file-management workflow. For a published package installation:
 
 ```bash
-uv tool uninstall projectforge
+uv tool uninstall matt-projectforge
 # or
 brew uninstall projectforge
 ```
