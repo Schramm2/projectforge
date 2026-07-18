@@ -45,10 +45,10 @@ See [the stack guide](docs/guides/stacks.md) for generated structures and comman
 
 ## Install ProjectForge
 
-Install the immutable v0.4.1 GitHub release:
+Install the immutable v0.5.0 GitHub release:
 
 ```bash
-uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz
+uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.0.tar.gz
 forge --version
 forge --help
 ```

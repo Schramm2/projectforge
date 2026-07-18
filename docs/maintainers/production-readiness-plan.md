@@ -159,26 +159,27 @@ Baseline gaps already proven:
 
 ## Release gates
 
-- [ ] `uv run python scripts/scan_safety.py`
-- [ ] `uv run ruff check src/ubundiforge tests`
-- [ ] `uv run pytest`
-- [ ] `uv build`
-- [ ] Documented dry-run smoke test
-- [ ] Clean wheel and sdist inspection
+- [x] `uv run python scripts/scan_safety.py`
+- [x] `uv run ruff check src/ubundiforge tests`
+- [x] `uv run pytest`
+- [x] `uv build`
+- [x] Documented dry-run smoke test
+- [x] Clean wheel and sdist inspection
 - [ ] Isolated wheel and immutable archive installation
-- [ ] Skill validation and behavioral tests
-- [ ] All new doctor/onboarding/provider/conventions/security/verification acceptance tests
-- [ ] Realistic isolated Claude, Codex, and Gemini probes with evidence classification
-- [ ] At least one authenticated end-to-end scaffold plus independent verification
+- [x] Skill validation and behavioral tests
+- [x] All new doctor/onboarding/provider/conventions/security/verification acceptance tests
+- [x] Realistic isolated Claude, Codex, and Gemini probes with evidence classification
+- [x] At least one authenticated end-to-end scaffold plus independent verification; see
+  [the evidence record](production-readiness-evidence.md).
 - [ ] Final security/privacy, changed-files, docs, package, and temporary-artifact review
 
 ## Version, PR, publication, and immutable verification
 
-- [ ] Choose the next semantic version from compatibility and maturity evidence; prefer a pre-1.0
+- [x] Choose the next semantic version from compatibility and maturity evidence; prefer a pre-1.0
   minor release unless all 1.0 claims are proven.
-- [ ] Update version sources, classifiers, changelog, migration guide, release notes, formula inputs,
+- [x] Update version sources, classifiers, changelog, migration guide, release notes, formula inputs,
   and immutable install references consistently.
-- [ ] Make intentional scoped commits on `feat/production-readiness`.
+- [x] Make intentional scoped commits on `feat/production-readiness`.
 - [ ] Push the branch and open a ready PR.
 - [ ] Wait for CI and resolve every failure.
 - [ ] Merge through the hosted workflow only after required evidence and authorization gates pass.
@@ -192,7 +193,7 @@ Baseline gaps already proven:
 
 | Provider/channel | Status | Evidence or blocker |
 | --- | --- | --- |
-| Claude Code | Partial | v2.1.214 installed; documented/runtime status reports authenticated; no production-readiness live scaffold yet |
+| Claude Code | Live | v2.1.214 installed and authenticated; safe three-phase scaffold, targeted repair, resume, and independent checks completed |
 | Codex CLI | Partial | v0.144.0 installed and authenticated; official latest v0.144.5 version/help surface passed in an isolated npm probe; authenticated bounded-write evidence remains |
 | Gemini CLI | Unavailable for live use | Official v0.51.0 version/help surface passed through the no-install route; no global binary, deterministic auth status, authenticated preflight, or model call is available |
 | GitHub release | Not started | Current latest is v0.4.1; publication must wait for all gates |

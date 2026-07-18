@@ -5,12 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-07-18
 
 ### Added
 
 - `forge doctor` human and JSON diagnostics for config, runtime tools, and credential-free provider
   readiness.
+- An explicit, read-only `forge doctor --preflight gemini` readiness call with a short-lived,
+  version-bound, credential-free proof for Gemini's status-API gap.
 - User-owned convention profiles with initialize, import, list, select, inspect, preview, validate,
   and edit workflows plus ordered source hashes.
 - Provider-neutral `safe`, `plan`, and explicitly consented `unsafe` execution modes.
@@ -33,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   project-local override.
 - Config writes are atomic and user-only; invalid config is preserved for recovery.
 - The dashboard reports `Project Ready` only when required verification actually passes.
+- Generated-project verification no longer inherits Forge's active virtual environment and uses a
+  bounded 60-second command timeout for realistic cold checks.
 - The built wheel and source distribution include the Forge operator skill.
 
 ### Security
@@ -41,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   both `--approval-mode unsafe` and `--allow-unsafe`.
 - Provider status, progress, failure output, logs, manifests, and verification evidence avoid
   credentials, account identity, private absolute paths, and unredacted provider output.
+- Verification reports replace project and home paths with portable, non-identifying forms.
 
 ### Migration
 
@@ -160,6 +165,7 @@ See [the migration guide](docs/guides/migrating-from-0.4.1.md) for details.
 - pipx support for isolated global installs.
 - MIT license.
 
+[0.5.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.5.0
 [0.4.1]: https://github.com/Schramm2/projectforge/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.3.0

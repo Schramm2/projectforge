@@ -7,7 +7,7 @@ ProjectForge supports Python 3.12 and 3.13 on macOS and Linux. Install `uv` from
 immutable release:
 
 ```bash
-uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz
+uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.0.tar.gz
 forge --version
 forge --help
 ```
