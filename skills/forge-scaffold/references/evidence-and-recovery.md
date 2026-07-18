@@ -36,7 +36,8 @@ For a failed recorded check:
 
 - Missing binary: show current official installation guidance, then rerun doctor.
 - Needs login: show the provider-owned login command from doctor; never handle credentials.
-- Preflight required: explain that installation is not authenticated readiness.
+- Check inconclusive: inspect connectivity or keyring access and rerun the provider-owned status
+  command; do not treat installation as authenticated readiness.
 - Model unavailable: remove the explicit override or use a provider-supported value.
 - Quota/rate limit: preserve output and advise waiting, plan review, or another ready provider.
 - Network: preserve partial output and check connectivity/proxy before retrying.

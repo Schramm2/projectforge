@@ -113,6 +113,18 @@ def test_claude_codex_routes_tests_to_codex(mock_check):
     ]
 
 
+def test_phase_fallback_uses_declared_backend_order_when_claude_is_unavailable():
+    result = pick_phase_backends(
+        "fastapi",
+        available_backends={"antigravity", "codex"},
+    )
+    assert result == [
+        ("architecture", "antigravity"),
+        ("tests", "codex"),
+        ("verify", "antigravity"),
+    ]
+
+
 @patch("ubundiforge.router.check_backend_installed", return_value=True)
 def test_override_forces_single_backend(mock_check):
     result = pick_phase_backends("nextjs", override="antigravity")

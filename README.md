@@ -3,6 +3,9 @@
 ProjectForge is a local CLI that turns a project brief and your conventions into a verified starter
 repository through Claude Code, Google Antigravity CLI, or Codex CLI.
 
+> This README tracks the current, unreleased source after v0.5.0. The published v0.5.0 package
+> still supports Gemini CLI; use the documentation bundled with that tag for released behavior.
+
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB)
 
 Forge shows the complete prompt before execution, uses bounded provider workspace modes by default,
@@ -43,9 +46,25 @@ See [the stack guide](docs/guides/stacks.md) for generated structures and comman
 - At least one installed and authenticated provider CLI for live generation. Preview does not need
   a provider.
 
-## Install ProjectForge
+## Use the current source
 
-Install the immutable v0.5.0 GitHub release:
+The Antigravity behavior documented below is available from the current repository checkout:
+
+```bash
+git clone https://github.com/Schramm2/projectforge.git
+cd projectforge
+uv sync --dev
+./forge --version
+./forge --help
+```
+
+Run `./forge` from the checkout anywhere this guide shows `forge`.
+
+## Install the latest published release
+
+The immutable v0.5.0 release and Homebrew formula use the earlier Claude/Gemini/Codex provider
+set. Consult the [v0.5.0 README](https://github.com/Schramm2/projectforge/blob/v0.5.0/README.md)
+for its provider setup and runtime behavior.
 
 ```bash
 uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.0.tar.gz

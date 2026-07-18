@@ -24,7 +24,6 @@ conventions/
   global/
   languages/
   stacks/
-  prompts/
   manifests/
 ```
 
@@ -131,12 +130,16 @@ In practice, a new stack usually requires changes in all of these places:
   Add CI support and optional auth support if applicable.
 - `tests/`
   Add or update tests for routing, prompt generation, CLI parsing, and options.
+- `conventions/manifests/bundles.yaml` and `conventions/manifests/browse-labels.yaml`
+  Register the compiled bundle and its admin browse label.
+- `README.md` and `docs/guides/stacks.md`
+  Update the supported-stack catalog and examples.
 
 After making the code changes, verify with:
 
 ```bash
 uv run pytest
-uv run ruff check .
+uv run ruff check src/ubundiforge tests
 ./forge --dry-run --name test-project --stack <new-stack> --description "test scaffold"
 ```
 
@@ -217,10 +220,10 @@ If automation is unavailable, you can still run the old manual flow.
 
 #### Compute the release tarball checksum
 
-Example for a planned `v0.5.0` release:
+Replace `vX.Y.Z` with the real planned release tag:
 
 ```bash
-TAG=v0.5.0
+TAG=vX.Y.Z
 SOURCE_URL="https://github.com/Schramm2/projectforge/archive/refs/tags/${TAG}.tar.gz"
 curl -Ls "${SOURCE_URL}" -o /tmp/projectforge-release.tar.gz
 SOURCE_SHA256="$(shasum -a 256 /tmp/projectforge-release.tar.gz | awk '{print $1}')"

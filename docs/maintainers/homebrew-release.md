@@ -1,8 +1,11 @@
 # Homebrew Release
 
 Homebrew is a supported public installation route. The release workflow keeps this repository's
-formula synchronized with `Schramm2/homebrew-tap`; v0.4.1 has passed a clean source installation
+formula synchronized with `Schramm2/homebrew-tap`; v0.5.0 has passed a clean source installation
 and `brew test`.
+
+The checked-in formula remains on v0.5.0 until the current unreleased Antigravity-capable source is
+versioned and published. Do not describe source-only provider changes as available from Homebrew.
 
 The names are intentionally different:
 
@@ -48,7 +51,7 @@ requires a token that reports push permission for the configured tap repository.
 Use a real tag and compute the checksum from the canonical repository. For example:
 
 ```bash
-TAG=v0.5.0
+TAG=vX.Y.Z
 SOURCE_URL="https://github.com/Schramm2/projectforge/archive/refs/tags/${TAG}.tar.gz"
 curl -Ls "${SOURCE_URL}" -o /tmp/projectforge-release.tar.gz
 SOURCE_SHA256="$(shasum -a 256 /tmp/projectforge-release.tar.gz | awk '{print $1}')"

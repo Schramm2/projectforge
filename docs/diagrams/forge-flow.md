@@ -44,7 +44,7 @@ flowchart TD
     Prompting --> Preview{"Dry run or export?"}
 
     Preview -- Yes --> OutputPrompt["Print or write merged prompts"]
-    Preview -- No --> Execute["Copy media, run phases,<br/>architecture first,<br/>middle phases parallel when possible,<br/>verify last"]
+    Preview -- No --> Execute["Copy media, run phases,<br/>architecture first,<br/>standard-mode middle phases parallel,<br/>verify last"]
 
     Execute --> Post["Write manifest, init git,<br/>verify scaffold, log quality,<br/>run hook, record preferences"]
     Post --> Ready["Render dashboard,<br/>write project card,<br/>badge README, play sound,<br/>open editor"]

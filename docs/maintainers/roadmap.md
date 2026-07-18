@@ -20,7 +20,8 @@ truth.
 
 - [DONE] **Quality-based routing**: Tracks which backend produces better results per stack over time. Stores success/failure signals after each scaffold in `~/.forge/quality.jsonl` and shifts routing weights using exponential moving average scoring. The router overrides the ideal backend when a clearly better alternative exists (>0.1 margin, minimum 8 data points).
 - [DONE] **Model selection per backend**: `--model opus` passes the model flag through to the AI CLI subprocess.
-- [DONE] **Fallback chain**: If the primary backend isn't installed, automatically try the next available (claude -> antigravity -> codex).
+- [DONE] **Fallback chain**: If the ideal backend is not usable, automatically try the next ready
+  backend in deterministic order (claude -> antigravity -> codex).
 - [DONE] **Multi-backend phase routing**: Different scaffold phases (architecture, frontend, tests, verify) route to the ideal AI backend based on strengths. Adjacent phases using the same backend are merged to reduce handoffs.
 - [DONE] **Specialist prompt variants**: Each phase has a "best" prompt variant optimized for its ideal backend, plus a general fallback variant for other backends.
 - **Cost-aware routing**: For backends with usage-based pricing, optionally prefer cheaper options for simple scaffolds.
@@ -64,7 +65,8 @@ truth.
 - [DONE] **Python worker stack**: `python-worker` stack for background workers and services.
 - [DONE] **AI-powered API stack**: `fastapi-ai` stack for FastAPI services with LLM/embeddings integration.
 - [DONE] **Scaffold options & auth providers**: Configurable auth providers (Clerk, Supabase Auth, Auth.js, Better Auth), CI template modes, and per-stack service selections via `scaffold_options.py`.
-- **Sub-stack prompts**: After selecting "Next.js + React", ask follow-ups like "Auth provider?" (Supabase, Clerk, NextAuth), "Database?" (Postgres, SQLite, none), "UI library?" (shadcn/ui, Radix, none).
+- **More sub-stack prompts**: Auth-provider follow-ups are implemented. Add database and UI-library
+  choices where their stack metadata and verification contracts are defined.
 - **Stack detection from existing project**: Run `forge` inside an existing repo and have it detect the stack from package.json / pyproject.toml, then scaffold missing pieces (e.g. add Docker to an existing project).
 
 ---
@@ -121,7 +123,9 @@ truth.
   test, and bounded health checks before the dashboard can report `Project Ready`.
 - **Diff review**: Show a tree of created files with line counts before the AI starts writing, let the user approve.
 - **Retry with feedback**: If the scaffold is bad, `forge retry "the auth setup is wrong, use Clerk not NextAuth"` re-runs with the original prompt plus correction.
-- [DONE] **Multi-pass scaffolding**: Scaffold phases (architecture, frontend, tests, verify) run sequentially, each reviewing and building on the previous phase's output. The verify phase acts as a final QA pass.
+- [DONE] **Multi-pass scaffolding**: Architecture runs first and verify runs last. Standard mode may
+  run multiple middle phases in parallel; `--agents` runs phase windows sequentially while its
+  orchestrator may parallelize independent tasks inside the active phase.
 - [DONE] **Multi-agent orchestration**: `--agents` decomposes each phase into 2-6 focused subagent tasks with dependency-aware parallel execution, live activity feed, and automatic reconciliation. Selectable interactively via the "Execution mode" prompt.
 
 ---
@@ -206,11 +210,12 @@ truth.
 
 ## Deployment & Distribution
 
-The v0.4.1 package is available from its immutable GitHub release through uv and from the public
-Homebrew tap. PyPI remains an optional future channel.
+The v0.5.0 package is available from its immutable GitHub release through uv and from the public
+Homebrew tap. The current source replaces Gemini with Antigravity but remains unreleased; PyPI is
+an optional future channel.
 
 The current workflow:
-1. User runs `uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz`
+1. User runs `uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.0.tar.gz`
    or `brew install --build-from-source schramm2/tap/projectforge`
 2. Runs `forge` from any directory
 3. Setup wizard runs on first use (detects tools, configures preferences)
@@ -218,8 +223,8 @@ The current workflow:
 
 Steps to ship:
 - [DONE] **Homebrew formula source**: The repo includes `Formula/projectforge.rb`, a formula generator, and documented release steps.
-- [DONE] **Publish and verify Homebrew**: `Formula/projectforge.rb` is synchronized into `Schramm2/homebrew-tap`; the superseded formula was retired; clean `brew install`, `brew test`, version, help, and dry-run checks passed for v0.4.1.
-- [DONE] **Homebrew release automation**: `.github/workflows/release-homebrew.yml` tagged, released, regenerated, and synchronized v0.4.1 successfully.
+- [DONE] **Publish and verify Homebrew**: `Formula/projectforge.rb` is synchronized into `Schramm2/homebrew-tap`; clean install, formula test, version, help, and dry-run checks passed for v0.5.0.
+- [DONE] **Homebrew release automation**: `.github/workflows/release-homebrew.yml` tagged, released, regenerated, and synchronized v0.5.0 successfully.
 - [DONE] **Buildable package metadata**: `pyproject.toml` is set up for versioned source/wheel builds.
 - **Publish releases to PyPI**: optional later, if Forge needs a Python package distribution channel.
 - Transfer repo to a shared organization when ready

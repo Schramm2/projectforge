@@ -1,32 +1,33 @@
 # Getting Started
 
-## 1. Install ProjectForge
+> This guide tracks the current, unreleased source after v0.5.0. The immutable v0.5.0 release and
+> Homebrew formula still use Gemini CLI; consult the documentation bundled with that tag for
+> released behavior.
+
+## 1. Use the current source
 
 ProjectForge supports Python 3.12 and 3.13 on macOS and Linux. Install `uv` from its
-[official guide](https://docs.astral.sh/uv/getting-started/installation/), then install the
-immutable release:
-
-```bash
-uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.0.tar.gz
-forge --version
-forge --help
-```
-
-Homebrew is also supported:
-
-```bash
-brew install schramm2/tap/projectforge
-forge --version
-```
-
-ProjectForge is not published to PyPI. For repository development:
+[official guide](https://docs.astral.sh/uv/getting-started/installation/), then install the current
+checkout for the Antigravity-capable behavior documented here:
 
 ```bash
 git clone https://github.com/Schramm2/projectforge.git
 cd projectforge
 uv sync --dev
 ./forge --version
+./forge --help
 ```
+
+Use `./forge` from the repository root anywhere the examples below show `forge`.
+
+The latest published release remains available through its immutable archive or Homebrew:
+
+```bash
+uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.0.tar.gz
+# or: brew install schramm2/tap/projectforge
+```
+
+Those v0.5.0 installs use Gemini CLI, not Antigravity. ProjectForge is not published to PyPI.
 
 ## 2. Install and authenticate one provider
 
@@ -126,12 +127,17 @@ Read [Migrating from 0.4.1](migrating-from-0.4.1.md) for config normalization, c
 precedence, safe provider modes, new manifests, and resume compatibility.
 
 ```bash
-uv tool upgrade projectforge
-# or
-brew upgrade schramm2/tap/projectforge
+git pull --ff-only
+uv sync --dev
 ```
 
+For the published package, use `uv tool upgrade projectforge` or
+`brew upgrade schramm2/tap/projectforge` and follow that release's bundled documentation.
+
 ## Uninstall
+
+For the current-source route, leave the repository environment and remove the checkout through
+your normal file-management workflow. For a published package installation:
 
 ```bash
 uv tool uninstall projectforge
@@ -139,8 +145,8 @@ uv tool uninstall projectforge
 brew uninstall projectforge
 ```
 
-Package removal does not delete user-owned files under `~/.forge/`. Move or back up that directory
-separately before removing it if you want to retain profiles or local scaffold history.
+Removing the checkout or package does not delete user-owned files under `~/.forge/`. Move or back
+up that directory separately if you want to retain profiles or local scaffold history.
 
 ## Next steps
 
