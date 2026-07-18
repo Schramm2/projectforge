@@ -7,7 +7,7 @@ ProjectForge's public identity is settled:
 - Homebrew formula: `projectforge`
 - preferred command: `projectforge`
 - compatibility command: `forge` (collides with Foundry's Ethereum CLI)
-- Python import namespace: `ubundiforge` (compatibility constraint; not public branding)
+- canonical Python import namespace: `projectforge`
 - canonical destination: <https://github.com/Schramm2/projectforge>
 
 ## v0.4.1 release status
@@ -50,7 +50,7 @@ brew install --build-from-source schramm2/tap/projectforge
 ## Release verification
 
 - Run `uv run python scripts/scan_safety.py`.
-- Run `uv run ruff check src/ubundiforge tests`.
+- Run `uv run ruff check src/projectforge tests`.
 - Run `uv run pytest` and investigate any change from the recorded baseline.
 - Run `uv build` and inspect wheel/sdist metadata.
 - Repeat the PyPI uv, PyPI pipx, and Homebrew install routes in clean environments.

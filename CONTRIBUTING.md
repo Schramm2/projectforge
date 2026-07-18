@@ -9,7 +9,7 @@ uv sync --dev
 uv run python scripts/scan_safety.py
 uv run python scripts/check_docs.py
 uv run python scripts/validate_forge_skill.py
-uv run ruff check src/ubundiforge tests
+uv run ruff check src/projectforge tests
 uv run pytest
 uv build
 uv run python scripts/inspect_artifacts.py
@@ -17,7 +17,7 @@ uv run python scripts/inspect_artifacts.py
 
 ## Repo layout
 
-- `src/ubundiforge/` contains the shipped CLI package.
+- `src/projectforge/` contains the shipped CLI package.
 - `tests/` contains the automated test suite and prompt snapshots.
 - `conventions/` contains the bundled convention layers and manifests.
 - `docs/guides/` contains user-facing product documentation.

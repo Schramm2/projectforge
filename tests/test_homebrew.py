@@ -3,8 +3,8 @@
 import tomllib
 from pathlib import Path
 
-from ubundiforge import __version__
-from ubundiforge.homebrew import (
+from projectforge import __version__
+from projectforge.homebrew import (
     DEFAULT_HOMEPAGE,
     DEFAULT_REPOSITORY,
     DEFAULT_SOURCE_URL,
@@ -85,8 +85,8 @@ def test_package_metadata_installs_collision_free_and_compatibility_commands():
 
     assert project["name"] == "matt-projectforge"
     assert project["scripts"] == {
-        "projectforge": "ubundiforge.__main__:main",
-        "forge": "ubundiforge.__main__:main",
+        "projectforge": "projectforge.__main__:main",
+        "forge": "projectforge.__main__:main",
     }
 
 

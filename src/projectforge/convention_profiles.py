@@ -5,9 +5,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from ubundiforge.convention_models import ConventionValidationError
-from ubundiforge.conventions import PROFILES_DIR
-from ubundiforge.safety import check_for_secrets
+from projectforge.convention_models import ConventionValidationError
+from projectforge.conventions import PROFILES_DIR
+from projectforge.safety import check_for_secrets
 
 _PROFILE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 _MAX_IMPORT_BYTES = 1_000_000

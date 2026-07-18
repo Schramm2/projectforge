@@ -5,8 +5,8 @@ from pathlib import Path
 
 from rich.console import Console
 
-from ubundiforge.dashboard import collect_project_stats, render_dashboard
-from ubundiforge.verify import CheckResult, VerifyReport
+from projectforge.dashboard import collect_project_stats, render_dashboard
+from projectforge.verify import CheckResult, VerifyReport
 
 
 def test_collect_stats_empty_dir(tmp_path: Path):

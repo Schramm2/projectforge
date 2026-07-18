@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from ubundiforge.adapters.antigravity_adapter import AntigravityAdapter
-from ubundiforge.protocol import AgentTask
+from projectforge.adapters.antigravity_adapter import AntigravityAdapter
+from projectforge.protocol import AgentTask
 
 # ---------------------------------------------------------------------------
 # Helpers

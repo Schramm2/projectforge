@@ -1,6 +1,6 @@
 """Tests for design template helpers and loading."""
 
-from ubundiforge.design_templates import (
+from projectforge.design_templates import (
     design_template_choices_for_stack,
     design_template_ids_for_stack,
     design_template_supported_for_stack,
@@ -30,9 +30,9 @@ def test_load_design_template_prefers_local_override(tmp_path, monkeypatch):
     override_path = local_dir / "default-design-guide.md"
     override_path.write_text("Local override template content that is definitely long enough.")
 
-    monkeypatch.setattr("ubundiforge.design_templates.LOCAL_DESIGN_TEMPLATES_DIR", local_dir)
+    monkeypatch.setattr("projectforge.design_templates.LOCAL_DESIGN_TEMPLATES_DIR", local_dir)
     monkeypatch.setattr(
-        "ubundiforge.design_templates.GLOBAL_DESIGN_TEMPLATES_DIR",
+        "projectforge.design_templates.GLOBAL_DESIGN_TEMPLATES_DIR",
         tmp_path / "global-design-templates",
     )
 

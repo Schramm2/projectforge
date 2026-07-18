@@ -6,10 +6,10 @@ on:
       - main
     paths:
       - pyproject.toml
-      - src/ubundiforge/__init__.py
+      - src/projectforge/__init__.py
       - uv.lock
       - scripts/generate_homebrew_formula.py
-      - src/ubundiforge/homebrew.py
+      - src/projectforge/homebrew.py
   workflow_dispatch:
     inputs:
       sync_only:
@@ -63,15 +63,15 @@ jobs:
 
           root = Path(".")
           version = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
-          init_text = (root / "src/ubundiforge/__init__.py").read_text()
+          init_text = (root / "src/projectforge/__init__.py").read_text()
           match = re.search(r'__version__\s*=\s*"([^"]+)"', init_text)
           if not match:
-              raise SystemExit("Could not find __version__ in src/ubundiforge/__init__.py")
+              raise SystemExit("Could not find __version__ in src/projectforge/__init__.py")
           init_version = match.group(1)
           if version != init_version:
               raise SystemExit(
                   "Version mismatch: pyproject.toml has "
-                  f"{version}, src/ubundiforge/__init__.py has {init_version}"
+                  f"{version}, src/projectforge/__init__.py has {init_version}"
               )
           parts = version.split(".")
           if len(parts) != 3 or not all(part.isdigit() for part in parts):
@@ -189,7 +189,7 @@ jobs:
       - name: Smoke-test forge dry run
         if: steps.mode.outputs.run_checks == 'true'
         run: |
-          uv run python -m ubundiforge \
+          uv run python -m projectforge \
             --dry-run \
             --name release-smoke \
             --stack fastapi \

@@ -4,25 +4,25 @@ import re
 
 import questionary
 
-from ubundiforge.design_templates import (
+from projectforge.design_templates import (
     DESIGN_TEMPLATE_OPTIONS,
     design_template_choices_for_stack,
 )
-from ubundiforge.media_assets import list_collections
-from ubundiforge.questionary_theme import (
+from projectforge.media_assets import list_collections
+from projectforge.questionary_theme import (
     prompt_checkbox,
     prompt_confirm,
     prompt_select,
     prompt_text,
 )
-from ubundiforge.scaffold_options import (
+from projectforge.scaffold_options import (
     AUTH_PROVIDER_OPTIONS,
     CI_ACTION_OPTIONS,
     auth_provider_choices_for_stack,
     ci_action_ids_for_stack,
 )
-from ubundiforge.stacks import STACK_META
-from ubundiforge.ui import create_console, grouped_lines, make_panel, muted, status_line, subtle
+from projectforge.stacks import STACK_META
+from projectforge.ui import create_console, grouped_lines, make_panel, muted, status_line, subtle
 
 STACK_CHOICES = [
     questionary.Choice("Next.js + React (frontend or fullstack)", value="nextjs"),
@@ -481,7 +481,7 @@ def collect_answers(docker_available: bool = True) -> dict:
     _ask_project_basics(answers, docker_available=docker_available)
 
     # Smart defaults — offer to skip remaining questions if patterns detected
-    from ubundiforge.preferences import get_defaults
+    from projectforge.preferences import get_defaults
 
     defaults = get_defaults()
     # Filter to questions that haven't been answered yet (not basics)

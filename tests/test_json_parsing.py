@@ -1,6 +1,6 @@
 """Tests for JSON extraction utilities in adapters.json_parsing."""
 
-from ubundiforge.adapters.json_parsing import (
+from projectforge.adapters.json_parsing import (
     extract_json,
     parse_decomposition_plan,
     validate_plan_schema,

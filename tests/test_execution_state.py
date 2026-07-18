@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from ubundiforge.execution_state import (
+from projectforge.execution_state import (
     ProgressContractError,
     initialize_progress,
     mark_phase,

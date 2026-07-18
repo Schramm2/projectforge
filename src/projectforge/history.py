@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from ubundiforge.quality import QUALITY_LOG_PATH
-from ubundiforge.scaffold_log import SCAFFOLD_LOG_PATH
+from projectforge.quality import QUALITY_LOG_PATH
+from projectforge.scaffold_log import SCAFFOLD_LOG_PATH
 
 _PYTEST_PATH_RE = re.compile(
     r"(?:^|[/\\])(?:pytest-of-[^/\\]+|pytest-current|pytest-\d+)(?:[/\\]|$)",

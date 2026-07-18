@@ -8,7 +8,7 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
-from ubundiforge.config import normalize_legacy_backend
+from projectforge.config import normalize_legacy_backend
 
 
 class ProgressContractError(ValueError):

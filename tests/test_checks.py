@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from ubundiforge.checks import CheckResult, detect_stack, run_checks
+from projectforge.checks import CheckResult, detect_stack, run_checks
 
 
 def test_detect_stack_python(tmp_path: Path):

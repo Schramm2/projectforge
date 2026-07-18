@@ -10,7 +10,7 @@ When fewer are available the installed backends absorb the missing ones' work.
 --use always overrides everything to a single backend.
 """
 
-from ubundiforge.config import check_backend_installed
+from projectforge.config import check_backend_installed
 
 # Scaffold phases (execution order matters)
 PHASE_ARCHITECTURE = "architecture"

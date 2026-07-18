@@ -2,7 +2,7 @@
 
 import json
 
-from ubundiforge.conventions import FORGE_DIR
+from projectforge.conventions import FORGE_DIR
 
 PREFERENCES_PATH = FORGE_DIR / "preferences.json"
 
