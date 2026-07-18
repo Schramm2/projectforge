@@ -5,6 +5,7 @@ from __future__ import annotations
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 from ubundiforge import __version__
 
@@ -66,10 +67,15 @@ def runtime_formula_resources(lock_path: Path) -> list[FormulaResource]:
         if sdist is None:
             raise ValueError(f"Package {name!r} has no sdist entry in {lock_path}.")
 
+        filename = Path(urlparse(sdist["url"]).path).name
+        source_url = (
+            f"https://files.pythonhosted.org/packages/source/{name[0]}/{name}/{filename}"
+        )
+
         resources.append(
             FormulaResource(
                 name=name,
-                url=sdist["url"],
+                url=source_url,
                 sha256=sdist["hash"].removeprefix("sha256:"),
             )
         )
