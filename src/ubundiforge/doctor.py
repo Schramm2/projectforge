@@ -22,6 +22,11 @@ _VERSION_COMMANDS = {
     "codex": ["codex", "--version"],
 }
 _EDITOR_COMMANDS = ("cursor", "code", "antigravity", "windsurf", "zed")
+_PROVIDER_INSTALL_URLS = {
+    "claude": "https://code.claude.com/docs/en/setup",
+    "gemini": "https://geminicli.com/docs/get-started/installation/",
+    "codex": "https://github.com/openai/codex",
+}
 
 
 def get_backend_version(backend: str) -> str | None:
@@ -62,19 +67,19 @@ def build_environment_report() -> dict:
     }
 
 
-def _config_diagnostic() -> dict[str, str]:
-    """Inspect configuration health without loading values or mutating the file."""
+def _config_diagnostic() -> tuple[dict[str, str], dict[str, str]]:
+    """Inspect config and return only health plus credential-safe model overrides."""
     if not CONFIG_PATH.exists():
-        return {"status": "missing"}
+        return {"status": "missing"}, {}
     try:
-        _normalize_forge_config(json.loads(CONFIG_PATH.read_text()))
+        config = _normalize_forge_config(json.loads(CONFIG_PATH.read_text()))
     except json.JSONDecodeError:
-        return {"status": "corrupt"}
+        return {"status": "corrupt"}, {}
     except ValueError:
-        return {"status": "invalid"}
+        return {"status": "invalid"}, {}
     except OSError:
-        return {"status": "unreadable"}
-    return {"status": "valid"}
+        return {"status": "unreadable"}, {}
+    return {"status": "valid"}, dict(config.get("backend_models", {}))
 
 
 def _readiness_label(status: BackendStatus) -> str:
@@ -87,9 +92,30 @@ def _readiness_label(status: BackendStatus) -> str:
     return "preflight_required"
 
 
+def _provider_repair(backend: str, status: BackendStatus) -> str:
+    """Return a provider-specific, identity-free recovery action."""
+    if status.ready is True:
+        return "No action required."
+    if not status.installed:
+        return (
+            f"Install from {_PROVIDER_INSTALL_URLS[backend]}, authenticate there, "
+            "then rerun forge doctor."
+        )
+    if status.ready is False:
+        command = status.login_command or f"{backend} login"
+        return f"Run {command}, then rerun forge doctor."
+    if backend == "gemini":
+        return (
+            "Complete Gemini authentication through its official CLI; readiness remains "
+            "preflight-required until explicitly verified."
+        )
+    return f"Recheck the provider-owned login flow, then rerun forge doctor for {backend}."
+
+
 def build_doctor_report() -> dict:
     """Build a deterministic report containing no configuration or identity values."""
     statuses = get_backend_statuses()
+    config, backend_models = _config_diagnostic()
     providers: dict[str, dict] = {}
     for backend in SUPPORTED_BACKENDS:
         status = statuses[backend]
@@ -99,13 +125,15 @@ def build_doctor_report() -> dict:
             "version": get_backend_version(backend) if status.installed else None,
             "auth_mode": status.auth_mode or None,
             "login_command": status.login_command or None,
+            "model_behavior": {
+                "mode": "override" if backend in backend_models else "provider_default",
+                "value": backend_models.get(backend),
+            },
+            "repair": _provider_repair(backend, status),
         }
 
-    config = _config_diagnostic()
     has_ready_provider = any(status.usable for status in statuses.values())
-    overall_status = (
-        "ready" if has_ready_provider and config["status"] == "valid" else "attention"
-    )
+    overall_status = "ready" if has_ready_provider and config["status"] == "valid" else "attention"
     return {
         "schema_version": 1,
         "projectforge_version": __version__,

@@ -64,3 +64,15 @@ def test_save_forge_config_rejects_sensitive_or_unknown_keys(monkeypatch, tmp_pa
         save_forge_config({"api_token": "must-not-be-stored"})
 
     assert not config_path.exists()
+
+
+def test_save_forge_config_rejects_credential_shaped_model_override(monkeypatch, tmp_path):
+    forge_dir = tmp_path / ".forge"
+    config_path = forge_dir / "config.json"
+    monkeypatch.setattr("ubundiforge.setup.FORGE_DIR", forge_dir)
+    monkeypatch.setattr("ubundiforge.setup.CONFIG_PATH", config_path)
+
+    with pytest.raises(ValueError, match="credential-like"):
+        save_forge_config({"backend_models": {"codex": "ghp_abcdefghijklmnopqrstuvwxyz1234567890"}})
+
+    assert not config_path.exists()

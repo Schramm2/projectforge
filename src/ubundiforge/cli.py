@@ -192,6 +192,17 @@ def doctor(
                     accent="aqua" if provider["readiness"] == "ready" else "amber",
                 )
             )
+            model_behavior = provider["model_behavior"]
+            model_label = (
+                f"override {model_behavior['value']}"
+                if model_behavior["mode"] == "override"
+                else "provider default"
+            )
+            console.print(muted(f"  model: {model_label}"))
+            if provider.get("auth_mode"):
+                console.print(muted(f"  authentication mode: {provider['auth_mode']}"))
+            if provider.get("repair") != "No action required.":
+                console.print(muted(f"  repair: {provider['repair']}"))
     exit_code = doctor_exit_code(report)
     if exit_code:
         raise typer.Exit(exit_code)

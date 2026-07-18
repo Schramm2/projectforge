@@ -44,10 +44,43 @@ def test_doctor_report_is_deterministic_and_excludes_provider_detail(monkeypatch
     assert list(report["providers"]) == ["claude", "gemini", "codex"]
     assert report["providers"]["gemini"]["readiness"] == "preflight_required"
     assert report["providers"]["codex"]["auth_mode"] == "chatgpt"
+    assert report["providers"]["codex"]["model_behavior"] == {
+        "mode": "provider_default",
+        "value": None,
+    }
+    assert "codex login" not in report["providers"]["codex"]["repair"]
+    assert "authentication" in report["providers"]["gemini"]["repair"].lower()
     assert report["config"] == {"status": "valid"}
     assert report["environment"]["python"]["supported"] is True
     assert "secret@example.com" not in serialized
     assert "do-not-print" not in serialized
+
+
+def test_doctor_reports_advanced_model_override_without_other_config(monkeypatch, tmp_path):
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({"backend_models": {"claude": "sonnet"}}))
+    monkeypatch.setattr("ubundiforge.doctor.CONFIG_PATH", config_path)
+    monkeypatch.setattr(
+        "ubundiforge.doctor.get_backend_statuses",
+        lambda: {
+            "claude": BackendStatus(installed=True, ready=True, auth_mode="authenticated"),
+            "gemini": BackendStatus(installed=False, ready=False),
+            "codex": BackendStatus(installed=False, ready=False),
+        },
+    )
+    monkeypatch.setattr("ubundiforge.doctor.get_backend_version", lambda backend: None)
+    monkeypatch.setattr("ubundiforge.doctor.build_environment_report", lambda: {})
+
+    report = build_doctor_report()
+
+    assert report["providers"]["claude"]["model_behavior"] == {
+        "mode": "override",
+        "value": "sonnet",
+    }
+    assert report["providers"]["codex"]["model_behavior"] == {
+        "mode": "provider_default",
+        "value": None,
+    }
 
 
 def test_doctor_exit_code_requires_valid_config_and_ready_provider():

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from rich.console import Console
 from typer.testing import CliRunner
 
@@ -38,6 +39,37 @@ def test_doctor_json_has_deterministic_exit_semantics(monkeypatch):
 
     assert result.exit_code == 1
     assert json.loads(result.stdout) == report
+
+
+def test_doctor_human_output_includes_model_behavior_and_repair(monkeypatch):
+    report = {
+        "schema_version": 1,
+        "projectforge_version": __version__,
+        "status": "attention",
+        "config": {"status": "valid"},
+        "environment": {
+            "python": {"version": "3.12.1", "supported": True},
+            "git": {"installed": True, "version": "git version 2.50.0"},
+            "docker": {"installed": False, "version": None},
+            "editors": {},
+        },
+        "providers": {
+            "claude": {
+                "readiness": "needs_login",
+                "version": "2.1.214",
+                "auth_mode": None,
+                "model_behavior": {"mode": "provider_default", "value": None},
+                "repair": "Run claude auth login, then rerun forge doctor.",
+            }
+        },
+    }
+    monkeypatch.setattr("ubundiforge.cli.build_doctor_report", lambda: report)
+
+    result = runner.invoke(app, ["doctor"])
+
+    assert result.exit_code == 1
+    assert "model: provider default" in result.stdout
+    assert "claude auth login" in result.stdout
 
 
 def test_live_unsafe_mode_requires_explicit_cli_consent():
@@ -887,6 +919,26 @@ def test_run_setup_does_not_create_legacy_conventions_file(monkeypatch, tmp_path
     assert "bundled conventions" in output.lower()
     assert "bundled source tree" in output.lower()
     assert "forge admin conventions" in output
+
+
+def test_setup_missing_providers_shows_official_install_auth_recheck_flow(monkeypatch):
+    console = Console(record=True, width=160)
+    monkeypatch.setattr(
+        "ubundiforge.setup.get_backend_statuses",
+        lambda: {
+            backend: BackendStatus(installed=False, ready=False)
+            for backend in ("claude", "gemini", "codex")
+        },
+    )
+
+    with pytest.raises(SystemExit):
+        run_setup(console)
+
+    output = console.export_text()
+    assert "https://code.claude.com/docs/en/setup" in output
+    assert "https://geminicli.com/docs/get-started/installation/" in output
+    assert "https://github.com/openai/codex" in output
+    assert "forge doctor" in output
 
 
 def test_admin_conventions_validate_passes() -> None:
