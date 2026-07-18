@@ -32,13 +32,16 @@ The names are intentionally different:
    inspection from the production-readiness checklist.
 4. Run the dry-run smoke command from `.github/workflows/release-homebrew.yml`.
 5. Commit and push the release through the repository's normal reviewed branch flow.
-6. Confirm the workflow's tap repository/token preflight passed before tag creation, then confirm
+6. Confirm the workflow's tap token passed a provider-owned push-permission check before tag
+   creation, then confirm
    `Release Homebrew` created the tag and GitHub release, regenerated the
    formula, and synchronized it to `Schramm2/homebrew-tap`.
 7. Repeat the clean installation checks below before updating public documentation.
 
 If the tag exists but formula synchronization failed, manually run the workflow with
-`sync_only=true`. That mode skips tag and release creation.
+`sync_only=true`. That mode skips tag and release creation. If the public tap already matches the
+newly generated formula byte-for-byte, the run completes as a verified no-op; any mismatch still
+requires a token that reports push permission for the configured tap repository.
 
 ## Manual formula regeneration
 
@@ -78,5 +81,6 @@ forge --dry-run --name brew-smoke --stack python-cli \
 
 The checked-in formula must always use a real release archive and its measured checksum. The
 generator requires that checksum explicitly so a version bump cannot silently reuse an older one.
-The workflow must verify tap publication authorization before creating a tag or GitHub release; a
-missing cross-repository credential is a stop-before-publish condition, not a partial-release mode.
+For every new release, the workflow must verify actual tap push permission before creating a tag or
+GitHub release; checking only that a secret is nonempty is insufficient. A missing or unusable
+cross-repository credential is a stop-before-publish condition, not a partial-release mode.
