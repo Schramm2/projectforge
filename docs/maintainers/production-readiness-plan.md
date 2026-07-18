@@ -132,17 +132,17 @@ Baseline gaps already proven:
 - [x] Read `writing-agent-instructions`, `skill-creator`, `superpowers:writing-skills`,
   `superpowers:test-driven-development`, `writing-great-skills`, its glossary, and the skill testing
   reference completely.
-- [ ] Record realistic no-guidance and current-skill RED scenarios without desired-answer leakage.
-- [ ] Rewrite frontmatter as a compact capability/trigger routing pointer with no workflow summary.
-- [ ] Keep the ordered core and completion criteria in `SKILL.md`; move branch-heavy reference one
+- [x] Record realistic no-guidance and current-skill RED scenarios without desired-answer leakage.
+- [x] Rewrite frontmatter as a compact capability/trigger routing pointer with no workflow summary.
+- [x] Keep the ordered core and completion criteria in `SKILL.md`; move branch-heavy reference one
   level down behind precise context pointers.
-- [ ] Remove stale version claims, duplicated CLI reference, no-ops, conflicting owners, README,
+- [x] Remove stale version claims, duplicated CLI reference, no-ops, conflicting owners, README,
   and CHANGELOG sediment.
-- [ ] Make the skill discover local/global Forge safely and consult live `--help` and `doctor`.
-- [ ] Route preview, live, audit, evolve, and replay branches while preserving approval and privacy
+- [x] Make the skill discover local/global Forge safely and consult live `--help` and `doctor`.
+- [x] Route preview, live, audit, evolve, and replay branches while preserving approval and privacy
   boundaries.
-- [ ] Generate aligned `agents/openai.yaml` using current creator guidance.
-- [ ] Run the native validator, frontmatter/package checks, metadata readback, links/paths, and
+- [x] Generate aligned `agents/openai.yaml` using current creator guidance.
+- [x] Run the native validator, frontmatter/package checks, metadata readback, links/paths, and
   fresh-context GREEN forward tests.
 
 ## Documentation, packaging, and CI
