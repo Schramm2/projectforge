@@ -26,14 +26,14 @@ def inspect_wheel(path: Path) -> None:
     with zipfile.ZipFile(path) as archive:
         names = set(archive.namelist())
         required_suffixes = {
-            "ubundiforge/__init__.py",
-            "ubundiforge/skills/forge-scaffold/SKILL.md",
-            "ubundiforge/skills/forge-scaffold/agents/openai.yaml",
+            "projectforge/__init__.py",
+            "projectforge/skills/forge-scaffold/SKILL.md",
+            "projectforge/skills/forge-scaffold/agents/openai.yaml",
         }
         for suffix in required_suffixes:
             if not any(name.endswith(suffix) for name in names):
                 raise SystemExit(f"Wheel is missing {suffix}")
-        if not any("ubundiforge/conventions/" in name for name in names):
+        if not any("projectforge/conventions/" in name for name in names):
             raise SystemExit("Wheel is missing bundled conventions")
         metadata_name = next((name for name in names if name.endswith(".dist-info/METADATA")), None)
         if metadata_name is None:
@@ -46,7 +46,7 @@ def inspect_wheel(path: Path) -> None:
             raise SystemExit("Wheel is missing console entry points")
         entry_points = archive.read(entry_points_name).decode()
         for command in ("projectforge", "forge"):
-            expected = f"{command} = ubundiforge.__main__:main"
+            expected = f"{command} = projectforge.__main__:main"
             if expected not in entry_points:
                 raise SystemExit(f"Wheel is missing the {command} command alias")
         metadata = email.message_from_bytes(archive.read(metadata_name))

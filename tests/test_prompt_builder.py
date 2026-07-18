@@ -2,7 +2,7 @@
 
 import pytest
 
-from ubundiforge.prompt_builder import (
+from projectforge.prompt_builder import (
     build_architecture_prompt,
     build_frontend_prompt,
     build_phase_prompt,

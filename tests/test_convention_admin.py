@@ -6,7 +6,7 @@ from subprocess import CompletedProcess
 import pytest
 from rich.console import Console
 
-from ubundiforge.convention_registry import build_registry
+from projectforge.convention_registry import build_registry
 
 
 def _write(path: Path, content: str) -> None:
@@ -109,7 +109,7 @@ fastapi: FastAPI
 
 
 def test_list_scopes_covers_global_language_stack_and_prompt(sample_tree: Path) -> None:
-    from ubundiforge.convention_admin import list_scopes
+    from projectforge.convention_admin import list_scopes
 
     registry = build_registry(sample_tree)
 
@@ -122,7 +122,7 @@ def test_list_scopes_covers_global_language_stack_and_prompt(sample_tree: Path) 
 
 
 def test_render_inheritance_trace_shows_compilation_order(sample_tree: Path) -> None:
-    from ubundiforge.convention_admin import render_inheritance_trace
+    from projectforge.convention_admin import render_inheritance_trace
 
     registry = build_registry(sample_tree)
 
@@ -135,7 +135,7 @@ def test_render_inheritance_trace_shows_compilation_order(sample_tree: Path) -> 
 
 
 def test_render_compiled_bundle_preview_lists_bundle_sources(sample_tree: Path) -> None:
-    from ubundiforge.convention_admin import render_bundle_preview
+    from projectforge.convention_admin import render_bundle_preview
 
     registry = build_registry(sample_tree)
 
@@ -148,27 +148,27 @@ def test_render_compiled_bundle_preview_lists_bundle_sources(sample_tree: Path) 
 
 
 def test_resolve_markdown_open_path_only_allows_convention_markdown(sample_tree: Path) -> None:
-    from ubundiforge.convention_admin import resolve_open_path
-    from ubundiforge.convention_models import ConventionValidationError
+    from projectforge.convention_admin import resolve_open_path
+    from projectforge.convention_models import ConventionValidationError
 
     resolved = resolve_open_path(sample_tree, "languages/python/style.md")
 
     assert resolved == sample_tree / "languages" / "python" / "style.md"
 
-    with pytest.raises(ConventionValidationError, match="markdown"):
+    with pytest.raises(ConventionValidationError, match=r"\.md"):
         resolve_open_path(sample_tree, "languages/python/metadata.yaml")
 
-    with pytest.raises(ConventionValidationError, match="outside"):
+    with pytest.raises(ConventionValidationError, match="inside the conventions folder"):
         resolve_open_path(sample_tree, "../README.md")
 
 
 def test_load_history_gracefully_handles_missing_git(monkeypatch, sample_tree: Path) -> None:
-    from ubundiforge.convention_history import load_history
+    from projectforge.convention_history import load_history
 
     def _missing_git(*args, **kwargs):
         raise FileNotFoundError
 
-    monkeypatch.setattr("ubundiforge.convention_history.subprocess.run", _missing_git)
+    monkeypatch.setattr("projectforge.convention_history.subprocess.run", _missing_git)
 
     history = load_history(sample_tree, "stacks/fastapi")
 
@@ -178,7 +178,7 @@ def test_load_history_gracefully_handles_missing_git(monkeypatch, sample_tree: P
 
 
 def test_load_history_reads_non_interactive_git_log(monkeypatch, sample_tree: Path) -> None:
-    from ubundiforge.convention_history import load_history
+    from projectforge.convention_history import load_history
 
     seen_commands: list[list[str]] = []
 
@@ -191,10 +191,25 @@ def test_load_history_reads_non_interactive_git_log(monkeypatch, sample_tree: Pa
             stderr="",
         )
 
-    monkeypatch.setattr("ubundiforge.convention_history.subprocess.run", _fake_run)
+    monkeypatch.setattr("projectforge.convention_history.subprocess.run", _fake_run)
 
     history = load_history(sample_tree, "stacks/fastapi")
 
     assert history.available is True
     assert history.entries == ("abc123 Add FastAPI overview",)
     assert seen_commands == [["git", "log", "--oneline", "--", "conventions/stacks/fastapi"]]
+
+
+def test_load_history_hides_os_error_details(monkeypatch, sample_tree: Path) -> None:
+    from projectforge.convention_history import load_history
+
+    def _failed_git(*args, **kwargs):
+        raise OSError("private checkout detail")
+
+    monkeypatch.setattr("projectforge.convention_history.subprocess.run", _failed_git)
+
+    history = load_history(sample_tree, "stacks/fastapi")
+
+    assert history.available is False
+    assert "Confirm Git works" in history.message
+    assert "private checkout detail" not in history.message

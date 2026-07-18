@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from ubundiforge.adapters.codex_adapter import CodexAdapter
-from ubundiforge.protocol import AgentTask
+from projectforge.adapters.codex_adapter import CodexAdapter
+from projectforge.protocol import AgentTask
 
 # ---------------------------------------------------------------------------
 # Helpers

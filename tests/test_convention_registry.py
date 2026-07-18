@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from ubundiforge.convention_models import ConventionValidationError
-from ubundiforge.convention_registry import build_registry
+from projectforge.convention_models import ConventionValidationError
+from projectforge.convention_registry import build_registry
 
 
 def _write(path: Path, content: str) -> None:

@@ -3,8 +3,8 @@
 import sys
 from pathlib import Path  # noqa: E402
 
-from ubundiforge.adapters.base import CLIAdapterBase
-from ubundiforge.protocol import AgentTask, ProgressEvent
+from projectforge.adapters.base import CLIAdapterBase
+from projectforge.protocol import AgentTask, ProgressEvent
 
 # ---------------------------------------------------------------------------
 # Stub concrete adapter using echo / false for testing
@@ -191,6 +191,8 @@ class TestCLIAdapterBaseExecute:
         result = adapter.execute(task, tmp_path, events.append)
 
         assert result.success is False
+        assert "selected AI tool could not start" in result.summary
+        assert "__forge_nonexistent" not in result.summary
         event_types = [e.event_type for e in events]
         assert "failed" in event_types
 

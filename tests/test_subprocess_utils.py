@@ -1,6 +1,6 @@
 """Tests for the subprocess_utils shared module."""
 
-from ubundiforge.subprocess_utils import (
+from projectforge.subprocess_utils import (
     ANSI_RE,
     PHASE_TIMEOUT,
     PULSE_STYLES,

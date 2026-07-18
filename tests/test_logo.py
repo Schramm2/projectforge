@@ -1,6 +1,6 @@
 """Tests for block-art logo rendering."""
 
-from ubundiforge.logo import render_logo_text
+from projectforge.logo import render_logo_text
 
 
 def test_render_logo_text_produces_block_art():

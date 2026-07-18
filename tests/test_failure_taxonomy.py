@@ -2,7 +2,7 @@
 
 import pytest
 
-from ubundiforge.failure_taxonomy import classify_provider_failure
+from projectforge.failure_taxonomy import classify_provider_failure
 
 
 @pytest.mark.parametrize(

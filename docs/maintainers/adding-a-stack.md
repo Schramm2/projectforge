@@ -8,17 +8,17 @@ Use this checklist when promoting a new scaffold type into Forge.
    Create the stack layer under `conventions/stacks/<new-stack>/`, add Markdown files plus
    `metadata.yaml`, wire the bundle into `conventions/manifests/bundles.yaml`, and add its admin
    label to `conventions/manifests/browse-labels.yaml`.
-2. Update `src/ubundiforge/stacks.py`.
+2. Update `src/projectforge/stacks.py`.
    Add the new `StackMeta` entry to `STACK_META`, including structure, libraries, commands, services, Docker default, and env hints.
-3. Update `src/ubundiforge/prompts.py`.
+3. Update `src/projectforge/prompts.py`.
    Add the stack to the interactive selection flow.
-4. Update `src/ubundiforge/router.py`.
+4. Update `src/projectforge/router.py`.
    Define the stack's phases and preferred backend routing.
-5. Update `src/ubundiforge/prompt_builder.py`.
+5. Update `src/projectforge/prompt_builder.py`.
    Add the human-readable stack label used in the generated prompt.
-6. Update `src/ubundiforge/cli.py`.
+6. Update `src/projectforge/cli.py`.
    Add any shorthand aliases accepted by `--stack`.
-7. Update `src/ubundiforge/scaffold_options.py`.
+7. Update `src/projectforge/scaffold_options.py`.
    Wire in CI actions and auth support when the stack needs them.
 8. Update [../../README.md](../../README.md) and [../guides/stacks.md](../guides/stacks.md).
    Document identifiers, aliases, defaults, project structure, libraries, and dev commands in the
@@ -32,7 +32,7 @@ Use this checklist when promoting a new scaffold type into Forge.
 
 ```bash
 uv run pytest
-uv run ruff check src/ubundiforge tests
+uv run ruff check src/projectforge tests
 ./forge admin conventions --validate
 ./forge admin conventions --preview-stack <new-stack>
 ./forge --name test-project --stack <new-stack> --description "test" --dry-run

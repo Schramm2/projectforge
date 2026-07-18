@@ -2,18 +2,18 @@
 
 from unittest.mock import patch
 
-from ubundiforge.sound import play_completion_sound
+from projectforge.sound import play_completion_sound
 
 
 def test_play_sound_success_no_crash():
     """play_completion_sound(success=True) does not crash."""
-    with patch("ubundiforge.sound._play_async"):
+    with patch("projectforge.sound._play_async"):
         play_completion_sound(success=True, enabled=True)
 
 
 def test_play_sound_failure_no_crash():
     """play_completion_sound(success=False) does not crash."""
-    with patch("ubundiforge.sound._play_async"):
+    with patch("projectforge.sound._play_async"):
         play_completion_sound(success=False, enabled=True)
 
 
@@ -25,8 +25,8 @@ def test_play_sound_disabled_noop():
 
 def test_play_sound_bell_fallback():
     """Falls back to terminal bell when no audio player found."""
-    with patch("ubundiforge.sound.platform.system", return_value="Other"):
-        with patch("ubundiforge.sound.shutil.which", return_value=None):
+    with patch("projectforge.sound.platform.system", return_value="Other"):
+        with patch("projectforge.sound.shutil.which", return_value=None):
             with patch("builtins.print") as mock_print:
                 play_completion_sound(success=True, enabled=True)
                 mock_print.assert_called_once_with("\a", end="", flush=True)

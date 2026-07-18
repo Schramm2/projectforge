@@ -11,4 +11,4 @@ fi
 
 export PYTHONPATH="$ROOT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
 
-exec uv run python -m ubundiforge "$@"
+exec uv run python -m projectforge "$@"

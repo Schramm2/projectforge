@@ -2,19 +2,19 @@
 
 import json
 
-from ubundiforge.convention_models import ConventionContribution
-from ubundiforge.scaffold_log import (
+from projectforge.convention_models import ConventionContribution
+from projectforge.scaffold_log import (
     append_scaffold_log,
     latest_scaffold_duration,
     write_scaffold_manifest,
 )
-from ubundiforge.verify import CheckResult, VerifyReport
+from projectforge.verify import CheckResult, VerifyReport
 
 
 def test_append_scaffold_log_creates_file(tmp_path, monkeypatch):
     log_path = tmp_path / "scaffold.log"
-    monkeypatch.setattr("ubundiforge.scaffold_log.SCAFFOLD_LOG_PATH", log_path)
-    monkeypatch.setattr("ubundiforge.scaffold_log.FORGE_DIR", tmp_path)
+    monkeypatch.setattr("projectforge.scaffold_log.SCAFFOLD_LOG_PATH", log_path)
+    monkeypatch.setattr("projectforge.scaffold_log.FORGE_DIR", tmp_path)
 
     answers = {"name": "demo", "stack": "nextjs", "demo_mode": True}
     phase_backends = [("architecture", "claude"), ("tests", "codex")]
@@ -35,8 +35,8 @@ def test_append_scaffold_log_creates_file(tmp_path, monkeypatch):
 
 def test_append_scaffold_log_records_successful_verification(tmp_path, monkeypatch):
     log_path = tmp_path / "scaffold.log"
-    monkeypatch.setattr("ubundiforge.scaffold_log.SCAFFOLD_LOG_PATH", log_path)
-    monkeypatch.setattr("ubundiforge.scaffold_log.FORGE_DIR", tmp_path)
+    monkeypatch.setattr("projectforge.scaffold_log.SCAFFOLD_LOG_PATH", log_path)
+    monkeypatch.setattr("projectforge.scaffold_log.FORGE_DIR", tmp_path)
     report = VerifyReport(checks=[CheckResult(name="test", passed=True)])
 
     append_scaffold_log(
@@ -56,8 +56,8 @@ def test_append_scaffold_log_records_successful_verification(tmp_path, monkeypat
 
 def test_append_scaffold_log_appends(tmp_path, monkeypatch):
     log_path = tmp_path / "scaffold.log"
-    monkeypatch.setattr("ubundiforge.scaffold_log.SCAFFOLD_LOG_PATH", log_path)
-    monkeypatch.setattr("ubundiforge.scaffold_log.FORGE_DIR", tmp_path)
+    monkeypatch.setattr("projectforge.scaffold_log.SCAFFOLD_LOG_PATH", log_path)
+    monkeypatch.setattr("projectforge.scaffold_log.FORGE_DIR", tmp_path)
 
     for name in ("alpha", "beta"):
         answers = {"name": name, "stack": "fastapi"}
