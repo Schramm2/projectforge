@@ -86,11 +86,16 @@ def list_scopes(registry: ConventionRegistry) -> tuple[ConventionScope, ...]:
 def _resolve_record(registry: ConventionRegistry, target: str) -> ConventionRecord:
     cleaned = target.strip()
     if not cleaned:
-        raise ConventionValidationError("A convention target is required.")
+        raise ConventionValidationError(
+            "Choose a stack or convention path, for example `stacks/fastapi`."
+        )
     if cleaned == "global":
         record = registry.global_record()
         if record is None:
-            raise ConventionValidationError("Global conventions are not configured.")
+            raise ConventionValidationError(
+                "Forge could not find the global convention record. Reinstall Forge or restore "
+                "its bundled conventions, then validate again."
+            )
         return record
     if cleaned in registry.stack_record_ids:
         return registry.stack(cleaned)
@@ -241,12 +246,15 @@ def resolve_open_path(root: Path, relative_path: str) -> Path:
 
     normalized = _normalize_relative_markdown_path(relative_path)
     if not normalized.endswith(".md"):
-        raise ConventionValidationError("Only markdown files can be opened from conventions.")
+        raise ConventionValidationError("Choose a `.md` file inside the conventions folder.")
 
     resolved_root = root.resolve()
     candidate = (resolved_root / normalized).resolve()
     if resolved_root not in candidate.parents:
-        raise ConventionValidationError("Requested markdown path is outside the conventions tree.")
+        raise ConventionValidationError("Choose a Markdown file inside the conventions folder.")
     if not candidate.exists():
-        raise ConventionValidationError(f"Convention markdown file not found: {normalized}")
+        raise ConventionValidationError(
+            "Forge could not find that convention file. Run `forge admin conventions --browse` "
+            "and choose an existing file."
+        )
     return candidate

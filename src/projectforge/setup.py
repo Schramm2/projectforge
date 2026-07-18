@@ -55,17 +55,6 @@ SUPPORTED_EDITORS = [
     ("zed", "Zed", "Zed.app"),
 ]
 
-_BACKEND_LOGIN_HINTS = {
-    "claude": "claude auth login",
-    "antigravity": "agy, then complete Google Sign-In",
-    "codex": "codex login",
-}
-_BACKEND_INSTALL_URLS = {
-    "claude": "https://code.claude.com/docs/en/setup",
-    "antigravity": "https://antigravity.google/docs/cli-install",
-    "codex": "https://github.com/openai/codex",
-}
-
 
 def _check_editor_installed(cli_cmd: str, app_bundle: str) -> tuple[bool, bool]:
     """Check if an editor is available via CLI and/or as a macOS .app bundle.
@@ -183,14 +172,13 @@ def load_forge_config() -> dict:
             backup_path = CONFIG_PATH.with_name(f"{CONFIG_PATH.name}.corrupt-{timestamp}")
             try:
                 CONFIG_PATH.replace(backup_path)
-                recovery = f"The original was preserved at {backup_path}."
             except OSError:
-                recovery = "The original could not be moved; it was left unchanged."
+                pass
             console = create_console()
             console.print(
                 status_line(
-                    f"Config file is corrupted: {CONFIG_PATH}. {recovery} "
-                    "Run forge --setup to recreate it.",
+                    "Forge could not read your saved settings. It kept a recovery copy when "
+                    "possible. Run `forge --setup` to create fresh settings.",
                     accent="amber",
                 )
             )
@@ -290,6 +278,19 @@ def _routing_summary(available: list[str], console: Console) -> None:
         console.print(make_panel(body, title="Routing", accent="amber"))
 
 
+def _print_legacy_conventions_warning(console: Console) -> None:
+    """Explain how to retain a legacy conventions file without exposing its path."""
+    if not CONVENTIONS_PATH.exists():
+        return
+    console.print(
+        status_line(
+            "Forge found a legacy user conventions file and left it unchanged. Import it "
+            "as a profile if you still need those rules.",
+            accent="amber",
+        )
+    )
+
+
 def run_setup(console: Console) -> dict:
     """Run the interactive setup wizard. Returns the saved config dict."""
     console.print()
@@ -347,15 +348,13 @@ def run_setup(console: Console) -> dict:
             make_panel(
                 grouped_lines(
                     [
-                        "No AI CLI tools found.",
-                        subtle("Forge needs at least one of: claude, antigravity, or codex."),
-                        *[
-                            muted(f"{backend}: {_BACKEND_INSTALL_URLS[backend]}")
-                            for backend in SUPPORTED_BACKENDS
-                        ],
+                        "Forge could not find a supported AI tool.",
                         muted(
-                            "Install one, complete its provider-owned login, then run "
-                            "forge doctor and forge --setup."
+                            "Follow the ProjectForge setup guide, install and sign in to one "
+                            "supported tool, then run `forge doctor` and `forge --setup`."
+                        ),
+                        muted(
+                            "https://github.com/Schramm2/projectforge#install-and-authenticate-a-provider"
                         ),
                     ]
                 ),
@@ -373,18 +372,17 @@ def run_setup(console: Console) -> dict:
     if not_ready_backends:
         lines = [
             subtle(
-                f"{backend} is installed but not ready for scaffolding. "
-                f"Run {_BACKEND_LOGIN_HINTS.get(backend, backend)}."
+                "An installed AI tool needs sign-in before Forge can use it. Run `forge doctor` "
+                "for the correct sign-in step."
             )
-            for backend in not_ready_backends
         ]
         lines.append(
             muted(
-                "Complete provider-owned login, then run forge doctor. Automatic routing skips "
-                "these backends until they are ready."
+                "Complete the official sign-in flow, then run `forge doctor`. Automatic routing "
+                "skips tools until they are ready."
             )
         )
-        console.print(make_panel(grouped_lines(lines), title="Backend Login", accent="amber"))
+        console.print(make_panel(grouped_lines(lines), title="AI Tool Sign-In", accent="amber"))
 
     unknown_backends = [
         backend
@@ -393,16 +391,18 @@ def run_setup(console: Console) -> dict:
     ]
     if unknown_backends:
         lines = [
-            subtle(f"{backend} is installed, but Forge could not auto-check readiness safely.")
-            for backend in unknown_backends
+            subtle(
+                "Forge could not confirm that an installed AI tool is ready. Run `forge doctor` "
+                "for a safe manual check."
+            )
         ]
         lines.append(
             muted(
-                "Forge will not route to these backends until readiness is confirmed. "
-                "Complete official authentication, then run forge doctor again."
+                "Forge will not use these tools until readiness is confirmed. Complete the "
+                "official sign-in flow, then run `forge doctor` again."
             )
         )
-        console.print(make_panel(grouped_lines(lines), title="Backend Checks", accent="amber"))
+        console.print(make_panel(grouped_lines(lines), title="AI Tool Checks", accent="amber"))
 
     # --- Step 2: Routing summary ---
     console.print(make_step_panel(2, 8, "Backend routing", accent="violet"))
@@ -498,7 +498,8 @@ def run_setup(console: Console) -> dict:
         preferred_editor = ""
         console.print(
             status_line(
-                "No editors with CLI access found. Open projects manually.",
+                "Forge could not find an editor command. Open projects manually, or install an "
+                "editor command and rerun `forge --setup`.",
                 accent="amber",
             )
         )
@@ -554,8 +555,8 @@ def run_setup(console: Console) -> dict:
             make_panel(
                 grouped_lines(
                     [
-                        "Git is not installed. Forge uses git init on every scaffold.",
-                        subtle("Install git and run forge --setup again."),
+                        "Git is not installed, so Forge cannot create project history.",
+                        subtle("Install Git, then run `forge --setup` again."),
                     ]
                 ),
                 title="Git",
@@ -567,8 +568,8 @@ def run_setup(console: Console) -> dict:
             make_panel(
                 grouped_lines(
                     [
-                        "Git user.name or user.email is not configured.",
-                        subtle("Forge runs git init + commit on scaffolded projects."),
+                        "Git needs your name and email before Forge can create the first commit.",
+                        subtle("Enter them now, or configure them later with the commands below."),
                         subtle('git config --global user.name "Your Name"'),
                         subtle('git config --global user.email "you@example.com"'),
                     ]
@@ -601,8 +602,8 @@ def run_setup(console: Console) -> dict:
             else:
                 console.print(
                     status_line(
-                        "Could not save git identity automatically. You can rerun "
-                        "forge --setup later.",
+                        "Forge could not save your Git identity. Run the displayed `git config` "
+                        "commands manually, then rerun `forge --setup`.",
                         accent="amber",
                     )
                 )
@@ -618,12 +619,9 @@ def run_setup(console: Console) -> dict:
             make_panel(
                 grouped_lines(
                     [
-                        "Docker not found.",
-                        subtle("Forge can still scaffold Docker support."),
-                        muted(
-                            "You will not be able to validate Dockerfiles until Docker is "
-                            "installed."
-                        ),
+                        "Docker is not installed.",
+                        subtle("Forge can still create Docker files."),
+                        muted("Install Docker before validating the generated Docker files."),
                     ]
                 ),
                 title="Docker",
@@ -702,16 +700,7 @@ def run_setup(console: Console) -> dict:
             accent="aqua",
         )
     )
-    if CONVENTIONS_PATH.exists():
-        console.print(
-            status_line(
-                (
-                    f"Legacy user conventions file detected at {CONVENTIONS_PATH}. "
-                    "Forge no longer creates this file during setup."
-                ),
-                accent="amber",
-            )
-        )
+    _print_legacy_conventions_warning(console)
 
     # Check media collections in the repo's media/ folder
     from projectforge.media_assets import MEDIA_DIR, list_collections

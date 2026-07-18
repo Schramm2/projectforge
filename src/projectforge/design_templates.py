@@ -65,13 +65,17 @@ def load_design_template(template_id: str | None) -> tuple[str | None, list[str]
 
     option = DESIGN_TEMPLATE_OPTIONS.get(template_id)
     if option is None:
-        warnings.append(f"Unknown design template '{template_id}' — skipping template guidance.")
+        warnings.append(
+            "Forge could not load that design template, so it will continue without template "
+            "guidance. Choose a listed template to include design rules."
+        )
         return None, warnings
 
     source = _resolve_design_template_path(template_id, option.template_filename)
     if source is None or not source.exists():
         warnings.append(
-            f"Design template '{template_id}' is configured but its file could not be found."
+            "Forge could not find the selected design template, so it will continue without "
+            "template guidance. Restore the template file or choose another template."
         )
         return None, warnings
 
@@ -80,11 +84,24 @@ def load_design_template(template_id: str | None) -> tuple[str | None, list[str]
     elif source.parent == GLOBAL_DESIGN_TEMPLATES_DIR:
         warnings.append(f"Using global design template from {source}")
 
-    content = source.read_text()
+    try:
+        content = source.read_text()
+    except OSError:
+        warnings.append(
+            "Forge could not read the selected design template, so it will continue without "
+            "template guidance. Check that the file is readable, then retry."
+        )
+        return None, warnings
     if not content.strip():
-        warnings.append("Design template file is empty — frontend scaffolds will ignore it.")
+        warnings.append(
+            "The selected design template is empty, so it will not guide the scaffold. Add "
+            "design rules or choose another template."
+        )
     elif len(content.strip()) < MIN_DESIGN_TEMPLATE_LENGTH:
-        warnings.append("Design template file is very short — consider adding more detail.")
+        warnings.append(
+            "The selected design template is very short. Add the essential visual rules before "
+            "scaffolding."
+        )
 
     return content, warnings
 

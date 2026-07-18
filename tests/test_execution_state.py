@@ -1,6 +1,7 @@
 """Tests for resumable scaffold phase evidence."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -135,7 +136,7 @@ def test_resume_rejects_a_changed_execution_contract(tmp_path, name, stack, appr
 
 
 def test_resume_requires_existing_progress_evidence(tmp_path):
-    with pytest.raises(ProgressContractError, match="progress evidence"):
+    with pytest.raises(ProgressContractError, match="resumable run"):
         initialize_progress(
             tmp_path,
             name="atlas",
@@ -144,3 +145,23 @@ def test_resume_requires_existing_progress_evidence(tmp_path):
             phase_prompts=_contract(),
             resume=True,
         )
+
+
+def test_progress_write_failure_hides_filesystem_detail(tmp_path, monkeypatch):
+    def unwritable(*_args, **_kwargs):
+        raise OSError("private filesystem detail")
+
+    monkeypatch.setattr(Path, "open", unwritable)
+
+    with pytest.raises(ProgressContractError) as raised:
+        initialize_progress(
+            tmp_path,
+            name="atlas",
+            stack="fastapi",
+            approval_mode="safe",
+            phase_prompts=_contract(),
+            resume=False,
+        )
+
+    assert "make the project folder writable" in str(raised.value)
+    assert "private filesystem detail" not in str(raised.value)

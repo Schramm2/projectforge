@@ -95,6 +95,39 @@ def test_stats_empty_shows_first_scaffold_guidance():
     assert "0% success rate" not in result.stdout
 
 
+def test_stats_hides_unreadable_history_detail(monkeypatch, tmp_path):
+    scaffold_path = tmp_path / "scaffold.log"
+    scaffold_path.write_text("{}\n")
+    monkeypatch.setattr("projectforge.cli.SCAFFOLD_LOG_PATH", scaffold_path)
+    original_read_text = Path.read_text
+
+    def unreadable(path: Path, *args, **kwargs):
+        if path == scaffold_path:
+            raise OSError("private filesystem detail")
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", unreadable)
+
+    result = runner.invoke(app, ["stats"])
+
+    assert result.exit_code == 1
+    assert "could not read the saved scaffold history" in result.stdout
+    assert "private filesystem detail" not in result.stdout
+
+
+def test_stats_hides_history_repair_failure_detail(monkeypatch):
+    monkeypatch.setattr(
+        "projectforge.history.repair_history",
+        lambda **_kwargs: (_ for _ in ()).throw(OSError("private filesystem detail")),
+    )
+
+    result = runner.invoke(app, ["stats", "--repair"])
+
+    assert result.exit_code == 1
+    assert "could not repair the saved scaffold history" in result.stdout
+    assert "private filesystem detail" not in result.stdout
+
+
 def test_stats_repair_quarantines_synthetic_history(monkeypatch, tmp_path):
     scaffold_path = tmp_path / "scaffold.log"
     quality_path = tmp_path / "quality.jsonl"
@@ -216,7 +249,8 @@ def test_live_unsafe_mode_requires_explicit_cli_consent():
     )
 
     assert result.exit_code == 1
-    assert "explicit consent" in result.stdout.lower()
+    assert "normal protections" in result.stdout.lower()
+    assert "isolated environment" in result.stdout.lower()
 
 
 def test_provider_running_commands_expose_approval_controls():
@@ -255,6 +289,87 @@ def _patch_prompt_only_dependencies(monkeypatch, *, setup_called: list[bool]) ->
         setup_called[0] = True
 
     monkeypatch.setattr("projectforge.cli.run_setup", _fake_run_setup)
+
+
+def _patch_live_scaffold_dependencies(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("projectforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("projectforge.cli.needs_setup", lambda: False)
+    monkeypatch.setattr(
+        "projectforge.cli.load_forge_config",
+        lambda: {"projects_dir": str(tmp_path)},
+    )
+    monkeypatch.setattr(
+        "projectforge.cli.get_backend_statuses",
+        lambda: {
+            "claude": BackendStatus(installed=True, ready=True),
+            "antigravity": BackendStatus(installed=False, ready=False),
+            "codex": BackendStatus(installed=False, ready=False),
+        },
+    )
+    monkeypatch.setattr(
+        "projectforge.cli.load_conventions",
+        lambda stack=None: ("Use strict typing.", []),
+    )
+    monkeypatch.setattr("projectforge.cli.load_claude_md_template", lambda: None)
+    monkeypatch.setattr("projectforge.cli.ensure_git_init", lambda project_dir: True)
+    monkeypatch.setattr(
+        "projectforge.cli.run_ai",
+        lambda backend, prompt, project_dir, **kwargs: (
+            project_dir.mkdir(parents=True, exist_ok=True) or 0
+        ),
+    )
+    monkeypatch.setattr("projectforge.cli.append_quality_signal", lambda **kwargs: None)
+    monkeypatch.setattr("projectforge.cli.append_scaffold_log", lambda *args, **kwargs: None)
+    monkeypatch.setattr("projectforge.cli.record_preferences", lambda answers: None)
+    monkeypatch.setattr("projectforge.cli.run_post_scaffold_hook", lambda *args: None)
+    monkeypatch.setattr("projectforge.cli.write_card", lambda *args, **kwargs: None)
+    monkeypatch.setattr("projectforge.cli.inject_badge_into_readme", lambda project_dir: None)
+
+
+def _live_scaffold_command(name: str) -> list[str]:
+    return [
+        "--use",
+        "claude",
+        "--name",
+        name,
+        "--stack",
+        "python-cli",
+        "--description",
+        "A persistence error test",
+        "--no-docker",
+        "--no-open",
+        "--no-verify",
+    ]
+
+
+def test_scaffold_record_write_failure_has_safe_recovery(monkeypatch, tmp_path):
+    _patch_live_scaffold_dependencies(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        "projectforge.cli.write_scaffold_manifest",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("private filesystem detail")),
+    )
+
+    result = runner.invoke(app, _live_scaffold_command("record-failure"))
+
+    assert result.exit_code == 1
+    assert "could not save the scaffold record" in result.stdout
+    assert "private filesystem detail" not in result.stdout
+
+
+def test_optional_evidence_write_failure_preserves_project(monkeypatch, tmp_path):
+    _patch_live_scaffold_dependencies(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        "projectforge.cli.append_scaffold_log",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("private filesystem detail")),
+    )
+
+    result = runner.invoke(app, _live_scaffold_command("evidence-failure"))
+
+    assert result.exit_code == 0
+    assert "could not save some local history or verification files" in " ".join(
+        result.stdout.split()
+    )
+    assert "private filesystem detail" not in result.stdout
 
 
 def test_dry_run_skips_setup_and_missing_backend_checks(monkeypatch):
@@ -351,10 +466,10 @@ def test_unknown_provider_readiness_is_not_executable(monkeypatch, tmp_path):
     )
 
     assert result.exit_code == 1
-    assert "could not confirm authentication" in result.stdout.lower()
+    assert "could not confirm that a selected ai tool is ready" in result.stdout.lower()
 
 
-def test_removed_gemini_override_points_to_antigravity():
+def test_removed_ai_tool_override_points_to_current_help():
     result = runner.invoke(
         app,
         [
@@ -371,8 +486,10 @@ def test_removed_gemini_override_points_to_antigravity():
     )
 
     assert result.exit_code == 1
-    assert "gemini cli backend was removed" in result.stdout.lower()
-    assert "--use antigravity" in " ".join(result.stdout.lower().split())
+    output = " ".join(result.stdout.lower().split())
+    assert "ai tool option is no longer supported" in output
+    assert "forge --help" in output
+    assert "gemini" not in output
 
 
 def test_export_skips_setup_and_writes_prompt(monkeypatch, tmp_path):
@@ -534,7 +651,8 @@ def test_dry_run_reports_bundle_validation_errors(monkeypatch):
     )
 
     assert result.exit_code == 1
-    assert "broken bundle" in result.stdout
+    assert "could not load the active conventions" in result.stdout
+    assert "broken bundle" not in result.stdout
 
 
 def test_mock_backends_cover_full_cli_flow_without_installed_ai_clis(monkeypatch, tmp_path):
@@ -709,7 +827,9 @@ def test_resume_preserves_completed_phases_and_finishes_failed_scaffold(monkeypa
     first = runner.invoke(app, command)
     assert first.exit_code == 9
     assert calls == ["Architecture & Core", "Tests & Automation"]
-    assert "Partial project output" in first.stdout
+    assert "completed work is safe" in first.stdout
+    assert "exit 9" not in first.stdout
+    assert "claude" not in first.stdout.lower().split("project generation stopped during", 1)[-1]
 
     second = runner.invoke(app, [*command, "--resume"])
     assert second.exit_code == 0
@@ -900,7 +1020,7 @@ def test_replay_without_snapshot_loads_compiled_conventions_for_manifest_stack(
     assert result.exit_code == 0
     assert seen_stacks == ["fastapi"]
     assert "compiled conventions for fastapi" in output
-    assert "Using current bundled conventions for stack 'fastapi'." in output
+    assert "Forge will use current conventions, so replay results may differ." in output
 
 
 def test_replay_prefers_snapshot_over_compiled_bundle(monkeypatch, tmp_path):
@@ -957,7 +1077,8 @@ def test_replay_reports_bundle_validation_errors(monkeypatch, tmp_path):
     result = runner.invoke(app, ["replay", "--dry-run"])
 
     assert result.exit_code == 1
-    assert "unknown stack" in result.stdout
+    assert "could not load conventions for replay" in result.stdout
+    assert "unknown stack" not in result.stdout
 
 
 def test_replay_unknown_manifest_stack_falls_back_to_default_bundle(monkeypatch, tmp_path):
@@ -993,11 +1114,109 @@ def test_replay_unknown_manifest_stack_falls_back_to_default_bundle(monkeypatch,
     result = runner.invoke(app, ["replay", "--dry-run"])
     output = " ".join(result.stdout.lower().split())
 
-    assert result.exit_code == 0
-    assert seen_stacks == ["not-a-real-stack", None]
-    assert "compiled default conventions" in result.stdout
-    assert "falling back to current bundled conventions" in output
-    assert "no conventions snapshot found. using current conventions." in output
+    assert result.exit_code == 1
+    assert seen_stacks == []
+    assert "recorded project type is no longer available" in output
+    assert "not-a-real-stack" not in output
+
+
+def test_replay_corrupt_scaffold_record_has_safe_recovery(monkeypatch, tmp_path):
+    project_dir = tmp_path / "atlas"
+    forge_dir = project_dir / ".forge"
+    forge_dir.mkdir(parents=True)
+    (forge_dir / "scaffold.json").write_text("{not valid json")
+    monkeypatch.chdir(project_dir)
+
+    result = runner.invoke(app, ["replay", "--dry-run"])
+
+    assert result.exit_code == 1
+    assert "could not read this project's scaffold record" in result.stdout
+    assert "JSONDecodeError" not in result.stdout
+    assert "scaffold.json" not in result.stdout
+
+
+def test_check_export_failure_has_safe_recovery(monkeypatch, tmp_path):
+    export_path = tmp_path / "audit.md"
+    monkeypatch.chdir(tmp_path)
+    original_write_text = Path.write_text
+
+    def unwritable(path: Path, *args, **kwargs):
+        if path == export_path:
+            raise OSError("private filesystem detail")
+        return original_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", unwritable)
+
+    result = runner.invoke(app, ["check", "--export", str(export_path)])
+
+    assert result.exit_code == 1
+    assert "could not save the audit report" in result.stdout
+    assert "private filesystem detail" not in result.stdout
+
+
+def test_evolve_record_write_failure_has_safe_recovery(monkeypatch, tmp_path):
+    project_dir = tmp_path / "atlas"
+    forge_dir = project_dir / ".forge"
+    forge_dir.mkdir(parents=True)
+    manifest_path = forge_dir / "scaffold.json"
+    manifest_path.write_text(
+        json.dumps({"name": "atlas", "stack": "fastapi", "description": "Evolve me"})
+    )
+    monkeypatch.chdir(project_dir)
+    monkeypatch.setattr("projectforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("projectforge.cli.check_backend_installed", lambda backend: True)
+    monkeypatch.setattr("projectforge.cli.run_ai", lambda *args, **kwargs: 0)
+    original_write_text = Path.write_text
+
+    def unwritable(path: Path, *args, **kwargs):
+        if path == manifest_path:
+            raise OSError("private filesystem detail")
+        return original_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", unwritable)
+
+    result = runner.invoke(app, ["evolve", "auth", "--use", "claude"])
+
+    assert result.exit_code == 1
+    assert "could not update the scaffold record" in result.stdout
+    assert "private filesystem detail" not in result.stdout
+
+
+def test_replay_diff_write_failure_has_safe_recovery(monkeypatch, tmp_path):
+    project_dir = tmp_path / "atlas"
+    forge_dir = project_dir / ".forge"
+    forge_dir.mkdir(parents=True)
+    (forge_dir / "scaffold.json").write_text(
+        json.dumps(
+            {
+                "name": "atlas",
+                "stack": "python-cli",
+                "description": "Replay me",
+                "routing": [{"phase": "architecture", "backend": "claude"}],
+            }
+        )
+    )
+    (forge_dir / "conventions-snapshot.md").write_text("snapshot conventions")
+    replay_dir = tmp_path / "replay"
+    replay_dir.mkdir()
+    monkeypatch.chdir(project_dir)
+    monkeypatch.setattr("projectforge.router.check_backend_installed", lambda backend: True)
+    monkeypatch.setattr("projectforge.cli.run_ai", lambda *args, **kwargs: 0)
+    monkeypatch.setattr("tempfile.mkdtemp", lambda **_kwargs: str(replay_dir))
+    original_write_text = Path.write_text
+
+    def unwritable(path: Path, *args, **kwargs):
+        if path.name.startswith("replay-diff-"):
+            raise OSError("private filesystem detail")
+        return original_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", unwritable)
+
+    result = runner.invoke(app, ["replay", "--diff"])
+
+    assert result.exit_code == 1
+    assert "could not save the diff report" in result.stdout
+    assert "private filesystem detail" not in result.stdout
 
 
 def test_resolve_project_dir_allows_rename(monkeypatch, tmp_path):
@@ -1087,9 +1306,8 @@ def test_setup_missing_providers_shows_official_install_auth_recheck_flow(monkey
         run_setup(console)
 
     output = console.export_text()
-    assert "https://code.claude.com/docs/en/setup" in output
-    assert "https://antigravity.google/docs/cli-install" in output
-    assert "https://github.com/openai/codex" in output
+    assert "projectforge#install-and-authenticate-a-provider" in output
+    assert "could not find a supported AI tool" in output
     assert "forge doctor" in output
 
 

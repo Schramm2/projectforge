@@ -191,6 +191,8 @@ class TestCLIAdapterBaseExecute:
         result = adapter.execute(task, tmp_path, events.append)
 
         assert result.success is False
+        assert "selected AI tool could not start" in result.summary
+        assert "__forge_nonexistent" not in result.summary
         event_types = [e.event_type for e in events]
         assert "failed" in event_types
 

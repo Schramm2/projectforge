@@ -133,9 +133,7 @@ def test_load_conventions_stack_composes_bundle_before_local_override(tmp_path, 
     assert any("local conventions" in w.lower() for w in warnings)
 
 
-def test_stack_bundle_composes_profile_user_and_project_layers_with_hashes(
-    tmp_path, monkeypatch
-):
+def test_stack_bundle_composes_profile_user_and_project_layers_with_hashes(tmp_path, monkeypatch):
     root = tmp_path / "bundled"
     (root / "global").mkdir(parents=True)
     (root / "global" / "shared.md").write_text("Bundled defaults apply first.")
@@ -174,9 +172,7 @@ def test_stack_bundle_rejects_credential_shaped_user_content(tmp_path, monkeypat
     (root / "global" / "shared.md").write_text("Safe bundled defaults for every project.")
     profiles_dir = tmp_path / "profiles"
     profiles_dir.mkdir()
-    (profiles_dir / "default.md").write_text(
-        "Never print ghp_abcdefghijklmnopqrstuvwxyz1234567890"
-    )
+    (profiles_dir / "default.md").write_text("Never print ghp_abcdefghijklmnopqrstuvwxyz1234567890")
     monkeypatch.setattr("projectforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
     monkeypatch.setattr("projectforge.conventions.PROFILES_DIR", profiles_dir)
     monkeypatch.setattr("projectforge.conventions.CONVENTIONS_PATH", tmp_path / "missing.md")
@@ -184,7 +180,7 @@ def test_stack_bundle_rejects_credential_shaped_user_content(tmp_path, monkeypat
         "projectforge.conventions.LOCAL_CONVENTIONS_PATH", tmp_path / "missing-local.md"
     )
 
-    with pytest.raises(ConventionValidationError, match="credential-like"):
+    with pytest.raises(ConventionValidationError, match="looks like a credential"):
         load_conventions_bundle(stack="fastapi")
 
 
@@ -202,7 +198,8 @@ def test_load_conventions_stack_ignores_placeholder_local_override(tmp_path, mon
     content, warnings = load_conventions(stack="fastapi")
 
     assert "bundled content" in content
-    assert any("ignoring placeholder conventions" in warning.lower() for warning in warnings)
+    assert any("ignored a placeholder convention file" in warning.lower() for warning in warnings)
+    assert all(str(local) not in warning for warning in warnings)
     assert any("placeholder" in w.lower() for w in warnings)
 
 

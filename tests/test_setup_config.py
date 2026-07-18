@@ -2,10 +2,16 @@
 
 import json
 import stat
+from io import StringIO
 
 import pytest
+from rich.console import Console
 
-from projectforge.setup import load_forge_config, save_forge_config
+from projectforge.setup import (
+    _print_legacy_conventions_warning,
+    load_forge_config,
+    save_forge_config,
+)
 
 
 def test_save_forge_config_replaces_atomically(monkeypatch, tmp_path):
@@ -24,7 +30,22 @@ def test_save_forge_config_replaces_atomically(monkeypatch, tmp_path):
     assert list(forge_dir.glob(".config.json.*.tmp")) == []
 
 
-def test_load_forge_config_preserves_corrupt_input(monkeypatch, tmp_path):
+def test_legacy_conventions_warning_hides_local_path(monkeypatch, tmp_path):
+    legacy_path = tmp_path / "private" / "conventions.md"
+    legacy_path.parent.mkdir()
+    legacy_path.write_text("legacy rules")
+    monkeypatch.setattr("projectforge.setup.CONVENTIONS_PATH", legacy_path)
+    output = StringIO()
+    console = Console(file=output, force_terminal=False, color_system=None, width=120)
+
+    _print_legacy_conventions_warning(console)
+
+    assert "legacy user conventions file" in output.getvalue()
+    assert "Import it as a profile" in output.getvalue()
+    assert str(legacy_path) not in output.getvalue()
+
+
+def test_load_forge_config_preserves_corrupt_input(monkeypatch, tmp_path, capsys):
     forge_dir = tmp_path / ".forge"
     config_path = forge_dir / "config.json"
     forge_dir.mkdir()
@@ -38,6 +59,10 @@ def test_load_forge_config_preserves_corrupt_input(monkeypatch, tmp_path):
     assert len(backups) == 1
     assert backups[0].read_text() == "{ definitely not json"
     assert not config_path.exists()
+    output = capsys.readouterr().out
+    assert "could not read your saved settings" in output
+    assert str(config_path) not in output
+    assert ".corrupt-" not in output
 
 
 def test_load_forge_config_migrates_v041_model_overrides_in_memory(monkeypatch, tmp_path):

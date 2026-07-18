@@ -119,12 +119,10 @@ def summarize_output_line(line: str) -> str | None:
 
 
 def progress_summary_for_line(line: str, current: str) -> str:
-    """Pick the best loader summary for a new backend output line."""
+    """Pick a privacy-safe loader summary without forwarding raw tool output."""
     summary = summarize_output_line(line)
     if summary:
         return summary
-    if not is_noisy_progress_line(line):
-        return line
     return current
 
 

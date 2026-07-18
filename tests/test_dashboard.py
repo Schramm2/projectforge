@@ -124,9 +124,7 @@ def test_render_dashboard_without_agent_stats(tmp_path: Path):
 
 def test_dashboard_does_not_claim_ready_when_verification_failed(tmp_path: Path):
     answers = {"name": "pulse", "stack": "fastapi"}
-    report = VerifyReport(
-        checks=[CheckResult(name="test", passed=False, detail="one test failed")]
-    )
+    report = VerifyReport(checks=[CheckResult(name="test", passed=False, detail="one test failed")])
     buf = StringIO()
     console = Console(file=buf, width=100)
 
@@ -143,3 +141,5 @@ def test_dashboard_does_not_claim_ready_when_verification_failed(tmp_path: Path)
     assert "Project Ready" not in output
     assert "verification needs attention" in output.lower()
     assert "one test failed" in output
+    assert "review the guidance above" in output
+    assert ".forge/verification.json" not in output

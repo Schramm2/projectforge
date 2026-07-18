@@ -64,13 +64,19 @@ class ConventionRegistry:
         try:
             return self.records[record_id]
         except KeyError as exc:
-            raise ConventionValidationError(f"Unknown convention record: {record_id}") from exc
+            raise ConventionValidationError(
+                "Forge could not load the requested conventions. Run `forge conventions "
+                "validate`, then restore or fix the convention files."
+            ) from exc
 
     def source(self, source_id: str) -> ConventionSource:
         try:
             return self.sources[source_id]
         except KeyError as exc:
-            raise ConventionValidationError(f"Unknown convention source: {source_id}") from exc
+            raise ConventionValidationError(
+                "Forge could not load the requested conventions. Run `forge conventions "
+                "validate`, then restore or fix the convention files."
+            ) from exc
 
     def global_record(self) -> ConventionRecord | None:
         return self.records.get("global")

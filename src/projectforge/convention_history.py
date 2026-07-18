@@ -51,22 +51,28 @@ def load_history(root: Path, target: str, *, limit: int = 10) -> GitHistoryResul
         return GitHistoryResult(
             target=git_target,
             available=False,
-            message="Git history is unavailable because git is not installed.",
+            message=(
+                "Convention history needs Git. Install Git, then run the history command again."
+            ),
         )
-    except OSError as exc:
+    except OSError:
         return GitHistoryResult(
             target=git_target,
             available=False,
-            message=f"Git history is unavailable: {exc}",
+            message=(
+                "Forge could not read convention history. Confirm Git works in this checkout, "
+                "then retry."
+            ),
         )
 
     if completed.returncode != 0:
-        stderr = (completed.stderr or "").strip()
-        message = stderr or "Git history is unavailable for this conventions target."
         return GitHistoryResult(
             target=git_target,
             available=False,
-            message=message,
+            message=(
+                "Forge could not read history for this convention. Confirm the target exists "
+                "in this Git checkout, then retry."
+            ),
         )
 
     entries = tuple(line.strip() for line in completed.stdout.splitlines() if line.strip())[:limit]
@@ -74,7 +80,10 @@ def load_history(root: Path, target: str, *, limit: int = 10) -> GitHistoryResul
         return GitHistoryResult(
             target=git_target,
             available=False,
-            message="No git history found for this conventions target.",
+            message=(
+                "No saved history exists for this convention yet. Commit the convention file, "
+                "then try again."
+            ),
         )
 
     return GitHistoryResult(target=git_target, available=True, entries=entries)

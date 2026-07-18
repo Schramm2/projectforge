@@ -56,7 +56,13 @@ from projectforge.design_templates import (
 from projectforge.doctor import build_doctor_report, doctor_exit_code
 from projectforge.evolutions import build_evolve_prompt, get_capabilities, get_capability
 from projectforge.execution_policy import validate_approval_mode
-from projectforge.execution_state import ProgressContractError, initialize_progress, mark_phase
+from projectforge.execution_state import (
+    ProgressContractError,
+    initialize_progress,
+)
+from projectforge.execution_state import (
+    mark_phase as _mark_phase,
+)
 from projectforge.logo import print_logo
 from projectforge.media_assets import (
     MEDIA_DIR,
@@ -138,11 +144,6 @@ _TOP_LEVEL_CONVENTION_HISTORY_TARGETS = {
     "prompts",
     "manifests",
 }
-_BACKEND_LOGIN_COMMANDS = {
-    "claude": "claude auth login",
-    "antigravity": "agy and complete Google Sign-In",
-    "codex": "codex login",
-}
 _PROVIDER_QUOTA_NOTES = {
     "claude": "Claude Code plan limits or configured API billing",
     "antigravity": "Google account plan and Antigravity quota",
@@ -156,20 +157,58 @@ evidence file. Preserve existing project output from earlier phases.
 </forge_runtime_boundary>"""
 
 
+def mark_phase(*args, **kwargs) -> dict:
+    """Persist phase progress while keeping filesystem failures user-safe."""
+    try:
+        return _mark_phase(*args, **kwargs)
+    except ProgressContractError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        raise typer.Exit(1) from exc
+
+
 def _validate_backend_override(backend: str | None) -> None:
     """Reject retired or unknown explicit backend names with migration guidance."""
     if backend is None:
         return
     if backend == "gemini":
         console.print(
-            "[red]The Gemini CLI backend was removed. Install Google Antigravity CLI and "
-            "use --use antigravity.[/red]"
+            "[red]That AI tool option is no longer supported. Run `forge --help` and choose "
+            "an available `--use` value.[/red]"
         )
         raise typer.Exit(1)
     if backend not in SUPPORTED_BACKENDS:
-        backends = ", ".join(SUPPORTED_BACKENDS)
-        console.print(f"[red]Unknown backend '{backend}'. Choose from: {backends}[/red]")
+        console.print(
+            "[red]That AI tool choice is not available. Run `forge --help` to see valid "
+            "`--use` values.[/red]"
+        )
         raise typer.Exit(1)
+
+
+def _load_scaffold_record(path: Path) -> dict:
+    """Load a project scaffold record without exposing parse or filesystem details."""
+    import json
+
+    try:
+        payload = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        console.print(
+            status_line(
+                "Forge could not read this project's scaffold record. Restore it from a "
+                "trusted backup, or scaffold a new target.",
+                accent="amber",
+            )
+        )
+        raise typer.Exit(1) from exc
+    if not isinstance(payload, dict):
+        console.print(
+            status_line(
+                "Forge could not read this project's scaffold record. Restore it from a "
+                "trusted backup, or scaffold a new target.",
+                accent="amber",
+            )
+        )
+        raise typer.Exit(1)
+    return payload
 
 
 @app.command()
@@ -391,16 +430,15 @@ def _provider_commitment_lines(
     return lines
 
 
-def _backend_help_line(backend: str, status: BackendStatus) -> Text:
+def _backend_help_line(_backend: str, status: BackendStatus) -> Text:
     """Return a user-facing readiness line for a backend."""
     if status.ready is False:
-        login_command = status.login_command or _BACKEND_LOGIN_COMMANDS.get(backend, backend)
-        return subtle(f"{backend} needs login. Run {login_command}.")
+        return subtle("A selected AI tool needs sign-in. Run `forge doctor` for the next step.")
     if not status.installed:
-        return subtle(f"{backend} is not installed or not on PATH.")
+        return subtle("A selected AI tool is not available. Run `forge doctor` for setup steps.")
     return subtle(
-        f"{backend} is installed but Forge could not confirm authentication. "
-        "Run forge doctor for the recommended next step."
+        "Forge could not confirm that a selected AI tool is ready. Run `forge doctor` for the "
+        "next step."
     )
 
 
@@ -411,19 +449,24 @@ def _render_backend_readiness_notice(
 ) -> None:
     """Render a panel when required backends are unavailable for routing."""
     lines: list[Text] = []
+    seen_messages: set[str] = set()
     for backend in sorted(required_backends):
         status = backend_statuses.get(backend, BackendStatus(False, False))
-        lines.append(_backend_help_line(backend, status))
+        line = _backend_help_line(backend, status)
+        message = line.plain
+        if message not in seen_messages:
+            lines.append(line)
+            seen_messages.add(message)
     lines.append(muted("Run forge --setup after fixing login or install issues."))
     console.print(make_panel(grouped_lines(lines), title="Backend Readiness", accent="amber"))
 
 
-def _render_phase_failure(backend: str, label: str, returncode: int) -> None:
+def _render_phase_failure(_backend: str, label: str, _returncode: int) -> None:
     """Render helpful follow-up guidance when a scaffold phase fails."""
     lines: list[Text] = [
-        subtle(f"{label} failed with {backend} (exit {returncode})."),
-        subtle("Partial project output and .forge/progress.json were preserved."),
-        subtle("Fix the reported provider issue, then repeat the same command with --resume."),
+        subtle(f"Project generation stopped during {label}."),
+        subtle("Your completed work is safe."),
+        subtle("Run `forge doctor`, fix the reported issue, then repeat with `--resume`."),
         muted("Resume verifies the original contract and does not rerun completed phases."),
     ]
     console.print(make_panel(grouped_lines(lines), title="Execution", accent="amber"))
@@ -432,11 +475,11 @@ def _render_phase_failure(backend: str, label: str, returncode: int) -> None:
 def _validate_project_name_for_collision(name: str) -> bool | str:
     """Validate a replacement project name when resolving collisions."""
     if not name.strip():
-        return "Project name cannot be empty."
+        return "Enter a project name, for example `customer-api`."
     if not _PROJECT_NAME_RE.match(name):
         return (
-            "Must start with a letter/number and contain only letters, numbers, "
-            "dots, hyphens, or underscores."
+            "Start with a letter or number. Use only letters, numbers, dots, hyphens, "
+            "or underscores."
         )
     return True
 
@@ -453,11 +496,10 @@ def _resolve_project_dir(base_dir: Path, answers: dict) -> Path:
             make_panel(
                 grouped_lines(
                     [
-                        Text(
-                            f"{project_dir} already exists and is not empty.",
-                            style="bold #F7F9FF",
+                        Text("That project folder already contains files.", style="bold #F7F9FF"),
+                        subtle(
+                            "Choose a different name, or confirm overwrite to replace its contents."
                         ),
-                        subtle("Choose another name, overwrite it, or cancel."),
                     ]
                 ),
                 title="Existing Directory",
@@ -583,7 +625,9 @@ def _prompt_post_setup_next_step() -> str:
 def _admin_history_target(value: str) -> str:
     cleaned = value.strip().strip("/")
     if not cleaned:
-        raise ConventionValidationError("A stack id or conventions path is required for history.")
+        raise ConventionValidationError(
+            "Choose a stack or convention path, for example `stacks/fastapi`, then retry."
+        )
     if (
         "/" in cleaned
         or cleaned.endswith(".md")
@@ -747,7 +791,13 @@ def conventions_select(
         console.print(status_line(str(exc), accent="amber"))
         raise typer.Exit(1) from exc
     if not path.exists():
-        console.print(status_line(f"Convention profile not found: {name}", accent="amber"))
+        console.print(
+            status_line(
+                "Forge could not find that convention profile. Run `forge conventions list`, "
+                "or create it with `forge conventions init NAME`.",
+                accent="amber",
+            )
+        )
         raise typer.Exit(1)
     config = load_forge_config()
     config["conventions_profile"] = name
@@ -792,7 +842,13 @@ def conventions_inspect(
     try:
         profile, bundle, report = _conventions_inspection(stack)
     except ConventionValidationError as exc:
-        console.print(status_line(str(exc), accent="amber"))
+        console.print(
+            status_line(
+                "Forge could not load the active conventions. Run `forge conventions "
+                "validate`, then fix or restore the convention files.",
+                accent="amber",
+            )
+        )
         raise typer.Exit(1) from exc
     if json_output:
         console.print_json(json.dumps(report))
@@ -812,7 +868,13 @@ def conventions_preview(
     try:
         _, bundle, _ = _conventions_inspection(stack)
     except ConventionValidationError as exc:
-        console.print(status_line(str(exc), accent="amber"))
+        console.print(
+            status_line(
+                "Forge could not load the active conventions. Run `forge conventions "
+                "validate`, then fix or restore the convention files.",
+                accent="amber",
+            )
+        )
         raise typer.Exit(1) from exc
     console.print(bundle.prompt_block)
 
@@ -825,13 +887,20 @@ def conventions_validate(
     try:
         profile, bundle, _ = _conventions_inspection(stack)
     except ConventionValidationError as exc:
-        console.print(status_line(str(exc), accent="amber"))
+        console.print(
+            status_line(
+                "Forge could not load the active conventions. Fix or restore the convention "
+                "files, then validate again.",
+                accent="amber",
+            )
+        )
         raise typer.Exit(1) from exc
     secret_types = check_for_secrets(bundle.prompt_block)
     if secret_types:
         console.print(
             status_line(
-                f"Validation failed: credential-like content ({', '.join(secret_types)}).",
+                "Forge found content that looks like a credential. Remove secrets from the "
+                "active convention files, then validate again.",
                 accent="amber",
             )
         )
@@ -851,7 +920,13 @@ def conventions_edit(
         console.print(status_line(str(exc), accent="amber"))
         raise typer.Exit(1) from exc
     if not path.exists():
-        console.print(status_line(f"Convention profile not found: {profile}", accent="amber"))
+        console.print(
+            status_line(
+                "Forge could not find that convention profile. Run `forge conventions list`, "
+                "or create it with `forge conventions init NAME`.",
+                accent="amber",
+            )
+        )
         raise typer.Exit(1)
     configured = load_forge_config().get("preferred_editor", "")
     editor = configured or os.environ.get("EDITOR", "")
@@ -897,7 +972,9 @@ def admin_conventions(
         open_path is not None,
     ]
     if sum(1 for action in direct_actions if action) > 1:
-        console.print(status_line("Choose only one direct admin action at a time.", accent="amber"))
+        console.print(
+            status_line("Choose one conventions action per command, then retry.", accent="amber")
+        )
         raise typer.Exit(1)
 
     try:
@@ -920,7 +997,13 @@ def admin_conventions(
             return
         _run_admin_conventions_interactive(registry)
     except ConventionValidationError as exc:
-        console.print(status_line(f"Conventions error: {exc}", accent="amber"))
+        console.print(
+            status_line(
+                "Forge could not load the bundled conventions. Reinstall Forge or restore its "
+                "bundled conventions, then run `forge admin conventions --validate`.",
+                accent="amber",
+            )
+        )
         raise typer.Exit(1) from exc
 
 
@@ -942,10 +1025,20 @@ def stats(
     from projectforge.quality import QUALITY_LOG_PATH, read_quality_signals
 
     if repair:
-        repair_result = repair_history(
-            scaffold_log_path=SCAFFOLD_LOG_PATH,
-            quality_log_path=QUALITY_LOG_PATH,
-        )
+        try:
+            repair_result = repair_history(
+                scaffold_log_path=SCAFFOLD_LOG_PATH,
+                quality_log_path=QUALITY_LOG_PATH,
+            )
+        except OSError as exc:
+            console.print(
+                status_line(
+                    "Forge could not repair the saved scaffold history. Check that Forge's "
+                    "data folder is readable and writable, then retry.",
+                    accent="amber",
+                )
+            )
+            raise typer.Exit(1) from exc
         if repair_result.total_entries:
             console.print(
                 status_line(
@@ -959,16 +1052,26 @@ def stats(
             console.print(status_line("No recognizable pytest history found.", accent="aqua"))
 
     scaffold_entries: list[dict] = []
-    if SCAFFOLD_LOG_PATH.exists():
-        for line in SCAFFOLD_LOG_PATH.read_text().splitlines():
-            line = line.strip()
-            if line:
-                try:
-                    scaffold_entries.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
+    try:
+        if SCAFFOLD_LOG_PATH.exists():
+            for line in SCAFFOLD_LOG_PATH.read_text().splitlines():
+                line = line.strip()
+                if line:
+                    try:
+                        scaffold_entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
 
-    quality_entries = read_quality_signals()
+        quality_entries = read_quality_signals()
+    except OSError as exc:
+        console.print(
+            status_line(
+                "Forge could not read the saved scaffold history. Check that Forge's data "
+                "folder is readable, then retry.",
+                accent="amber",
+            )
+        )
+        raise typer.Exit(1) from exc
 
     stats_data = aggregate_stats(
         scaffold_entries=scaffold_entries,
@@ -1027,13 +1130,14 @@ def evolve(
     if not manifest_path.exists():
         console.print(
             status_line(
-                "No .forge/scaffold.json found. Run this inside a Forge project.",
+                "Forge could not find this project's scaffold record. Run this command from "
+                "the root of a project created by Forge.",
                 accent="amber",
             )
         )
         raise typer.Exit(1)
 
-    dna = json.loads(manifest_path.read_text())
+    dna = _load_scaffold_record(manifest_path)
     stack = dna.get("stack", "")
 
     print_logo(console)
@@ -1046,7 +1150,8 @@ def evolve(
     if not caps:
         console.print(
             status_line(
-                f"No evolution capabilities defined for stack '{stack}'.",
+                "This project type has no add-on capabilities. Make the change manually, or "
+                "use `forge evolve` in a supported project.",
                 accent="amber",
             )
         )
@@ -1059,7 +1164,7 @@ def evolve(
             valid = ", ".join(c["name"] for c in caps)
             console.print(
                 status_line(
-                    f"Unknown capability '{capability}'. Choose from: {valid}",
+                    f"That capability is not available for this stack. Choose one of: {valid}.",
                     accent="amber",
                 )
             )
@@ -1083,7 +1188,13 @@ def evolve(
     if use:
         backend = use
         if not check_backend_installed(backend):
-            console.print(status_line(f"{backend} is not installed.", accent="amber"))
+            console.print(
+                status_line(
+                    "The selected AI tool is not available. Run `forge doctor`, complete the "
+                    "recommended setup, then retry.",
+                    accent="amber",
+                )
+            )
             raise typer.Exit(1)
     else:
         phase_plan = pick_phase_backends(stack, override=None)
@@ -1112,12 +1223,24 @@ def evolve(
             }
         )
         dna["evolutions"] = evolutions
-        manifest_path.write_text(json.dumps(dna, indent=2) + "\n")
+        try:
+            manifest_path.write_text(json.dumps(dna, indent=2) + "\n")
+        except OSError as exc:
+            console.print(
+                status_line(
+                    "The change was applied, but Forge could not update the scaffold record. "
+                    "Check that the project folder is writable before using `forge evolve` "
+                    "again.",
+                    accent="amber",
+                )
+            )
+            raise typer.Exit(1) from exc
         console.print(status_line(f"Successfully added {cap['name']}", accent="aqua"))
     else:
         console.print(
             status_line(
-                f"Evolution failed (exit {returncode}). Try --verbose for details.",
+                "Forge could not apply this change. Your existing project is unchanged where "
+                "possible; run `forge doctor`, then retry.",
                 accent="amber",
             )
         )
@@ -1187,7 +1310,18 @@ def check(
         if fixable:
             console.print()
             for c in fixable:
-                if generate_fix(project_dir, c):
+                try:
+                    fixed = generate_fix(project_dir, c)
+                except OSError as exc:
+                    console.print(
+                        status_line(
+                            "Forge could not create that convention file. Check that the project "
+                            "folder is writable, then run `forge check --fix` again.",
+                            accent="amber",
+                        )
+                    )
+                    raise typer.Exit(1) from exc
+                if fixed:
                     console.print(status_line(f"Created {c.name}", accent="aqua"))
         else:
             console.print(status_line("Nothing to fix automatically.", accent="amber"))
@@ -1203,7 +1337,17 @@ def check(
                 lines.append(f"- {icon} {c.name}{': ' + c.detail if c.detail else ''}")
         summary_text = f"{len(passed)} passed, {len(warnings)} warnings, {len(failed)} failed"
         lines.append(f"\n---\n{summary_text}\n")
-        Path(export).write_text("\n".join(lines))
+        try:
+            Path(export).write_text("\n".join(lines))
+        except OSError as exc:
+            console.print(
+                status_line(
+                    "Forge could not save the audit report at that location. Choose a writable "
+                    "path, then export it again.",
+                    accent="amber",
+                )
+            )
+            raise typer.Exit(1) from exc
         console.print(status_line(f"Report exported to {export}", accent="aqua"))
 
     if fix:
@@ -1242,7 +1386,6 @@ def replay(
     ] = False,
 ) -> None:
     """Replay a scaffold using the project's original inputs."""
-    import json
     import tempfile
 
     try:
@@ -1261,58 +1404,62 @@ def replay(
     if not manifest_path.exists():
         console.print(
             status_line(
-                "No .forge/scaffold.json found. Run this inside a Forge project.",
+                "Forge could not find this project's scaffold record. Run this command from "
+                "the root of a project created by Forge.",
                 accent="amber",
             )
         )
         raise typer.Exit(1)
 
-    dna = json.loads(manifest_path.read_text())
+    dna = _load_scaffold_record(manifest_path)
     stack = dna.get("stack", "")
     name = dna.get("name", project_dir.name)
 
     console.print(header_panel(__version__))
-    console.print(status_line(f"Replaying: {name} ({stack})", accent="violet"))
+    console.print(status_line(f"Replaying: {name}", accent="violet"))
 
     # Load conventions snapshot or current bundled conventions for the stack
     snapshot_path = project_dir / ".forge" / "conventions-snapshot.md"
     if snapshot_path.exists():
-        conventions = snapshot_path.read_text()
+        try:
+            conventions = snapshot_path.read_text()
+        except OSError as exc:
+            console.print(
+                status_line(
+                    "Forge could not read the saved convention snapshot. Restore it from a "
+                    "trusted backup, or remove it to use current conventions.",
+                    accent="amber",
+                )
+            )
+            raise typer.Exit(1) from exc
     else:
         replay_stack = stack or None
-        loaded_stack = replay_stack
+        if replay_stack and replay_stack not in STACK_PHASES:
+            console.print(
+                status_line(
+                    "The recorded project type is no longer available. Use the original Forge "
+                    "version to replay it, or scaffold a new target.",
+                    accent="amber",
+                )
+            )
+            raise typer.Exit(1)
         try:
             conventions, conv_warnings = load_bundled_conventions(stack=replay_stack)
         except ConventionValidationError as exc:
-            if replay_stack and str(exc) == f"Unknown convention record: stacks/{replay_stack}":
-                console.print(
-                    status_line(
-                        (
-                            f"Unknown stack '{replay_stack}' in replay manifest; "
-                            "falling back to current bundled conventions."
-                        ),
-                        accent="amber",
-                    )
+            console.print(
+                status_line(
+                    "Forge could not load conventions for replay. Run `forge conventions "
+                    "validate`, then fix or restore the convention files.",
+                    accent="amber",
                 )
-                loaded_stack = None
-                try:
-                    conventions, conv_warnings = load_bundled_conventions()
-                except ConventionValidationError as fallback_exc:
-                    console.print(status_line(f"Conventions error: {fallback_exc}", accent="amber"))
-                    raise typer.Exit(1) from fallback_exc
-            else:
-                console.print(status_line(f"Conventions error: {exc}", accent="amber"))
-                raise typer.Exit(1) from exc
+            )
+            raise typer.Exit(1) from exc
         for warning in conv_warnings:
             console.print(f"[yellow]{warning}[/yellow]")
         console.print(
             status_line(
-                (
-                    f"No conventions snapshot found. Using current bundled conventions "
-                    f"for stack '{loaded_stack}'."
-                    if loaded_stack
-                    else "No conventions snapshot found. Using current conventions."
-                ),
+                "No saved convention snapshot was found. Forge will use current conventions, "
+                "so replay results may differ.",
                 accent="amber",
             )
         )
@@ -1332,7 +1479,14 @@ def replay(
 
     # Reconstruct phase backends from routing
     routing = dna.get("routing", [])
-    phase_backends = [(r["phase"], normalize_legacy_backend(r["backend"])) for r in routing]
+    phase_backends = [
+        (item["phase"], normalize_legacy_backend(item["backend"]))
+        for item in routing
+        if isinstance(routing, list)
+        and isinstance(item, dict)
+        and isinstance(item.get("phase"), str)
+        and isinstance(item.get("backend"), str)
+    ]
 
     if not phase_backends:
         phase_backends = pick_phase_backends(stack, override=use)
@@ -1343,7 +1497,8 @@ def replay(
         if not check_backend_installed(actual):
             console.print(
                 status_line(
-                    f"{actual} is not installed. Results may differ from original scaffold.",
+                    "A tool used by the original scaffold is unavailable. Run `forge doctor`; "
+                    "complete its setup before replaying for comparable results.",
                     accent="amber",
                 )
             )
@@ -1386,7 +1541,8 @@ def replay(
         if returncode != 0:
             console.print(
                 status_line(
-                    f"Replay phase '{label}' failed (exit {returncode}).",
+                    "Replay stopped before it finished. Keep the partial project, fix the "
+                    "reported setup issue, then run replay again.",
                     accent="amber",
                 )
             )
@@ -1448,7 +1604,17 @@ def replay(
         if removed:
             lines.append("\n## Removed\n")
             lines.extend(f"- {f}" for f in sorted(removed))
-        diff_file.write_text("\n".join(lines) + "\n")
+        try:
+            diff_file.write_text("\n".join(lines) + "\n")
+        except OSError as exc:
+            console.print(
+                status_line(
+                    "Forge compared the projects but could not save the diff report. Check that "
+                    "the project folder is writable, then run replay with `--diff` again.",
+                    accent="amber",
+                )
+            )
+            raise typer.Exit(1) from exc
         console.print(status_line(f"Diff saved to {diff_file}", accent="aqua"))
 
 
@@ -1607,7 +1773,12 @@ def main(
 
     prompt_only = dry_run or bool(export)
     if resume and prompt_only:
-        console.print(status_line("--resume cannot be combined with --dry-run or --export."))
+        console.print(
+            status_line(
+                "Resume works only on a live run. Remove `--dry-run` or `--export`, then repeat "
+                "the original command."
+            )
+        )
         raise typer.Exit(1)
     try:
         validate_approval_mode(
@@ -1673,7 +1844,7 @@ def main(
         resolved_stack = STACK_ALIASES.get(stack.lower())
         if not resolved_stack:
             valid = ", ".join(sorted(set(STACK_ALIASES.values())))
-            console.print(f"[red]Unknown stack '{stack}'. Choose from: {valid}[/red]")
+            console.print(f"[red]That stack is not available. Choose one of: {valid}.[/red]")
             raise typer.Exit(1)
 
         from projectforge.stacks import STACK_META
@@ -1684,7 +1855,7 @@ def main(
         if auth_provider and auth_provider not in AUTH_PROVIDER_OPTIONS:
             valid = ", ".join(sorted(AUTH_PROVIDER_OPTIONS))
             console.print(
-                f"[red]Unknown auth provider '{auth_provider}'. Choose from: {valid}[/red]"
+                f"[red]That authentication option is not available. Choose one of: {valid}.[/red]"
             )
             raise typer.Exit(1)
         if auth_provider and not auth_provider_supported_for_stack(resolved_stack, auth_provider):
@@ -1692,20 +1863,20 @@ def main(
             if allowed:
                 valid = ", ".join(allowed)
                 console.print(
-                    "[red]Auth provider "
-                    f"'{auth_provider}' is not supported for stack '{resolved_stack}'. "
-                    f"Choose from: {valid}[/red]"
+                    "[red]That authentication option does not work with this stack. "
+                    f"Choose one of: {valid}.[/red]"
                 )
             else:
                 console.print(
-                    f"[red]Stack '{resolved_stack}' does not support --auth-provider.[/red]"
+                    "[red]This stack does not support an authentication option. Remove "
+                    "`--auth-provider` and try again.[/red]"
                 )
             raise typer.Exit(1)
 
         if design_template and design_template not in DESIGN_TEMPLATE_OPTIONS:
             valid = ", ".join(sorted(DESIGN_TEMPLATE_OPTIONS))
             console.print(
-                f"[red]Unknown design template '{design_template}'. Choose from: {valid}[/red]"
+                f"[red]That design template is not available. Choose one of: {valid}.[/red]"
             )
             raise typer.Exit(1)
         if design_template and not design_template_supported_for_stack(
@@ -1715,19 +1886,19 @@ def main(
             if allowed:
                 valid = ", ".join(allowed)
                 console.print(
-                    "[red]Design template "
-                    f"'{design_template}' is not supported for stack '{resolved_stack}'. "
-                    f"Choose from: {valid}[/red]"
+                    "[red]That design template does not work with this stack. "
+                    f"Choose one of: {valid}.[/red]"
                 )
             else:
                 console.print(
-                    f"[red]Stack '{resolved_stack}' does not support --design-template.[/red]"
+                    "[red]This stack does not support a design template. Remove "
+                    "`--design-template` and try again.[/red]"
                 )
             raise typer.Exit(1)
 
         if ci_template and ci_template not in CI_TEMPLATE_MODES:
             valid = ", ".join(CI_TEMPLATE_MODES)
-            console.print(f"[red]Unknown CI template '{ci_template}'. Choose from: {valid}[/red]")
+            console.print(f"[red]That CI template is not available. Choose one of: {valid}.[/red]")
             raise typer.Exit(1)
 
         ci_requested = ci if ci is not None else bool(ci_template or ci_actions)
@@ -1741,10 +1912,9 @@ def main(
                 invalid_actions = [action for action in action_ids if action not in allowed_actions]
                 if invalid_actions:
                     valid = ", ".join(sorted(allowed_actions))
-                    invalid = ", ".join(invalid_actions)
                     console.print(
-                        "[red]Unknown CI actions "
-                        f"'{invalid}' for stack '{resolved_stack}'. Choose from: {valid}[/red]"
+                        "[red]Some CI checks do not work with this stack. "
+                        f"Choose from: {valid}.[/red]"
                     )
                     raise typer.Exit(1)
             elif ci_mode == "questionnaire":
@@ -1844,8 +2014,9 @@ def main(
             status = backend_statuses.get(backend, BackendStatus(False, False))
             if not status.installed:
                 console.print(
-                    f"\n[red bold]{backend}[/red bold] [red]is not installed or not on PATH.[/red]"
-                    "\n[dim]Install at least one AI CLI (claude, antigravity, or codex).[/dim]"
+                    "\n[red]No ready AI tool is available.[/red]"
+                    "\n[dim]Run `forge doctor`, complete one recommended setup path, then "
+                    "retry.[/dim]"
                 )
                 raise typer.Exit(1)
             if status.ready is not True:
@@ -1870,7 +2041,13 @@ def main(
             profile=conventions_profile,
         )
     except ConventionValidationError as exc:
-        console.print(status_line(f"Conventions error: {exc}", accent="amber"))
+        console.print(
+            status_line(
+                "Forge could not load the active conventions. Run `forge conventions "
+                "validate`, then fix or restore the convention files.",
+                accent="amber",
+            )
+        )
         raise typer.Exit(1) from exc
     for warning in conv_warnings:
         console.print(f"[yellow]{warning}[/yellow]")
@@ -1931,11 +2108,10 @@ def main(
             continue
         secret_warnings = check_for_secrets(text)
         if secret_warnings:
-            types = ", ".join(secret_warnings)
             console.print(
-                f"\n[red bold]Possible secrets detected in {field_name}: "
-                f"{types}[/red bold]"
-                "\n[red]Remove credentials before passing them to an AI CLI.[/red]"
+                f"\n[red bold]Forge found content in {field_name} that looks like a "
+                "credential.[/red bold]"
+                "\n[red]Remove it and use a placeholder before continuing.[/red]"
             )
             raise typer.Exit(1)
 
@@ -1948,7 +2124,8 @@ def main(
         if not project_dir.is_dir():
             console.print(
                 status_line(
-                    "Resume target does not exist. Repeat the original project name and options.",
+                    "Forge could not find the partial project to resume. Use the original project "
+                    "name and working directory, then repeat the command.",
                     accent="amber",
                 )
             )
@@ -2043,7 +2220,11 @@ def main(
             except OSError as exc:
                 console.print()
                 console.print(
-                    status_line(f"Could not write to {export_path}: {exc}", accent="amber")
+                    status_line(
+                        "Forge could not save the prompt at that location. Choose a writable "
+                        "path and run the export again.",
+                        accent="amber",
+                    )
                 )
                 raise typer.Exit(1) from exc
             console.print()
@@ -2531,42 +2712,63 @@ def main(
         step += 1
 
     # Post-scaffold: manifest, log, git init, verify, hooks, dashboard
-    write_scaffold_manifest(
-        answers,
-        phase_backends,
-        project_dir,
-        conventions,
-        model_override=model,
-        backend_models=backend_models,
-        approval_mode=approval_mode,
-        convention_sources=convention_bundle.contributions,
-    )
+    try:
+        write_scaffold_manifest(
+            answers,
+            phase_backends,
+            project_dir,
+            conventions,
+            model_override=model,
+            backend_models=backend_models,
+            approval_mode=approval_mode,
+            convention_sources=convention_bundle.contributions,
+        )
+    except OSError as exc:
+        console.print(
+            status_line(
+                "Forge created the project files but could not save the scaffold record. Keep "
+                "the generated files, make the project folder writable, then scaffold a new "
+                "target.",
+                accent="amber",
+            )
+        )
+        raise typer.Exit(1) from exc
 
     git_ok = ensure_git_init(project_dir)
 
     verify_report = None
+    local_evidence_saved = True
     if verify:
         verify_report = verify_scaffold(answers["stack"], project_dir, verbose=verbose)
-        write_verification_report(verify_report, project_dir)
+        try:
+            write_verification_report(verify_report, project_dir)
+        except OSError:
+            local_evidence_saved = False
 
-    append_quality_signal(
-        stack=answers["stack"],
-        phase_backends=phase_backends,
-        verify_report=verify_report,
-        project_dir=project_dir,
-    )
+    try:
+        append_quality_signal(
+            stack=answers["stack"],
+            phase_backends=phase_backends,
+            verify_report=verify_report,
+            project_dir=project_dir,
+        )
+    except OSError:
+        local_evidence_saved = False
 
     run_post_scaffold_hook(project_dir, answers)
     elapsed = time.monotonic() - scaffold_start
-    append_scaffold_log(
-        answers,
-        phase_backends,
-        project_dir,
-        verify_report=verify_report,
-        verification_requested=verify,
-        duration_seconds=elapsed,
-    )
-    record_preferences(answers)
+    try:
+        append_scaffold_log(
+            answers,
+            phase_backends,
+            project_dir,
+            verify_report=verify_report,
+            verification_requested=verify,
+            duration_seconds=elapsed,
+        )
+        record_preferences(answers)
+    except OSError:
+        local_evidence_saved = False
 
     render_dashboard(
         console=console,
@@ -2580,14 +2782,27 @@ def main(
 
     scaffold_date = datetime.now(UTC).strftime("%Y-%m-%d")
     backends_used = sorted({b for _, b in phase_backends})
-    write_card(
-        project_dir,
-        name=answers["name"],
-        stack=answers["stack"],
-        backends=backends_used,
-        date=scaffold_date,
-    )
-    inject_badge_into_readme(project_dir)
+    try:
+        write_card(
+            project_dir,
+            name=answers["name"],
+            stack=answers["stack"],
+            backends=backends_used,
+            date=scaffold_date,
+        )
+        inject_badge_into_readme(project_dir)
+    except OSError:
+        local_evidence_saved = False
+
+    if not local_evidence_saved:
+        console.print(
+            status_line(
+                "The project was created, but Forge could not save some local history or "
+                "verification files. Check that the project and Forge data folders are "
+                "writable before the next run.",
+                accent="amber",
+            )
+        )
 
     sound_enabled = forge_config.get("sound", False)
     play_completion_sound(success=True, enabled=sound_enabled)

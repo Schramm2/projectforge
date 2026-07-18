@@ -230,7 +230,7 @@ class TestMakeSingleTaskPlan:
         assert plan.tasks[0].backend == "claude"
         assert len(plan.execution_order) == 1
         assert plan.execution_order[0] == [plan.tasks[0].id]
-        assert "single" in plan.rationale.lower() or "fallback" in plan.rationale.lower()
+        assert "standard workflow" in plan.rationale.lower()
 
 
 class TestExecuteTaskGraph:

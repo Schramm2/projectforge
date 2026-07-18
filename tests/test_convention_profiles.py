@@ -20,7 +20,7 @@ def test_initialize_profile_creates_stable_default_without_overwrite(monkeypatch
 def test_profile_names_cannot_escape_profile_directory(monkeypatch, tmp_path):
     monkeypatch.setattr("projectforge.convention_profiles.PROFILES_DIR", tmp_path / "profiles")
 
-    with pytest.raises(ConventionValidationError, match="Invalid conventions profile"):
+    with pytest.raises(ConventionValidationError, match="profile name is not valid"):
         initialize_profile("../outside")
 
 
@@ -36,5 +36,5 @@ def test_import_profile_accepts_instruction_markdown_and_rejects_secrets(monkeyp
 
     secret_source = tmp_path / "CLAUDE.md"
     secret_source.write_text("Never print ghp_abcdefghijklmnopqrstuvwxyz1234567890AB")
-    with pytest.raises(ConventionValidationError, match="credential-like"):
+    with pytest.raises(ConventionValidationError, match="looks like a credential"):
         import_profile(secret_source, "unsafe")

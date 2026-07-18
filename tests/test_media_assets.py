@@ -113,6 +113,47 @@ def test_copy_assets_skips_oversized_files(tmp_path: Path) -> None:
     assert result.skipped == 1
     assert len(result.warnings) == 1
     assert "huge.mp4" in result.warnings[0]
+    assert "Compress it or choose a smaller file" in result.warnings[0]
+
+
+def test_copy_assets_hides_copy_failure_detail(tmp_path: Path, monkeypatch: object) -> None:
+    src = tmp_path / "source"
+    dest = tmp_path / "project"
+    _create_file(src / "logo.svg", b"<svg/>")
+
+    def fail_copy(*_args: object, **_kwargs: object) -> None:
+        raise OSError("private filesystem detail")
+
+    monkeypatch.setattr("projectforge.media_assets.shutil.copy2", fail_copy)
+
+    result = copy_assets(src, dest, "nextjs")
+
+    assert result.copied == 0
+    assert result.skipped == 1
+    assert "Check that the source is readable" in result.warnings[0]
+    assert "private filesystem detail" not in result.warnings[0]
+
+
+def test_copy_assets_hides_media_folder_creation_failure(tmp_path: Path, monkeypatch) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    project = tmp_path / "project"
+    original_mkdir = Path.mkdir
+
+    def unwritable(path: Path, *args, **kwargs):
+        if path == project / "public":
+            raise OSError("private filesystem detail")
+        return original_mkdir(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", unwritable)
+
+    result = copy_assets(source, project, "nextjs")
+
+    assert result.copied == 0
+    assert result.warnings == [
+        "Forge could not create the media folder. Check that the project folder is writable, "
+        "then copy the media again."
+    ]
 
 
 def test_list_collections_finds_subdirectories(tmp_path: Path, monkeypatch: object) -> None:

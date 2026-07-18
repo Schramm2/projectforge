@@ -168,9 +168,15 @@ def copy_assets(
     """
     target_subdir = target_asset_dir(stack)
     dest = project_dir / target_subdir
-    dest.mkdir(parents=True, exist_ok=True)
-
     result = CopyResult(target_dir=dest)
+    try:
+        dest.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        result.warnings.append(
+            "Forge could not create the media folder. Check that the project folder is "
+            "writable, then copy the media again."
+        )
+        return result
     assets = scan_assets(asset_dir)
 
     for asset in assets:
@@ -180,13 +186,21 @@ def copy_assets(
         if asset.size_bytes > MAX_FILE_SIZE:
             result.skipped += 1
             result.warnings.append(
-                f"Skipped {asset.relative_path} ({_format_size(asset.size_bytes)} "
-                f"exceeds {_format_size(MAX_FILE_SIZE)} limit)"
+                f"Forge skipped `{asset.relative_path}` because it is larger than "
+                f"{_format_size(MAX_FILE_SIZE)}. Compress it or choose a smaller file, then retry."
             )
             continue
 
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dst)
+        try:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+        except OSError:
+            result.skipped += 1
+            result.warnings.append(
+                f"Forge could not copy `{asset.relative_path}`. Check that the source is "
+                "readable and the project folder is writable, then retry."
+            )
+            continue
         result.copied += 1
 
     return result
