@@ -184,15 +184,10 @@ If you changed stack behavior, also run a dry-run smoke test:
 ./forge admin conventions --validate
 ```
 
-### 4. Push the release commit to `main`
+### 4. Merge the reviewed release change
 
-Example for version `vX.Y.Z`:
-
-```bash
-git add .
-git commit -m "release: vX.Y.Z"
-git push origin main
-```
+Use the repository's normal reviewed branch flow. Do not bypass review by committing directly to
+`main` unless a maintainer explicitly authorizes it.
 
 The Homebrew release workflow handles the rest automatically:
 
@@ -212,10 +207,14 @@ If automation is unavailable, you can still run the old manual flow.
 
 #### Compute the release tarball checksum
 
-Example:
+Example for a planned `v0.5.0` release:
 
 ```bash
-curl -Ls <release-tarball-url> | shasum -a 256
+TAG=v0.5.0
+SOURCE_URL="https://github.com/Schramm2/projectforge/archive/refs/tags/${TAG}.tar.gz"
+curl -Ls "${SOURCE_URL}" -o /tmp/projectforge-release.tar.gz
+SOURCE_SHA256="$(shasum -a 256 /tmp/projectforge-release.tar.gz | awk '{print $1}')"
+echo "${SOURCE_SHA256}"
 ```
 
 Save the resulting SHA-256 value.
@@ -227,8 +226,8 @@ Run:
 ```bash
 uv run python scripts/generate_homebrew_formula.py \
   --output Formula/projectforge.rb \
-  --source-url <release-tarball-url> \
-  --source-sha256 <sha256>
+  --source-url "${SOURCE_URL}" \
+  --source-sha256 "${SOURCE_SHA256}"
 ```
 
 This updates:
@@ -241,7 +240,8 @@ Commit the regenerated formula so the main repo reflects the exact release metad
 
 #### Sync the formula into the Homebrew tap repo
 
-Copy or sync `Formula/projectforge.rb` into the configured tap repository.
+Copy or sync `Formula/projectforge.rb` to
+`Schramm2/homebrew-tap/Formula/projectforge.rb`.
 
 The tap repo is what Homebrew users install from.
 
@@ -250,8 +250,8 @@ The tap repo is what Homebrew users install from.
 In the tap context, run:
 
 ```bash
-brew install --build-from-source <tap-owner>/<tap>/projectforge
-brew test <tap-owner>/<tap>/projectforge
+brew install --build-from-source Schramm2/homebrew-tap/projectforge
+brew test Schramm2/homebrew-tap/projectforge
 ```
 
 #### Push the tap update

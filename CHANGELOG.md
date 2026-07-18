@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-07-18
+
+### Added
+
+- Reproducible public-showcase evidence, a terminal demo script, and public-safety regression
+  checks.
+- Canonical project URLs in package metadata and release documentation.
+
+### Changed
+
+- The public distribution identity is now consistently `projectforge`; the installed command
+  remains `forge`.
+- Homebrew release automation now targets the canonical repository and tap.
+- Public install documentation now uses the immutable `v0.4.1` release tag.
+
+### Fixed
+
+- Homebrew formula generation now requires the release archive checksum explicitly, preventing a
+  version bump from silently reusing an older checksum.
+- Removed stale showcase images that contained superseded branding or unverified output.
+
 ## [0.4.0] - 2026-03-23
 
 ### Added
@@ -93,7 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pipx support for isolated global installs.
 - MIT license.
 
-[0.4.0]: https://github.com/your-org/projectforge/releases/tag/v0.4.0
-[0.3.0]: https://github.com/your-org/projectforge/releases/tag/v0.3.0
-[0.2.0]: https://github.com/your-org/projectforge/releases/tag/v0.2.0
-[0.1.0]: https://github.com/your-org/projectforge/releases/tag/v0.1.0
+[0.4.1]: https://github.com/Schramm2/projectforge/releases/tag/v0.4.1
+[0.4.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.4.0
+[0.3.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.3.0
+[0.2.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.2.0
+[0.1.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.1.0

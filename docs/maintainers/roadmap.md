@@ -2,7 +2,7 @@
 
 Live roadmap for expanding Forge into a production-grade project scaffolder. Organized by theme, not strict priority.
 
-Items marked with [DONE] are implemented in this repository as of `0.4.0`. Planned items are intentionally aspirational; example commands below describe direction, not guaranteed current CLI flags.
+Items marked with [DONE] are implemented in this repository as of `0.4.1`. Planned items are intentionally aspirational; example commands below describe direction, not guaranteed current CLI flags.
 
 ---
 
@@ -184,23 +184,25 @@ Items marked with [DONE] are implemented in this repository as of `0.4.0`. Plann
 - [DONE] **Snapshot tests**: Store expected prompt outputs and diff against them on changes.
 - [DONE] **CI pipeline**: GitHub Actions running Ruff, the full pytest suite, package builds, and a `forge --dry-run` smoke check on pushes and PRs.
 - [DONE] **Mock backends**: Test the full flow without requiring actual AI CLIs installed.
-- [DONE] **408 tests**: Comprehensive test coverage across all modules — dashboard, activity feed, phase timeline, file tree, quality memory, preferences, analytics, evolutions, checks, card, sound, scaffold log, protocol, subprocess utilities, adapters, and orchestration.
+- [DONE] **Automated test suite**: Coverage spans the dashboard, activity feed, phase timeline, file tree, quality memory, preferences, analytics, evolutions, checks, card, sound, scaffold log, protocol, subprocess utilities, adapters, and orchestration. Use the latest verified showcase report for the measured count.
 
 ---
 
 ## Deployment & Distribution
 
-Packaging groundwork is in place; release automation and wider distribution are the next layer.
+Packaging groundwork is in place. The supported public route currently installs from the
+canonical GitHub repository with uv; PyPI and Homebrew remain release work.
 
-The target workflow:
-1. Team member runs `brew install projectforge`
+The current workflow:
+1. User runs `uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1`
 2. Runs `forge` from any directory
 3. Setup wizard runs on first use (detects tools, configures preferences)
 4. Projects scaffold into their configured directory with organization conventions baked in
 
 Steps to ship:
-- [DONE] **Homebrew formula**: The repo includes `Formula/projectforge.rb`, a formula generator, and documented Homebrew release steps.
-- [DONE] **Automated Homebrew release flow**: Pushing a new version to `main` creates the release tag, GitHub release, regenerates the Homebrew formula, and syncs the tap. See `.github/workflows/release-homebrew.yml`.
+- [DONE] **Homebrew formula source**: The repo includes `Formula/projectforge.rb`, a formula generator, and documented release steps.
+- **Publish and verify Homebrew**: Sync `Formula/projectforge.rb` into `Schramm2/homebrew-tap`, retire any superseded formula after compatibility review, and test the tap from a clean environment.
+- [DONE] **Homebrew release automation code**: `.github/workflows/release-homebrew.yml` can tag, release, regenerate, and sync after its credentials and target repository are configured. This is not evidence that the public tap is ready.
 - [DONE] **Buildable package metadata**: `pyproject.toml` is set up for versioned source/wheel builds.
 - **Publish releases to PyPI**: optional later, if Forge needs a Python package distribution channel.
 - Transfer repo to a shared organization when ready
@@ -209,7 +211,7 @@ Steps to ship:
 
 ---
 
-## CLI Commands Summary (v0.4.0)
+## CLI Commands Summary (v0.4.1)
 
 | Command | Description |
 |---------|-------------|
