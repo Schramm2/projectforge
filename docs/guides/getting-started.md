@@ -6,6 +6,10 @@
 > as a compatibility alias. Foundry also installs a command named `forge`; use `projectforge` when
 > both products are installed.
 
+![New ProjectForge user journey from installation to full use](../diagrams/forge-user-journey.svg)
+
+The [new user journey](../diagrams/forge-user-journey.md) shows how these setup steps lead into preview, live generation, verification, recovery, and ongoing project commands.
+
 ## 1. Use the current source
 
 ProjectForge supports Python 3.12 and 3.13 on macOS and Linux. Install `uv` from its

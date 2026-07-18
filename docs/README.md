@@ -46,8 +46,12 @@ documentation remain the authority for the immutable Gemini-backed releases.
 
 ## Diagrams
 
-- [diagrams/forge-flow.md](diagrams/forge-flow.md) - overview and map of the diagram set
+- [diagrams/forge-flow.md](diagrams/forge-flow.md) - product map and index for the complete D2 diagram set
+- [diagrams/forge-user-journey.md](diagrams/forge-user-journey.md) - new user path from installation through verified handoff and ongoing use
+- [diagrams/forge-product-overview.md](diagrams/forge-product-overview.md) - product boundary across developer inputs, Forge, providers, generated projects, and local memory
+- [diagrams/forge-project-lifecycle.md](diagrams/forge-project-lifecycle.md) - scaffold outcomes, recovery, durable records, and ongoing commands
 - [diagrams/forge-input-flow.md](diagrams/forge-input-flow.md) - setup wizard, questionnaire, smart defaults, and review loop
 - [diagrams/forge-routing-and-execution.md](diagrams/forge-routing-and-execution.md) - routing logic, phase merging, and execution order
 - [diagrams/forge-prompt-assembly.md](diagrams/forge-prompt-assembly.md) - prompt inputs, variants, and phase-specific assembly
 - [diagrams/forge-runtime-pipeline.md](diagrams/forge-runtime-pipeline.md) - module-level scaffold pipeline and post-scaffold outputs
+- [diagrams/forge-trust-boundaries.md](diagrams/forge-trust-boundaries.md) - execution modes, provider boundary, local state, and readiness evidence

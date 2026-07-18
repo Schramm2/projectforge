@@ -1,0 +1,62 @@
+...@styles
+
+direction: down
+
+title: "How Forge chooses a provider for each phase" {
+  near: top-center
+  shape: text
+  class: text
+}
+
+input: "Stack, description, readiness, quality history, optional --use" {class: tag}
+
+override_lane: "Honor explicit intent" {
+  class: lavender-zone
+  direction: down
+  override: "--use provided?" {shape: diamond; class: card}
+  forced: "Assign that provider to every phase" {class: card}
+  continue: "Use automatic routing" {class: muted}
+  override -> forced: yes
+  override -> continue: no
+}
+
+selection: "Build the automatic plan" {
+  class: lavender-zone
+  direction: down
+  phases: "Load phases for the stack" {class: card}
+  available: "Keep only ready providers" {class: card}
+  keyword: "Testing or automation brief?" {shape: diamond; class: card}
+  ideal: "Use specialist mapping" {class: card}
+  codex: "Prefer Codex for architecture" {class: card}
+  fallback: "Ideal provider ready?" {shape: diamond; class: card}
+  next: "Fallback: Claude, Antigravity, Codex" {class: muted}
+
+  phases -> available -> keyword
+  keyword -> codex: yes
+  keyword -> ideal: no
+  codex -> fallback
+  ideal -> fallback
+  fallback -> next: no
+}
+
+quality_lane: "Apply local evidence" {
+  class: lavender-zone
+  direction: down
+  candidate: "Selected provider" {class: card}
+  quality: "Alternative score wins by > 0.1?" {shape: diamond; class: card}
+  swap: "Use stronger local performer" {class: card}
+  keep: "Keep current choice" {class: muted}
+  plan: "Per-phase provider plan" {class: accent}
+
+  candidate -> quality
+  quality -> swap: yes
+  quality -> keep: no
+  swap -> plan
+  keep -> plan
+}
+
+input -> override_lane.override
+override_lane.forced -> quality_lane.plan
+override_lane.continue -> selection.phases
+selection.fallback -> quality_lane.candidate: yes
+selection.next -> quality_lane.candidate

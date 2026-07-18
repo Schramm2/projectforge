@@ -1,0 +1,40 @@
+...@styles
+
+direction: right
+
+title: "Phase merging and execution windows" {
+  near: top-center
+  shape: text
+  class: text
+}
+
+plan: "Per-phase provider plan" {class: tag}
+merge: "Merge adjacent phases\nowned by one provider" {class: card}
+prompts: "Build phase prompts and\nmerged preview prompts" {class: card}
+prompt_only: "Dry run or export?" {shape: diamond; class: card}
+preview: "Print or export prompts\nzero provider calls" {class: data}
+
+standard: "Standard execution" {
+  class: lavender-zone
+  architecture: "Architecture first" {class: card}
+  middle: "Frontend and tests\nparallel when possible" {class: card}
+  verify: "Verify and fix last" {class: card}
+  architecture -> middle -> verify
+}
+
+agents: "--agents execution" {
+  class: lavender-zone
+  windows: "Phase windows stay sequential" {class: card}
+  tasks: "Independent tasks may run\nin parallel within a phase" {class: card}
+  reconcile: "Reconcile before next phase" {class: card}
+  windows -> tasks -> reconcile
+}
+
+complete: "Provider phases complete" {class: accent}
+
+plan -> merge -> prompts -> prompt_only
+prompt_only -> preview: yes
+prompt_only -> standard.architecture: standard
+prompt_only -> agents.windows: --agents
+standard.verify -> complete
+agents.reconcile -> complete

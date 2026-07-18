@@ -296,6 +296,7 @@ them up or move that directory separately if you no longer need them.
 ## Documentation
 
 - [Getting Started](docs/guides/getting-started.md)
+- [Product and user-flow diagrams](docs/diagrams/forge-flow.md)
 - [Configuration](docs/guides/configuration.md)
 - [Stacks](docs/guides/stacks.md)
 - [Troubleshooting](docs/guides/troubleshooting.md)

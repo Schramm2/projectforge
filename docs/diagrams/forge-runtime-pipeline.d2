@@ -1,0 +1,54 @@
+...@styles
+
+direction: down
+
+title: "End-to-end scaffold runtime" {
+  near: top-center
+  shape: text
+  class: text
+}
+
+entry: "CLI command" {class: tag}
+
+prepare: "1  Prepare" {
+  class: lavender-zone
+  grid-rows: 2
+  setup: "1  Setup if needed" {class: card}
+  answers: "2  Collect or validate answers" {class: card}
+  route: "3  Route phases" {class: card}
+  context: "4  Load conventions, design,\nmedia, and quality" {class: card}
+  safety: "5  Scan for secrets" {class: card}
+  prompts: "6  Build phase prompts" {class: data}
+}
+
+execute: "2  Execute" {
+  class: lavender-zone
+  grid-rows: 1
+  copy: "1  Copy selected media" {class: card}
+  progress: "2  Initialize resumable progress" {class: data}
+  phases: "3  Run provider phases" {class: card}
+}
+
+finish: "3  Verify and hand off" {
+  class: lavender-zone
+  grid-rows: 2
+  manifest: "1  Write manifest and snapshot" {class: data}
+  git: "2  Initialize Git if needed" {class: card}
+  verify: "3  Run generated-project checks" {class: card}
+  records: "4  Write verification and quality signals" {class: data}
+  hook: "5  Run optional post-scaffold hook" {class: muted}
+  dashboard: "6  Dashboard, card, badge,\nsound, and editor" {class: accent}
+}
+
+learning: "Local learning for future runs" {
+  class: lavender-zone
+  grid-rows: 1
+  history: "Scaffold history" {class: data}
+  preferences: "Answer preferences" {class: data}
+  quality: "Provider quality signals" {class: data}
+}
+
+entry -> prepare
+prepare -> execute
+execute -> finish
+finish -> learning: records local outcomes

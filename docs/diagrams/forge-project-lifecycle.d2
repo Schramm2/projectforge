@@ -1,0 +1,62 @@
+...@styles
+
+direction: down
+
+title: "Lifecycle of a Forge-managed project" {
+  near: top-center
+  shape: text
+  class: text
+}
+
+intent: "Project intent" {class: tag}
+preview: "Preview the contract\nforge --dry-run" {class: card}
+scaffold: "Create the project\nforge ... --verify" {class: card}
+
+outcome: "Scaffold outcome" {
+  class: lavender-zone
+  interrupted: "Provider phase interrupted" {class: muted}
+  created: "Project Created\nverification skipped or incomplete" {class: muted}
+  ready: "Project Ready\nrequired checks passed" {class: accent}
+}
+
+recover: "Fix provider readiness, then --resume" {class: card}
+repair: "Use verification evidence to repair" {class: card}
+
+operate: "Ongoing use" {
+  class: lavender-zone
+  develop: "Develop normally" {class: card}
+  evolve: "Add a capability\nforge evolve" {class: card}
+  check: "Audit convention drift\nforge check" {class: card}
+  replay: "Recreate or compare\nforge replay" {class: card}
+  stats: "Review local outcomes\nforge stats" {class: card}
+}
+
+records: "Durable records" {
+  class: lavender-zone
+  progress: ".forge/progress.json" {class: data}
+  manifest: ".forge/scaffold.json" {class: data}
+  snapshot: ".forge/conventions-snapshot.md" {class: data}
+  verification: ".forge/verification.json" {class: data}
+}
+
+intent -> preview -> scaffold
+scaffold -> outcome.interrupted
+scaffold -> outcome.created
+scaffold -> outcome.ready
+outcome.interrupted -> recover -> scaffold: continue incomplete phases
+outcome.created -> repair -> outcome.ready
+outcome.ready -> operate.develop: verified handoff {
+  style.stroke: "#0f77ff"
+  style.stroke-width: 3
+}
+operate.develop -> operate.evolve
+operate.develop -> operate.check
+operate.develop -> operate.replay
+operate.develop -> operate.stats
+scaffold -> records.progress
+scaffold -> records.manifest
+scaffold -> records.snapshot
+scaffold -> records.verification
+records.manifest -> operate.evolve
+records.snapshot -> operate.replay
+records.verification -> repair
