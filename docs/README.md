@@ -10,6 +10,7 @@ Current product truth lives in `guides/`, `maintainers/`, and the code under `sr
 - [guides/configuration.md](guides/configuration.md) — user config, conventions, hooks, and manifests
 - [guides/stacks.md](guides/stacks.md) — supported stack catalog and defaults
 - [guides/troubleshooting.md](guides/troubleshooting.md) — common issues and fixes
+- [showcase/README.md](showcase/README.md) — measured portfolio evidence and terminal demo flow
 
 ## Maintainers
 
@@ -27,8 +28,8 @@ Current product truth lives in `guides/`, `maintainers/`, and the code under `sr
 
 ## Skills
 
-- [skills/forge-scaffold/SKILL.md](/skills/forge-scaffold/SKILL.md) — portable skill that teaches AI agents how to use all five Forge commands professionally
-- [skills/forge-scaffold/README.md](/skills/forge-scaffold/README.md) — human-facing usage and testing guide for the skill
+- [skills/forge-scaffold/SKILL.md](../skills/forge-scaffold/SKILL.md) — portable skill that teaches AI agents how to use the Forge command surface professionally
+- [skills/forge-scaffold/README.md](../skills/forge-scaffold/README.md) — human-facing usage and testing guide for the skill
 
 ## Diagrams
 

@@ -24,8 +24,10 @@ which codex
 
 **Fix by install method:**
 
-- **Homebrew:** Run `brew list projectforge` to confirm it is installed. If missing, run `brew tap <tap-owner>/<tap> && brew install projectforge`.
-- **From source:** Either activate the virtual environment or run directly with `./forge` from the repo root.
+- **GitHub tool install:** Re-run `uv tool install --force git+https://github.com/Schramm2/projectforge.git@v0.4.1`, then follow uv's PATH guidance if it reports that its tool bin directory is not on PATH.
+- **Development checkout:** Run `uv sync --dev`, then use `./forge` from the repository root.
+
+PyPI and Homebrew are not currently supported ProjectForge install routes.
 
 ## Setup wizard keeps running
 

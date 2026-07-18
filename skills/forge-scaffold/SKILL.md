@@ -1,6 +1,6 @@
 ---
 name: forge-scaffold
-description: Professional Forge assistant for ProjectForge v0.4.0 — scaffolds projects, audits conventions, augments existing projects, tracks quality, and manages the full lifecycle. Uses the Forge CLI directly.
+description: Professional Forge assistant for ProjectForge v0.4.1 — scaffolds projects, audits conventions, augments existing projects, tracks quality, and manages the full lifecycle. Uses the Forge CLI directly.
 ---
 
 # Forge Scaffolding Assistant
@@ -29,7 +29,7 @@ command -v uv >/dev/null 2>&1 && test -d src/ubundiforge && echo "READY" || echo
 forge --version
 ```
 
-- If **NOT_FOUND**: Do NOT guess Forge behavior from memory alone. Tell the user Forge is not available. Suggest `brew install projectforge` (Homebrew) or repo-local setup with `uv sync --dev`.
+- If **NOT_FOUND**: Do NOT guess Forge behavior from memory alone. Tell the user Forge is not available. Suggest `uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1` or repo-local setup with `uv sync --dev`.
 
 ## Error Handling
 
@@ -39,7 +39,7 @@ If a real scaffold is risky or likely to fail because the environment is incompl
 
 ## CLI Commands
 
-Forge v0.4.0 has five commands:
+Forge v0.4.1 exposes the default scaffold flow plus five subcommands:
 
 | Command | Purpose |
 |---------|---------|
@@ -48,6 +48,7 @@ Forge v0.4.0 has five commands:
 | `forge evolve [capability]` | Add capabilities to existing projects |
 | `forge check` | Convention drift detection |
 | `forge replay` | Reproduce past scaffolds |
+| `forge admin conventions` | Validate, preview, and browse bundled conventions |
 
 ---
 
@@ -55,13 +56,16 @@ Forge v0.4.0 has five commands:
 
 ### Forge Access
 
-**Homebrew install:**
+**Supported public install:**
 
 ```bash
-brew tap <tap-owner>/<tap>
-brew install projectforge
+uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1
 forge --version
 ```
+
+Do not suggest PyPI or Homebrew for ProjectForge until a maintainer has published and verified
+those channels. `--dry-run` and `--export` do not require backend authentication; live generation
+does.
 
 **Repo-local setup:**
 
@@ -427,4 +431,4 @@ Each scaffolded project gets `.forge/scaffold.json` (manifest), `.forge/conventi
 
 ## Privacy & Data Handling
 
-**Data processing:** Forge passes the project brief, selected options, conventions, and optional design-template or media context into the chosen AI CLI. Quality signals and preferences are stored locally under `~/.forge/` and never transmitted. **User controls:** Use `--dry-run` or `--export` to inspect the prompt before execution, disable `--open`, and review `.forge/scaffold.json` after generation. **Safety note:** Forge scans freeform instructions for likely secrets, but do not rely on secret scanning as the only protection.
+**Data processing:** Forge passes the project brief, selected options, conventions, and optional design-template or media context into the chosen AI CLI. Quality signals and preferences are stored locally under `~/.forge/` and never transmitted by Forge. **User controls:** Use `--dry-run` or `--export` to inspect the prompt before execution, disable `--open`, and review `.forge/scaffold.json` after generation. Live generation requires the selected AI CLI's own authentication. **Safety note:** Forge scans freeform instructions for likely secrets, but do not rely on secret scanning as the only protection.

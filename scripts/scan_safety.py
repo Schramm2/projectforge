@@ -16,142 +16,60 @@ class BannedPattern:
     regex: re.Pattern[str]
 
 
-@dataclass(frozen=True)
-class AllowedOccurrence:
-    """A narrow exception for compatibility references that are safe to publish."""
-
-    pattern_name: str
-    path_regex: re.Pattern[str]
-    line_regex: re.Pattern[str]
-    reason: str
-
-
 BANNED_PATTERNS = [
-    BannedPattern("legacy company brand", re.compile(r"\bubundi\b|ubundi(?=[._-])", re.I)),
-    BannedPattern("legacy package brand", re.compile(r"\bubundiforge\b", re.I)),
-    BannedPattern("personal GitHub owner", re.compile(r"\bmatthewubundi\b", re.I)),
-    BannedPattern("personal machine/user name", re.compile(r"\bmatthew-schramm\b", re.I)),
-    BannedPattern("personal local path", re.compile(r"/Users/matthew-schramm(?:-ubundi)?", re.I)),
     BannedPattern(
-        "private email/domain",
-        re.compile(r"\b[\w.+-]+@ubundi\.co\.za\b|\bubundi\.co\.za\b", re.I),
+        "local user path",
+        re.compile(r"/(?:Users|home)/[^/\s]+(?:/|\b)", re.I),
     ),
+    BannedPattern(
+        "email address",
+        re.compile(r"\b[\w.+-]+@(?:[\w-]+\.)+[A-Za-z]{2,}\b", re.I),
+    ),
+    BannedPattern("private workspace path", re.compile(r"Workspace\.nosync|Brain Dump", re.I)),
     BannedPattern("internal docs path", re.compile(r"\bdocs/internal\b", re.I)),
-    BannedPattern("private repo wording", re.compile(r"\bexisting\s+ubundi\s+repos?\b", re.I)),
-    BannedPattern("old tap name", re.compile(r"\bhomebrew-tap\b", re.I)),
+    BannedPattern(
+        "public install placeholder",
+        re.compile(
+            r"<(?:tap-owner|tap|repository-url|release-tarball-url|tarball-url|sha256)>|"
+            r"github\.com/projectforge/projectforge|"
+            r"REPLACE_WITH_RELEASE_TARBALL_SHA256",
+            re.I,
+        ),
+    ),
     BannedPattern(
         "private prompt wording",
         re.compile(r"\bprivate\s+prompts?\b|\binternal\s+repo\s+names?\b", re.I),
     ),
 ]
 
-UBUNDIFORGE_NAMESPACE_LINE = re.compile(
-    r"("
-    r"\bfrom ubundiforge\b|"
-    r"\bimport ubundiforge\b|"
-    r"ubundiforge\.[A-Za-z0-9_.]+|"
-    r"src/ubundiforge|"
-    r"python -m ubundiforge|"
-    r"ubundiforge.__main__:main|"
-    r"packages = \[\"src/ubundiforge\"\]|"
-    r"ubundiforge/conventions|"
-    r"/src/ubundiforge|"
-    r"test -d src/ubundiforge|"
-    r"compatibility namespace|"
-    r"Python import namespace remains `ubundiforge`|"
-    r"Module entry point for `python -m ubundiforge`|"
-    r"Tests for ubundiforge\.media_assets|"
-    r"# src/ubundiforge/card\.py"
-    r")",
-    re.I,
-)
-
-ALLOWLIST = [
-    AllowedOccurrence(
-        "legacy package brand",
-        re.compile(r".*"),
-        UBUNDIFORGE_NAMESPACE_LINE,
-        "The Python package directory/import namespace remains for compatibility.",
-    ),
-    AllowedOccurrence(
-        "legacy package brand",
-        re.compile(r"tests/test_cli\.py"),
-        re.compile(r'assert "ubundiforge" not in result\.stdout\.lower\(\)'),
-        "Regression coverage ensures public version output does not use the legacy name.",
-    ),
-    AllowedOccurrence(
-        "legacy company brand",
-        re.compile(r"scripts/scan_safety\.py"),
-        re.compile(r".*"),
-        "The scanner must define the exact legacy brand terms it blocks.",
-    ),
-    AllowedOccurrence(
-        "legacy package brand",
-        re.compile(r"scripts/scan_safety\.py"),
-        re.compile(r".*"),
-        "The scanner must define the exact legacy package terms it blocks.",
-    ),
-    AllowedOccurrence(
-        "personal GitHub owner",
-        re.compile(r"scripts/scan_safety\.py"),
-        re.compile(r".*"),
-        "The scanner must define the exact personal owner term it blocks.",
-    ),
-    AllowedOccurrence(
-        "personal machine/user name",
-        re.compile(r"scripts/scan_safety\.py"),
-        re.compile(r".*"),
-        "The scanner must define the exact local machine/user term it blocks.",
-    ),
-    AllowedOccurrence(
-        "personal local path",
-        re.compile(r"scripts/scan_safety\.py"),
-        re.compile(r".*"),
-        "The scanner must define the exact local path prefix it blocks.",
-    ),
-    AllowedOccurrence(
-        "private email/domain",
-        re.compile(r"scripts/scan_safety\.py"),
-        re.compile(r".*"),
-        "The scanner must define the exact private domain it blocks.",
-    ),
-    AllowedOccurrence(
-        "internal docs path",
-        re.compile(r"scripts/scan_safety\.py"),
-        re.compile(r".*"),
-        "The scanner must define the exact internal docs path it blocks.",
-    ),
-    AllowedOccurrence(
-        "private repo wording",
-        re.compile(r"scripts/scan_safety\.py"),
-        re.compile(r".*"),
-        "The scanner must define the exact private repo wording it blocks.",
-    ),
-    AllowedOccurrence(
-        "old tap name",
-        re.compile(r"scripts/scan_safety\.py"),
-        re.compile(r".*"),
-        "The scanner must define the exact old tap name it blocks.",
-    ),
-    AllowedOccurrence(
-        "private prompt wording",
-        re.compile(r"scripts/scan_safety\.py"),
-        re.compile(r".*"),
-        "The scanner must define the exact private prompt wording it blocks.",
-    ),
-]
-
-# Files that are allowed to contain references (e.g. this script, and git history/lockfiles)
+# Files that define or exercise the checks rather than public-facing content.
 ALLOWLIST_FILES = {
+    "scripts/scan_safety.py",
+    "tests/test_scan_safety.py",
     "uv.lock",
 }
 
+BINARY_SUFFIXES = {
+    ".gif",
+    ".ico",
+    ".jpeg",
+    ".jpg",
+    ".mp3",
+    ".mp4",
+    ".pdf",
+    ".png",
+    ".svgz",
+    ".webm",
+    ".woff",
+    ".woff2",
+}
 
-def get_tracked_files() -> list[str]:
-    """Get list of tracked files via git ls-files."""
+
+def get_public_files() -> list[str]:
+    """Get tracked and untracked non-ignored files via git ls-files."""
     try:
         result = subprocess.run(
-            ["git", "ls-files"],
+            ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
             capture_output=True,
             text=True,
             check=True,
@@ -173,18 +91,21 @@ def get_tracked_files() -> list[str]:
 
 
 def is_allowed(file_str: str, pattern_name: str, line: str) -> bool:
-    """Return whether a banned match has a documented compatibility exception."""
-    return any(
-        item.pattern_name == pattern_name
-        and item.path_regex.fullmatch(file_str)
-        and item.line_regex.search(line)
-        for item in ALLOWLIST
-    )
+    """Return whether a banned match has a documented file-level exception."""
+    if file_str in ALLOWLIST_FILES:
+        return True
+    if pattern_name == "email address":
+        return "git@github.com" in line or re.search(
+            r"@[A-Za-z0-9.-]*example\.(?:com|net|org|test)\b", line, re.I
+        ) is not None
+    return False
 
 
 def scan_file(file_str: str, file_path: Path) -> list[tuple[int, str, str]]:
     """Scan a single file. Returns list of (line_num, pattern_name, line_content)."""
     violations = []
+    if file_path.suffix.lower() in BINARY_SUFFIXES:
+        return violations
     try:
         # Read text, ignoring binary decoding errors
         content = file_path.read_text(encoding="utf-8", errors="ignore")
@@ -199,12 +120,12 @@ def scan_file(file_str: str, file_path: Path) -> list[tuple[int, str, str]]:
 
 def main() -> None:
     """Run the scanner."""
-    tracked_files = get_tracked_files()
+    public_files = [file_str for file_str in get_public_files() if Path(file_str).is_file()]
     total_violations = 0
 
-    print(f"Scanning {len(tracked_files)} tracked files for safety guardrails...")
+    print(f"Scanning {len(public_files)} public working-tree files for safety guardrails...")
 
-    for file_str in tracked_files:
+    for file_str in public_files:
         if file_str in ALLOWLIST_FILES:
             continue
         file_path = Path(file_str)

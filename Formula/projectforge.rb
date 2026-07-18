@@ -2,11 +2,11 @@ class Projectforge < Formula
   include Language::Python::Virtualenv
 
   desc "Scaffold projects with AI coding tools and shared conventions"
-  homepage "https://github.com/projectforge/projectforge"
-  url "https://github.com/projectforge/projectforge/archive/refs/tags/v0.4.0.tar.gz"
-  sha256 "cc471b06eb0c99290d0abf30c36d60e800e68b40f7cb062579ff110ede174aef"
+  homepage "https://github.com/Schramm2/projectforge"
+  url "https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.0.tar.gz"
+  sha256 "bd90748e3eabcfbfeb54e25f706fb41c9ad0f320f0751eee90a225ce03c73a9f"
   license "MIT"
-  head "https://github.com/projectforge/projectforge.git", branch: "main"
+  head "https://github.com/Schramm2/projectforge.git", branch: "main"
 
   depends_on "python@3.13"
 
