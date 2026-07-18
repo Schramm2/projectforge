@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from ubundiforge.agent_quality import append_agent_quality_signal
+from projectforge.agent_quality import append_agent_quality_signal
 
 
 def test_writes_signal_to_jsonl(tmp_path: Path) -> None:

@@ -127,7 +127,7 @@ showcase record.
 
 ```bash
 uv run python scripts/scan_safety.py
-uv run ruff check src/ubundiforge tests
+uv run ruff check src/projectforge tests
 uv run pytest
 uv build --out-dir /tmp/projectforge-build-20260718
 
@@ -143,14 +143,13 @@ source and wheel packages built. The deterministic checked-in fixture passed its
 single test, and CLI checks. It is intentionally separate from the authenticated 23-test live
 scaffold above.
 
-Wheel metadata reported `Name: projectforge`, the canonical GitHub project URLs,
-`forge = ubundiforge.__main__:main`, and the expected bundled conventions. Regenerating the formula
-with the measured archive URL and checksum produced a byte-for-byte match with
-`Formula/projectforge.rb`.
+Wheel metadata reported `Name: projectforge`, the canonical GitHub project URLs, the expected
+ProjectForge command entry points, and the bundled conventions. Regenerating the formula with the
+measured archive URL and checksum produced a byte-for-byte match with `Formula/projectforge.rb`.
 
 ## Privacy boundary
 
 The current public tree contains no standalone company brand, company domain, credentials, or
-private workspace paths. The historical Python import namespace remains for compatibility and is
-not presented as company branding. This working-tree review does not rewrite or make claims about
-historical commits, reflogs, forks, or third-party caches.
+private workspace paths. The Python namespace matches the ProjectForge product identity. This
+working-tree review does not rewrite or make claims about historical commits, reflogs, forks, or
+third-party caches.

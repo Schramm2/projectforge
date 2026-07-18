@@ -163,7 +163,7 @@ Baseline gaps already proven:
 ## Release gates
 
 - [x] `uv run python scripts/scan_safety.py`
-- [x] `uv run ruff check src/ubundiforge tests`
+- [x] `uv run ruff check src/projectforge tests`
 - [x] `uv run pytest`
 - [x] `uv build`
 - [x] Documented dry-run smoke test

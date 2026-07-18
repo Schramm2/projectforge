@@ -6,12 +6,12 @@ A Python CLI that wraps AI coding tools (Claude Code, Google Antigravity CLI, Co
 
 - Python 3.12+, Typer, Rich, questionary
 - Packaged with hatchling, installed via `uv sync`
-- Entry point: `forge` -> `ubundiforge.__main__:main`
+- Entry point: `forge` -> `projectforge.__main__:main`
 
 ## Project structure
 
 ```
-src/ubundiforge/       Core package (src layout)
+src/projectforge/       Core package (src layout)
   cli.py               Command surface and scaffold orchestration
   config.py            Backend install + readiness checks (BackendStatus)
   prompts.py           Interactive questionnaire with review/edit screen
@@ -27,7 +27,7 @@ src/ubundiforge/       Core package (src layout)
   progress.py          Durable phase state and resume contracts
   homebrew.py          Formula generation from uv.lock
   ui.py                Shared Rich primitives and theme palette
-tests/                 pytest suite mirroring src/ubundiforge/ modules
+tests/                 pytest suite mirroring src/projectforge/ modules
 conventions/           Bundled convention layers and manifests
 docs/guides/           Maintained user documentation
 docs/maintainers/      Maintainer runbooks, roadmap, and dated evidence
@@ -48,8 +48,8 @@ hook, records quality/preferences, and renders the final project card/dashboard.
 ```bash
 uv sync --dev                                # Install in dev mode
 uv run pytest                                # Run tests
-uv run ruff check src/ubundiforge tests      # Lint
-uv run ruff format src/ubundiforge tests     # Format
+uv run ruff check src/projectforge tests      # Lint
+uv run ruff format src/projectforge tests     # Format
 uv run python scripts/check_docs.py          # Validate maintained documentation links
 uv run python scripts/validate_forge_skill.py # Validate the shipped agent skill
 uv build && uv run python scripts/inspect_artifacts.py

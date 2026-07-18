@@ -9,16 +9,16 @@ import pytest
 from rich.console import Console
 from typer.testing import CliRunner
 
-from ubundiforge import __version__
-from ubundiforge.cli import (
+from projectforge import __version__
+from projectforge.cli import (
     _format_duration,
     _provider_commitment_lines,
     _render_loaded_context,
     app,
 )
-from ubundiforge.config import BackendStatus
-from ubundiforge.convention_models import ConventionContribution, ConventionValidationError
-from ubundiforge.setup import run_setup
+from projectforge.config import BackendStatus
+from projectforge.convention_models import ConventionContribution, ConventionValidationError
+from projectforge.setup import run_setup
 
 runner = CliRunner()
 
@@ -28,13 +28,12 @@ def test_version_output_uses_public_project_name():
 
     assert result.exit_code == 0
     assert result.stdout.strip() == f"projectforge {__version__}"
-    assert "ubundiforge" not in result.stdout.lower()
 
 
 def test_scaffold_context_hides_hashes_unless_verbose(monkeypatch):
     output = StringIO()
     monkeypatch.setattr(
-        "ubundiforge.cli.console",
+        "projectforge.cli.console",
         Console(file=output, force_terminal=False, color_system=None, width=120),
     )
     source = ConventionContribution(
@@ -96,6 +95,39 @@ def test_stats_empty_shows_first_scaffold_guidance():
     assert "0% success rate" not in result.stdout
 
 
+def test_stats_hides_unreadable_history_detail(monkeypatch, tmp_path):
+    scaffold_path = tmp_path / "scaffold.log"
+    scaffold_path.write_text("{}\n")
+    monkeypatch.setattr("projectforge.cli.SCAFFOLD_LOG_PATH", scaffold_path)
+    original_read_text = Path.read_text
+
+    def unreadable(path: Path, *args, **kwargs):
+        if path == scaffold_path:
+            raise OSError("private filesystem detail")
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", unreadable)
+
+    result = runner.invoke(app, ["stats"])
+
+    assert result.exit_code == 1
+    assert "could not read the saved scaffold history" in result.stdout
+    assert "private filesystem detail" not in result.stdout
+
+
+def test_stats_hides_history_repair_failure_detail(monkeypatch):
+    monkeypatch.setattr(
+        "projectforge.history.repair_history",
+        lambda **_kwargs: (_ for _ in ()).throw(OSError("private filesystem detail")),
+    )
+
+    result = runner.invoke(app, ["stats", "--repair"])
+
+    assert result.exit_code == 1
+    assert "could not repair the saved scaffold history" in result.stdout
+    assert "private filesystem detail" not in result.stdout
+
+
 def test_stats_repair_quarantines_synthetic_history(monkeypatch, tmp_path):
     scaffold_path = tmp_path / "scaffold.log"
     quality_path = tmp_path / "quality.jsonl"
@@ -125,8 +157,8 @@ def test_stats_repair_quarantines_synthetic_history(monkeypatch, tmp_path):
         )
         + "\n"
     )
-    monkeypatch.setattr("ubundiforge.cli.SCAFFOLD_LOG_PATH", scaffold_path)
-    monkeypatch.setattr("ubundiforge.quality.QUALITY_LOG_PATH", quality_path)
+    monkeypatch.setattr("projectforge.cli.SCAFFOLD_LOG_PATH", scaffold_path)
+    monkeypatch.setattr("projectforge.quality.QUALITY_LOG_PATH", quality_path)
 
     result = runner.invoke(app, ["stats", "--repair"])
 
@@ -145,7 +177,7 @@ def test_doctor_json_has_deterministic_exit_semantics(monkeypatch):
         "config": {"status": "missing"},
         "providers": {},
     }
-    monkeypatch.setattr("ubundiforge.cli.build_doctor_report", lambda: report)
+    monkeypatch.setattr("projectforge.cli.build_doctor_report", lambda: report)
 
     result = runner.invoke(app, ["doctor", "--json"])
 
@@ -179,7 +211,7 @@ def test_doctor_human_output_includes_model_behavior_and_repair(monkeypatch):
             }
         },
     }
-    monkeypatch.setattr("ubundiforge.cli.build_doctor_report", lambda: report)
+    monkeypatch.setattr("projectforge.cli.build_doctor_report", lambda: report)
 
     result = runner.invoke(app, ["doctor"])
 
@@ -217,7 +249,8 @@ def test_live_unsafe_mode_requires_explicit_cli_consent():
     )
 
     assert result.exit_code == 1
-    assert "explicit consent" in result.stdout.lower()
+    assert "normal protections" in result.stdout.lower()
+    assert "isolated environment" in result.stdout.lower()
 
 
 def test_provider_running_commands_expose_approval_controls():
@@ -235,27 +268,108 @@ def test_provider_running_commands_expose_approval_controls():
 
 
 def _patch_prompt_only_dependencies(monkeypatch, *, setup_called: list[bool]) -> None:
-    monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
-    monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: True)
-    monkeypatch.setattr("ubundiforge.cli.load_forge_config", lambda: {})
+    monkeypatch.setattr("projectforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("projectforge.cli.needs_setup", lambda: True)
+    monkeypatch.setattr("projectforge.cli.load_forge_config", lambda: {})
     monkeypatch.setattr(
-        "ubundiforge.cli.get_backend_statuses",
+        "projectforge.cli.get_backend_statuses",
         lambda: {
             backend: BackendStatus(installed=False, ready=False)
             for backend in ("claude", "antigravity", "codex")
         },
     )
-    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: False)
+    monkeypatch.setattr("projectforge.router.check_backend_installed", lambda backend: False)
     monkeypatch.setattr(
-        "ubundiforge.cli.load_conventions",
+        "projectforge.cli.load_conventions",
         lambda stack=None: ("Use strict typing.", []),
     )
-    monkeypatch.setattr("ubundiforge.cli.load_claude_md_template", lambda: None)
+    monkeypatch.setattr("projectforge.cli.load_claude_md_template", lambda: None)
 
     def _fake_run_setup(console) -> None:
         setup_called[0] = True
 
-    monkeypatch.setattr("ubundiforge.cli.run_setup", _fake_run_setup)
+    monkeypatch.setattr("projectforge.cli.run_setup", _fake_run_setup)
+
+
+def _patch_live_scaffold_dependencies(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("projectforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("projectforge.cli.needs_setup", lambda: False)
+    monkeypatch.setattr(
+        "projectforge.cli.load_forge_config",
+        lambda: {"projects_dir": str(tmp_path)},
+    )
+    monkeypatch.setattr(
+        "projectforge.cli.get_backend_statuses",
+        lambda: {
+            "claude": BackendStatus(installed=True, ready=True),
+            "antigravity": BackendStatus(installed=False, ready=False),
+            "codex": BackendStatus(installed=False, ready=False),
+        },
+    )
+    monkeypatch.setattr(
+        "projectforge.cli.load_conventions",
+        lambda stack=None: ("Use strict typing.", []),
+    )
+    monkeypatch.setattr("projectforge.cli.load_claude_md_template", lambda: None)
+    monkeypatch.setattr("projectforge.cli.ensure_git_init", lambda project_dir: True)
+    monkeypatch.setattr(
+        "projectforge.cli.run_ai",
+        lambda backend, prompt, project_dir, **kwargs: (
+            project_dir.mkdir(parents=True, exist_ok=True) or 0
+        ),
+    )
+    monkeypatch.setattr("projectforge.cli.append_quality_signal", lambda **kwargs: None)
+    monkeypatch.setattr("projectforge.cli.append_scaffold_log", lambda *args, **kwargs: None)
+    monkeypatch.setattr("projectforge.cli.record_preferences", lambda answers: None)
+    monkeypatch.setattr("projectforge.cli.run_post_scaffold_hook", lambda *args: None)
+    monkeypatch.setattr("projectforge.cli.write_card", lambda *args, **kwargs: None)
+    monkeypatch.setattr("projectforge.cli.inject_badge_into_readme", lambda project_dir: None)
+
+
+def _live_scaffold_command(name: str) -> list[str]:
+    return [
+        "--use",
+        "claude",
+        "--name",
+        name,
+        "--stack",
+        "python-cli",
+        "--description",
+        "A persistence error test",
+        "--no-docker",
+        "--no-open",
+        "--no-verify",
+    ]
+
+
+def test_scaffold_record_write_failure_has_safe_recovery(monkeypatch, tmp_path):
+    _patch_live_scaffold_dependencies(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        "projectforge.cli.write_scaffold_manifest",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("private filesystem detail")),
+    )
+
+    result = runner.invoke(app, _live_scaffold_command("record-failure"))
+
+    assert result.exit_code == 1
+    assert "could not save the scaffold record" in result.stdout
+    assert "private filesystem detail" not in result.stdout
+
+
+def test_optional_evidence_write_failure_preserves_project(monkeypatch, tmp_path):
+    _patch_live_scaffold_dependencies(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        "projectforge.cli.append_scaffold_log",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("private filesystem detail")),
+    )
+
+    result = runner.invoke(app, _live_scaffold_command("evidence-failure"))
+
+    assert result.exit_code == 0
+    assert "could not save some local history or verification files" in " ".join(
+        result.stdout.split()
+    )
+    assert "private filesystem detail" not in result.stdout
 
 
 def test_dry_run_skips_setup_and_missing_backend_checks(monkeypatch):
@@ -292,7 +406,7 @@ def test_dry_run_agents_never_starts_provider_processes(monkeypatch):
     setup_called = [False]
     _patch_prompt_only_dependencies(monkeypatch, setup_called=setup_called)
     monkeypatch.setattr(
-        "ubundiforge.orchestrator._get_plan",
+        "projectforge.orchestrator._get_plan",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             AssertionError("dry-run must not call a provider planner")
         ),
@@ -320,14 +434,14 @@ def test_dry_run_agents_never_starts_provider_processes(monkeypatch):
 
 
 def test_unknown_provider_readiness_is_not_executable(monkeypatch, tmp_path):
-    monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
-    monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: False)
+    monkeypatch.setattr("projectforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("projectforge.cli.needs_setup", lambda: False)
     monkeypatch.setattr(
-        "ubundiforge.cli.load_forge_config",
+        "projectforge.cli.load_forge_config",
         lambda: {"projects_dir": str(tmp_path)},
     )
     monkeypatch.setattr(
-        "ubundiforge.cli.get_backend_statuses",
+        "projectforge.cli.get_backend_statuses",
         lambda: {
             "claude": BackendStatus(installed=False, ready=False),
             "antigravity": BackendStatus(installed=True, ready=None),
@@ -352,10 +466,10 @@ def test_unknown_provider_readiness_is_not_executable(monkeypatch, tmp_path):
     )
 
     assert result.exit_code == 1
-    assert "could not confirm authentication" in result.stdout.lower()
+    assert "could not confirm that a selected ai tool is ready" in result.stdout.lower()
 
 
-def test_removed_gemini_override_points_to_antigravity():
+def test_removed_ai_tool_override_points_to_current_help():
     result = runner.invoke(
         app,
         [
@@ -372,8 +486,10 @@ def test_removed_gemini_override_points_to_antigravity():
     )
 
     assert result.exit_code == 1
-    assert "gemini cli backend was removed" in result.stdout.lower()
-    assert "--use antigravity" in " ".join(result.stdout.lower().split())
+    output = " ".join(result.stdout.lower().split())
+    assert "ai tool option is no longer supported" in output
+    assert "forge --help" in output
+    assert "gemini" not in output
 
 
 def test_export_skips_setup_and_writes_prompt(monkeypatch, tmp_path):
@@ -487,7 +603,7 @@ def test_dry_run_loads_compiled_conventions_for_requested_stack(monkeypatch):
         seen_stacks.append(stack)
         return (f"compiled conventions for {stack}", [])
 
-    monkeypatch.setattr("ubundiforge.cli.load_conventions", _fake_load_conventions)
+    monkeypatch.setattr("projectforge.cli.load_conventions", _fake_load_conventions)
 
     result = runner.invoke(
         app,
@@ -514,7 +630,7 @@ def test_dry_run_reports_bundle_validation_errors(monkeypatch):
     setup_called = [False]
     _patch_prompt_only_dependencies(monkeypatch, setup_called=setup_called)
     monkeypatch.setattr(
-        "ubundiforge.cli.load_conventions",
+        "projectforge.cli.load_conventions",
         lambda stack=None: (_ for _ in ()).throw(ConventionValidationError("broken bundle")),
     )
 
@@ -535,29 +651,30 @@ def test_dry_run_reports_bundle_validation_errors(monkeypatch):
     )
 
     assert result.exit_code == 1
-    assert "broken bundle" in result.stdout
+    assert "could not load the active conventions" in result.stdout
+    assert "broken bundle" not in result.stdout
 
 
 def test_mock_backends_cover_full_cli_flow_without_installed_ai_clis(monkeypatch, tmp_path):
-    monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
-    monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: False)
+    monkeypatch.setattr("projectforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("projectforge.cli.needs_setup", lambda: False)
     monkeypatch.setattr(
-        "ubundiforge.cli.load_forge_config",
+        "projectforge.cli.load_forge_config",
         lambda: {"projects_dir": str(tmp_path)},
     )
     monkeypatch.setattr(
-        "ubundiforge.cli.load_conventions",
+        "projectforge.cli.load_conventions",
         lambda stack=None: ("Use strict typing.", []),
     )
-    monkeypatch.setattr("ubundiforge.cli.load_claude_md_template", lambda: None)
+    monkeypatch.setattr("projectforge.cli.load_claude_md_template", lambda: None)
     monkeypatch.setattr(
-        "ubundiforge.cli.get_backend_statuses",
+        "projectforge.cli.get_backend_statuses",
         lambda: {
             backend: BackendStatus(installed=True, ready=True)
             for backend in ("claude", "antigravity", "codex")
         },
     )
-    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
+    monkeypatch.setattr("projectforge.router.check_backend_installed", lambda backend: True)
 
     phase_calls: list[str] = []
 
@@ -597,9 +714,9 @@ def test_mock_backends_cover_full_cli_flow_without_installed_ai_clis(monkeypatch
             results.append((phase["label"], 0))
         return results
 
-    monkeypatch.setattr("ubundiforge.cli.run_ai", _fake_run_ai)
-    monkeypatch.setattr("ubundiforge.cli.run_ai_parallel", _fake_run_ai_parallel)
-    monkeypatch.setattr("ubundiforge.cli.ensure_git_init", lambda project_dir: True)
+    monkeypatch.setattr("projectforge.cli.run_ai", _fake_run_ai)
+    monkeypatch.setattr("projectforge.cli.run_ai_parallel", _fake_run_ai_parallel)
+    monkeypatch.setattr("projectforge.cli.ensure_git_init", lambda project_dir: True)
 
     result = runner.invoke(
         app,
@@ -642,33 +759,33 @@ def test_root_help_documents_safe_resume_contract():
 
 
 def test_resume_preserves_completed_phases_and_finishes_failed_scaffold(monkeypatch, tmp_path):
-    monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
-    monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: False)
+    monkeypatch.setattr("projectforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("projectforge.cli.needs_setup", lambda: False)
     monkeypatch.setattr(
-        "ubundiforge.cli.load_forge_config",
+        "projectforge.cli.load_forge_config",
         lambda: {"projects_dir": str(tmp_path)},
     )
     monkeypatch.setattr(
-        "ubundiforge.cli.get_backend_statuses",
+        "projectforge.cli.get_backend_statuses",
         lambda: {
             "claude": BackendStatus(installed=True, ready=True),
             "antigravity": BackendStatus(installed=False, ready=False),
             "codex": BackendStatus(installed=False, ready=False),
         },
     )
-    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
+    monkeypatch.setattr("projectforge.router.check_backend_installed", lambda backend: True)
     monkeypatch.setattr(
-        "ubundiforge.cli.load_conventions",
+        "projectforge.cli.load_conventions",
         lambda stack=None: ("Use strict typing.", []),
     )
-    monkeypatch.setattr("ubundiforge.cli.load_claude_md_template", lambda: None)
-    monkeypatch.setattr("ubundiforge.cli.ensure_git_init", lambda project_dir: True)
-    monkeypatch.setattr("ubundiforge.cli.append_quality_signal", lambda **kwargs: None)
-    monkeypatch.setattr("ubundiforge.cli.append_scaffold_log", lambda *args, **kwargs: None)
-    monkeypatch.setattr("ubundiforge.cli.record_preferences", lambda answers: None)
-    monkeypatch.setattr("ubundiforge.cli.run_post_scaffold_hook", lambda *args: None)
-    monkeypatch.setattr("ubundiforge.cli.write_card", lambda *args, **kwargs: None)
-    monkeypatch.setattr("ubundiforge.cli.inject_badge_into_readme", lambda project_dir: None)
+    monkeypatch.setattr("projectforge.cli.load_claude_md_template", lambda: None)
+    monkeypatch.setattr("projectforge.cli.ensure_git_init", lambda project_dir: True)
+    monkeypatch.setattr("projectforge.cli.append_quality_signal", lambda **kwargs: None)
+    monkeypatch.setattr("projectforge.cli.append_scaffold_log", lambda *args, **kwargs: None)
+    monkeypatch.setattr("projectforge.cli.record_preferences", lambda answers: None)
+    monkeypatch.setattr("projectforge.cli.run_post_scaffold_hook", lambda *args: None)
+    monkeypatch.setattr("projectforge.cli.write_card", lambda *args, **kwargs: None)
+    monkeypatch.setattr("projectforge.cli.inject_badge_into_readme", lambda project_dir: None)
 
     calls: list[str] = []
     failed_once = {"value": False}
@@ -692,7 +809,7 @@ def test_resume_preserves_completed_phases_and_finishes_failed_scaffold(monkeypa
             return 9
         return 0
 
-    monkeypatch.setattr("ubundiforge.cli.run_ai", _fake_run_ai)
+    monkeypatch.setattr("projectforge.cli.run_ai", _fake_run_ai)
     command = [
         "--use",
         "claude",
@@ -710,7 +827,9 @@ def test_resume_preserves_completed_phases_and_finishes_failed_scaffold(monkeypa
     first = runner.invoke(app, command)
     assert first.exit_code == 9
     assert calls == ["Architecture & Core", "Tests & Automation"]
-    assert "Partial project output" in first.stdout
+    assert "completed work is safe" in first.stdout
+    assert "exit 9" not in first.stdout
+    assert "claude" not in first.stdout.lower().split("project generation stopped during", 1)[-1]
 
     second = runner.invoke(app, [*command, "--resume"])
     assert second.exit_code == 0
@@ -729,8 +848,8 @@ def test_resume_preserves_completed_phases_and_finishes_failed_scaffold(monkeypa
 
 
 def test_first_run_setup_prompts_before_interactive_scaffold(monkeypatch):
-    monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
-    monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: True)
+    monkeypatch.setattr("projectforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("projectforge.cli.needs_setup", lambda: True)
 
     setup_calls = {"count": 0}
     answer_calls = {"count": 0}
@@ -739,9 +858,9 @@ def test_first_run_setup_prompts_before_interactive_scaffold(monkeypatch):
         setup_calls["count"] += 1
         return {}
 
-    monkeypatch.setattr("ubundiforge.cli.run_setup", _fake_run_setup)
+    monkeypatch.setattr("projectforge.cli.run_setup", _fake_run_setup)
     monkeypatch.setattr(
-        "ubundiforge.cli.prompt_select",
+        "projectforge.cli.prompt_select",
         lambda *args, **kwargs: SimpleNamespace(ask=lambda: "exit"),
     )
 
@@ -749,7 +868,7 @@ def test_first_run_setup_prompts_before_interactive_scaffold(monkeypatch):
         answer_calls["count"] += 1
         raise AssertionError("collect_answers should not run when the user exits after setup")
 
-    monkeypatch.setattr("ubundiforge.cli.collect_answers", _unexpected_collect_answers)
+    monkeypatch.setattr("projectforge.cli.collect_answers", _unexpected_collect_answers)
 
     result = runner.invoke(app, [])
 
@@ -763,8 +882,8 @@ def test_first_run_setup_prompts_before_interactive_scaffold(monkeypatch):
 
 
 def test_first_run_setup_can_be_repeated_before_scaffolding(monkeypatch):
-    monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
-    monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: True)
+    monkeypatch.setattr("projectforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("projectforge.cli.needs_setup", lambda: True)
 
     setup_calls = {"count": 0}
     actions = iter(["setup", "exit"])
@@ -773,13 +892,13 @@ def test_first_run_setup_can_be_repeated_before_scaffolding(monkeypatch):
         setup_calls["count"] += 1
         return {}
 
-    monkeypatch.setattr("ubundiforge.cli.run_setup", _fake_run_setup)
+    monkeypatch.setattr("projectforge.cli.run_setup", _fake_run_setup)
     monkeypatch.setattr(
-        "ubundiforge.cli.prompt_select",
+        "projectforge.cli.prompt_select",
         lambda *args, **kwargs: SimpleNamespace(ask=lambda: next(actions)),
     )
     monkeypatch.setattr(
-        "ubundiforge.cli.collect_answers",
+        "projectforge.cli.collect_answers",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             AssertionError("collect_answers should not run when the user exits")
         ),
@@ -792,25 +911,25 @@ def test_first_run_setup_can_be_repeated_before_scaffolding(monkeypatch):
 
 
 def test_first_run_with_explicit_scaffold_flags_skips_post_setup_prompt(monkeypatch, tmp_path):
-    monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
-    monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: True)
+    monkeypatch.setattr("projectforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("projectforge.cli.needs_setup", lambda: True)
     monkeypatch.setattr(
-        "ubundiforge.cli.load_forge_config",
+        "projectforge.cli.load_forge_config",
         lambda: {"projects_dir": str(tmp_path)},
     )
     monkeypatch.setattr(
-        "ubundiforge.cli.load_conventions",
+        "projectforge.cli.load_conventions",
         lambda stack=None: ("Use strict typing.", []),
     )
-    monkeypatch.setattr("ubundiforge.cli.load_claude_md_template", lambda: None)
+    monkeypatch.setattr("projectforge.cli.load_claude_md_template", lambda: None)
     monkeypatch.setattr(
-        "ubundiforge.cli.get_backend_statuses",
+        "projectforge.cli.get_backend_statuses",
         lambda: {
             backend: BackendStatus(installed=True, ready=True)
             for backend in ("claude", "antigravity", "codex")
         },
     )
-    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
+    monkeypatch.setattr("projectforge.router.check_backend_installed", lambda backend: True)
 
     setup_calls = {"count": 0}
     prompt_calls = {"count": 0}
@@ -819,13 +938,13 @@ def test_first_run_with_explicit_scaffold_flags_skips_post_setup_prompt(monkeypa
         setup_calls["count"] += 1
         return {}
 
-    monkeypatch.setattr("ubundiforge.cli.run_setup", _fake_run_setup)
+    monkeypatch.setattr("projectforge.cli.run_setup", _fake_run_setup)
 
     def _unexpected_post_setup_prompt(*args, **kwargs):
         prompt_calls["count"] += 1
         raise AssertionError("post-setup prompt should be skipped for explicit scaffold runs")
 
-    monkeypatch.setattr("ubundiforge.cli.prompt_select", _unexpected_post_setup_prompt)
+    monkeypatch.setattr("projectforge.cli.prompt_select", _unexpected_post_setup_prompt)
 
     def _fake_run_ai(backend, prompt, project_dir, *args, **kwargs):
         project_dir.mkdir(parents=True, exist_ok=True)
@@ -835,9 +954,9 @@ def test_first_run_with_explicit_scaffold_flags_skips_post_setup_prompt(monkeypa
         project_dir.mkdir(parents=True, exist_ok=True)
         return []
 
-    monkeypatch.setattr("ubundiforge.cli.run_ai", _fake_run_ai)
-    monkeypatch.setattr("ubundiforge.cli.run_ai_parallel", _fake_run_ai_parallel)
-    monkeypatch.setattr("ubundiforge.cli.ensure_git_init", lambda project_dir: True)
+    monkeypatch.setattr("projectforge.cli.run_ai", _fake_run_ai)
+    monkeypatch.setattr("projectforge.cli.run_ai_parallel", _fake_run_ai_parallel)
+    monkeypatch.setattr("projectforge.cli.ensure_git_init", lambda project_dir: True)
 
     result = runner.invoke(
         app,
@@ -886,14 +1005,14 @@ def test_replay_without_snapshot_loads_compiled_conventions_for_manifest_stack(
 
     monkeypatch.chdir(project_dir)
     monkeypatch.setattr(
-        "ubundiforge.cli.load_bundled_conventions",
+        "projectforge.cli.load_bundled_conventions",
         _fake_load_bundled_conventions,
     )
     monkeypatch.setattr(
-        "ubundiforge.cli.load_conventions",
+        "projectforge.cli.load_conventions",
         lambda stack=None: (_ for _ in ()).throw(AssertionError("should use bundled replay path")),
     )
-    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
+    monkeypatch.setattr("projectforge.router.check_backend_installed", lambda backend: True)
 
     result = runner.invoke(app, ["replay", "--dry-run"])
     output = " ".join(result.stdout.split())
@@ -901,7 +1020,7 @@ def test_replay_without_snapshot_loads_compiled_conventions_for_manifest_stack(
     assert result.exit_code == 0
     assert seen_stacks == ["fastapi"]
     assert "compiled conventions for fastapi" in output
-    assert "Using current bundled conventions for stack 'fastapi'." in output
+    assert "Forge will use current conventions, so replay results may differ." in output
 
 
 def test_replay_prefers_snapshot_over_compiled_bundle(monkeypatch, tmp_path):
@@ -922,10 +1041,10 @@ def test_replay_prefers_snapshot_over_compiled_bundle(monkeypatch, tmp_path):
 
     monkeypatch.chdir(project_dir)
     monkeypatch.setattr(
-        "ubundiforge.cli.load_conventions",
+        "projectforge.cli.load_conventions",
         lambda stack=None: (_ for _ in ()).throw(AssertionError("should not load current bundle")),
     )
-    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
+    monkeypatch.setattr("projectforge.router.check_backend_installed", lambda backend: True)
 
     result = runner.invoke(app, ["replay", "--dry-run"])
 
@@ -950,15 +1069,16 @@ def test_replay_reports_bundle_validation_errors(monkeypatch, tmp_path):
 
     monkeypatch.chdir(project_dir)
     monkeypatch.setattr(
-        "ubundiforge.cli.load_bundled_conventions",
+        "projectforge.cli.load_bundled_conventions",
         lambda stack=None: (_ for _ in ()).throw(ConventionValidationError("unknown stack")),
     )
-    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
+    monkeypatch.setattr("projectforge.router.check_backend_installed", lambda backend: True)
 
     result = runner.invoke(app, ["replay", "--dry-run"])
 
     assert result.exit_code == 1
-    assert "unknown stack" in result.stdout
+    assert "could not load conventions for replay" in result.stdout
+    assert "unknown stack" not in result.stdout
 
 
 def test_replay_unknown_manifest_stack_falls_back_to_default_bundle(monkeypatch, tmp_path):
@@ -986,23 +1106,121 @@ def test_replay_unknown_manifest_stack_falls_back_to_default_bundle(monkeypatch,
 
     monkeypatch.chdir(project_dir)
     monkeypatch.setattr(
-        "ubundiforge.cli.load_bundled_conventions",
+        "projectforge.cli.load_bundled_conventions",
         _fake_load_bundled_conventions,
     )
-    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
+    monkeypatch.setattr("projectforge.router.check_backend_installed", lambda backend: True)
 
     result = runner.invoke(app, ["replay", "--dry-run"])
     output = " ".join(result.stdout.lower().split())
 
-    assert result.exit_code == 0
-    assert seen_stacks == ["not-a-real-stack", None]
-    assert "compiled default conventions" in result.stdout
-    assert "falling back to current bundled conventions" in output
-    assert "no conventions snapshot found. using current conventions." in output
+    assert result.exit_code == 1
+    assert seen_stacks == []
+    assert "recorded project type is no longer available" in output
+    assert "not-a-real-stack" not in output
+
+
+def test_replay_corrupt_scaffold_record_has_safe_recovery(monkeypatch, tmp_path):
+    project_dir = tmp_path / "atlas"
+    forge_dir = project_dir / ".forge"
+    forge_dir.mkdir(parents=True)
+    (forge_dir / "scaffold.json").write_text("{not valid json")
+    monkeypatch.chdir(project_dir)
+
+    result = runner.invoke(app, ["replay", "--dry-run"])
+
+    assert result.exit_code == 1
+    assert "could not read this project's scaffold record" in result.stdout
+    assert "JSONDecodeError" not in result.stdout
+    assert "scaffold.json" not in result.stdout
+
+
+def test_check_export_failure_has_safe_recovery(monkeypatch, tmp_path):
+    export_path = tmp_path / "audit.md"
+    monkeypatch.chdir(tmp_path)
+    original_write_text = Path.write_text
+
+    def unwritable(path: Path, *args, **kwargs):
+        if path == export_path:
+            raise OSError("private filesystem detail")
+        return original_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", unwritable)
+
+    result = runner.invoke(app, ["check", "--export", str(export_path)])
+
+    assert result.exit_code == 1
+    assert "could not save the audit report" in result.stdout
+    assert "private filesystem detail" not in result.stdout
+
+
+def test_evolve_record_write_failure_has_safe_recovery(monkeypatch, tmp_path):
+    project_dir = tmp_path / "atlas"
+    forge_dir = project_dir / ".forge"
+    forge_dir.mkdir(parents=True)
+    manifest_path = forge_dir / "scaffold.json"
+    manifest_path.write_text(
+        json.dumps({"name": "atlas", "stack": "fastapi", "description": "Evolve me"})
+    )
+    monkeypatch.chdir(project_dir)
+    monkeypatch.setattr("projectforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("projectforge.cli.check_backend_installed", lambda backend: True)
+    monkeypatch.setattr("projectforge.cli.run_ai", lambda *args, **kwargs: 0)
+    original_write_text = Path.write_text
+
+    def unwritable(path: Path, *args, **kwargs):
+        if path == manifest_path:
+            raise OSError("private filesystem detail")
+        return original_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", unwritable)
+
+    result = runner.invoke(app, ["evolve", "auth", "--use", "claude"])
+
+    assert result.exit_code == 1
+    assert "could not update the scaffold record" in result.stdout
+    assert "private filesystem detail" not in result.stdout
+
+
+def test_replay_diff_write_failure_has_safe_recovery(monkeypatch, tmp_path):
+    project_dir = tmp_path / "atlas"
+    forge_dir = project_dir / ".forge"
+    forge_dir.mkdir(parents=True)
+    (forge_dir / "scaffold.json").write_text(
+        json.dumps(
+            {
+                "name": "atlas",
+                "stack": "python-cli",
+                "description": "Replay me",
+                "routing": [{"phase": "architecture", "backend": "claude"}],
+            }
+        )
+    )
+    (forge_dir / "conventions-snapshot.md").write_text("snapshot conventions")
+    replay_dir = tmp_path / "replay"
+    replay_dir.mkdir()
+    monkeypatch.chdir(project_dir)
+    monkeypatch.setattr("projectforge.router.check_backend_installed", lambda backend: True)
+    monkeypatch.setattr("projectforge.cli.run_ai", lambda *args, **kwargs: 0)
+    monkeypatch.setattr("tempfile.mkdtemp", lambda **_kwargs: str(replay_dir))
+    original_write_text = Path.write_text
+
+    def unwritable(path: Path, *args, **kwargs):
+        if path.name.startswith("replay-diff-"):
+            raise OSError("private filesystem detail")
+        return original_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", unwritable)
+
+    result = runner.invoke(app, ["replay", "--diff"])
+
+    assert result.exit_code == 1
+    assert "could not save the diff report" in result.stdout
+    assert "private filesystem detail" not in result.stdout
 
 
 def test_resolve_project_dir_allows_rename(monkeypatch, tmp_path):
-    from ubundiforge.cli import _resolve_project_dir
+    from projectforge.cli import _resolve_project_dir
 
     target = tmp_path / "existing"
     target.mkdir()
@@ -1012,11 +1230,11 @@ def test_resolve_project_dir_allows_rename(monkeypatch, tmp_path):
     actions = iter(["rename"])
 
     monkeypatch.setattr(
-        "ubundiforge.cli.prompt_select",
+        "projectforge.cli.prompt_select",
         lambda *args, **kwargs: SimpleNamespace(ask=lambda: next(actions)),
     )
     monkeypatch.setattr(
-        "ubundiforge.cli.prompt_text",
+        "projectforge.cli.prompt_text",
         lambda *args, **kwargs: SimpleNamespace(ask=lambda: "renamed-project"),
     )
 
@@ -1035,31 +1253,31 @@ def test_run_setup_does_not_create_legacy_conventions_file(monkeypatch, tmp_path
 
     prompt_select_answers = iter(["_provider_default"])
 
-    monkeypatch.setattr("ubundiforge.setup.FORGE_DIR", forge_dir)
-    monkeypatch.setattr("ubundiforge.setup.CONFIG_PATH", config_path)
-    monkeypatch.setattr("ubundiforge.setup.CONVENTIONS_PATH", conventions_path)
+    monkeypatch.setattr("projectforge.setup.FORGE_DIR", forge_dir)
+    monkeypatch.setattr("projectforge.setup.CONFIG_PATH", config_path)
+    monkeypatch.setattr("projectforge.setup.CONVENTIONS_PATH", conventions_path)
     monkeypatch.setattr(
-        "ubundiforge.setup.get_backend_statuses",
+        "projectforge.setup.get_backend_statuses",
         lambda: {
             "claude": BackendStatus(installed=True, ready=True),
             "antigravity": BackendStatus(installed=False, ready=False),
             "codex": BackendStatus(installed=False, ready=False),
         },
     )
-    monkeypatch.setattr("ubundiforge.setup.load_forge_config", lambda: {})
-    monkeypatch.setattr("ubundiforge.setup._check_editor_installed", lambda *_: (False, False))
+    monkeypatch.setattr("projectforge.setup.load_forge_config", lambda: {})
+    monkeypatch.setattr("projectforge.setup._check_editor_installed", lambda *_: (False, False))
     monkeypatch.setattr(
-        "ubundiforge.setup.prompt_select",
+        "projectforge.setup.prompt_select",
         lambda *args, **kwargs: SimpleNamespace(ask=lambda: next(prompt_select_answers)),
     )
     monkeypatch.setattr(
-        "ubundiforge.setup.prompt_text",
+        "projectforge.setup.prompt_text",
         lambda *args, **kwargs: SimpleNamespace(ask=lambda: ""),
     )
-    monkeypatch.setattr("ubundiforge.media_assets.list_collections", lambda: [])
-    monkeypatch.setattr("ubundiforge.media_assets.MEDIA_DIR", tmp_path / "media")
+    monkeypatch.setattr("projectforge.media_assets.list_collections", lambda: [])
+    monkeypatch.setattr("projectforge.media_assets.MEDIA_DIR", tmp_path / "media")
     monkeypatch.setattr(
-        "ubundiforge.setup.shutil.which",
+        "projectforge.setup.shutil.which",
         lambda cmd: None if cmd in {"git", "docker"} else f"/usr/bin/{cmd}",
     )
 
@@ -1077,7 +1295,7 @@ def test_run_setup_does_not_create_legacy_conventions_file(monkeypatch, tmp_path
 def test_setup_missing_providers_shows_official_install_auth_recheck_flow(monkeypatch):
     console = Console(record=True, width=160)
     monkeypatch.setattr(
-        "ubundiforge.setup.get_backend_statuses",
+        "projectforge.setup.get_backend_statuses",
         lambda: {
             backend: BackendStatus(installed=False, ready=False)
             for backend in ("claude", "antigravity", "codex")
@@ -1088,9 +1306,8 @@ def test_setup_missing_providers_shows_official_install_auth_recheck_flow(monkey
         run_setup(console)
 
     output = console.export_text()
-    assert "https://code.claude.com/docs/en/setup" in output
-    assert "https://antigravity.google/docs/cli-install" in output
-    assert "https://github.com/openai/codex" in output
+    assert "projectforge#install-and-authenticate-a-provider" in output
+    assert "could not find a supported AI tool" in output
     assert "forge doctor" in output
 
 
@@ -1105,15 +1322,15 @@ def test_user_convention_profile_init_select_and_inspect(monkeypatch, tmp_path):
     forge_dir = tmp_path / ".forge"
     profiles_dir = forge_dir / "profiles"
     config_path = forge_dir / "config.json"
-    monkeypatch.setattr("ubundiforge.convention_profiles.PROFILES_DIR", profiles_dir)
-    monkeypatch.setattr("ubundiforge.conventions.PROFILES_DIR", profiles_dir)
-    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", forge_dir / "conventions.md")
+    monkeypatch.setattr("projectforge.convention_profiles.PROFILES_DIR", profiles_dir)
+    monkeypatch.setattr("projectforge.conventions.PROFILES_DIR", profiles_dir)
+    monkeypatch.setattr("projectforge.conventions.CONVENTIONS_PATH", forge_dir / "conventions.md")
     monkeypatch.setattr(
-        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH",
+        "projectforge.conventions.LOCAL_CONVENTIONS_PATH",
         tmp_path / "project" / ".forge" / "conventions.md",
     )
-    monkeypatch.setattr("ubundiforge.setup.FORGE_DIR", forge_dir)
-    monkeypatch.setattr("ubundiforge.setup.CONFIG_PATH", config_path)
+    monkeypatch.setattr("projectforge.setup.FORGE_DIR", forge_dir)
+    monkeypatch.setattr("projectforge.setup.CONFIG_PATH", config_path)
 
     initialized = runner.invoke(app, ["conventions", "init", "team"])
     selected = runner.invoke(app, ["conventions", "select", "team"])
@@ -1139,10 +1356,10 @@ def test_admin_conventions_preview_stack() -> None:
 
 
 def test_admin_conventions_history_degrades_gracefully(monkeypatch) -> None:
-    from ubundiforge.convention_history import GitHistoryResult
+    from projectforge.convention_history import GitHistoryResult
 
     monkeypatch.setattr(
-        "ubundiforge.cli.load_history",
+        "projectforge.cli.load_history",
         lambda root, target: GitHistoryResult(
             target=target,
             available=False,
@@ -1158,7 +1375,7 @@ def test_admin_conventions_history_degrades_gracefully(monkeypatch) -> None:
 
 
 def test_admin_conventions_history_allows_top_level_scope_targets(monkeypatch) -> None:
-    from ubundiforge.convention_history import GitHistoryResult
+    from projectforge.convention_history import GitHistoryResult
 
     seen_targets: list[str] = []
 
@@ -1170,7 +1387,7 @@ def test_admin_conventions_history_allows_top_level_scope_targets(monkeypatch) -
             entries=("abc123 Update global conventions",),
         )
 
-    monkeypatch.setattr("ubundiforge.cli.load_history", _fake_load_history)
+    monkeypatch.setattr("projectforge.cli.load_history", _fake_load_history)
 
     result = runner.invoke(app, ["admin", "conventions", "--history", "global"])
 
@@ -1190,7 +1407,7 @@ def test_admin_conventions_defaults_to_interactive_menu(monkeypatch) -> None:
     actions = iter(["validate"])
 
     monkeypatch.setattr(
-        "ubundiforge.cli.prompt_select",
+        "projectforge.cli.prompt_select",
         lambda *args, **kwargs: SimpleNamespace(ask=lambda: next(actions)),
     )
 

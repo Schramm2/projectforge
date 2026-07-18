@@ -34,19 +34,19 @@ Issues = "https://github.com/Schramm2/projectforge/issues"
 Releases = "https://github.com/Schramm2/projectforge/releases"
 
 [project.scripts]
-projectforge = "ubundiforge.__main__:main"
-forge = "ubundiforge.__main__:main"
+projectforge = "projectforge.__main__:main"
+forge = "projectforge.__main__:main"
 
 [project.entry-points."pipx.run"]
-projectforge = "ubundiforge.__main__:main"
+projectforge = "projectforge.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ubundiforge"]
-force-include = { "conventions" = "ubundiforge/conventions", "skills/forge-scaffold" = "ubundiforge/skills/forge-scaffold" }
+packages = ["src/projectforge"]
+force-include = { "conventions" = "projectforge/conventions", "skills/forge-scaffold" = "projectforge/skills/forge-scaffold" }
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "/src/ubundiforge",
+    "/src/projectforge",
     "/conventions",
     "/skills/forge-scaffold",
     "/docs",

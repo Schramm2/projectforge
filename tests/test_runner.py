@@ -3,14 +3,14 @@
 import stat
 from pathlib import Path
 
-from ubundiforge.runner import (
+from projectforge.runner import (
     ActivityTracker,
     _build_cmd,
     _initial_phase_summary,
     reset_project_dir,
     run_post_scaffold_hook,
 )
-from ubundiforge.subprocess_utils import progress_summary_for_line as _progress_summary_for_line
+from projectforge.subprocess_utils import progress_summary_for_line as _progress_summary_for_line
 
 
 def test_claude_cmd_basic():
@@ -140,7 +140,7 @@ def test_progress_summary_for_line_maps_common_backend_output_to_clean_loader_co
 
 
 def test_progress_output_redacts_credential_shaped_values():
-    from ubundiforge.subprocess_utils import sanitize_progress_line
+    from projectforge.subprocess_utils import sanitize_progress_line
 
     clean = sanitize_progress_line("clone failed: ghp_abcdefghijklmnopqrstuvwxyz1234567890")
 
@@ -148,14 +148,14 @@ def test_progress_output_redacts_credential_shaped_values():
     assert "REDACTED" in clean
 
 
-def test_progress_summary_for_line_uses_clean_fallback_for_non_noisy_updates():
+def test_progress_summary_for_line_does_not_forward_unmatched_or_noisy_updates():
     current = "Setting up tests and developer workflows"
 
-    assert (
-        _progress_summary_for_line("Refining the empty state for the dashboard shell", current)
-        == "Refining the empty state for the dashboard shell"
-    )
+    assert _progress_summary_for_line("Internal tool detail: request abc-123", current) == current
     assert _progress_summary_for_line("$ cat src/app/page.tsx", current) == current
+    assert _progress_summary_for_line("Traceback at /private/project/tool.py", current) == (
+        "Working through an issue in the scaffold"
+    )
 
 
 def test_reset_project_dir_clears_existing_contents(tmp_path):
@@ -182,7 +182,7 @@ def test_reset_project_dir_creates_missing_directory(tmp_path):
 
 
 def test_post_scaffold_hook_returns_true_when_no_hook(tmp_path, monkeypatch):
-    monkeypatch.setattr("ubundiforge.runner.POST_SCAFFOLD_HOOK", tmp_path / "nope.sh")
+    monkeypatch.setattr("projectforge.runner.POST_SCAFFOLD_HOOK", tmp_path / "nope.sh")
     assert run_post_scaffold_hook(tmp_path, {"name": "demo"}) is True
 
 
@@ -192,7 +192,7 @@ def test_post_scaffold_hook_runs_script(tmp_path, monkeypatch):
     hook_path.write_text(f'#!/bin/bash\necho "$FORGE_PROJECT_NAME" > {marker}\n')
     hook_path.chmod(hook_path.stat().st_mode | stat.S_IEXEC)
 
-    monkeypatch.setattr("ubundiforge.runner.POST_SCAFFOLD_HOOK", hook_path)
+    monkeypatch.setattr("projectforge.runner.POST_SCAFFOLD_HOOK", hook_path)
 
     project_dir = tmp_path / "my-project"
     project_dir.mkdir()
@@ -202,18 +202,25 @@ def test_post_scaffold_hook_runs_script(tmp_path, monkeypatch):
     assert marker.read_text().strip() == "my-project"
 
 
-def test_post_scaffold_hook_returns_false_on_failure(tmp_path, monkeypatch):
+def test_post_scaffold_hook_returns_false_on_failure(tmp_path, monkeypatch, capsys):
     hook_path = tmp_path / "hook.sh"
-    hook_path.write_text("#!/bin/bash\nexit 1\n")
+    hook_path.write_text(
+        "#!/bin/bash\necho 'private stdout detail'\necho 'private stderr detail' >&2\nexit 1\n"
+    )
     hook_path.chmod(hook_path.stat().st_mode | stat.S_IEXEC)
 
-    monkeypatch.setattr("ubundiforge.runner.POST_SCAFFOLD_HOOK", hook_path)
+    monkeypatch.setattr("projectforge.runner.POST_SCAFFOLD_HOOK", hook_path)
 
     project_dir = tmp_path / "fail-project"
     project_dir.mkdir()
 
     result = run_post_scaffold_hook(project_dir, {"name": "fail-project"})
     assert result is False
+    output = capsys.readouterr().out
+    assert "did not finish successfully" in output
+    assert "private stdout detail" not in output
+    assert "private stderr detail" not in output
+    assert "code 1" not in output
 
 
 def test_post_scaffold_hook_passes_env_vars(tmp_path, monkeypatch):
@@ -222,7 +229,7 @@ def test_post_scaffold_hook_passes_env_vars(tmp_path, monkeypatch):
     hook_path.write_text(f'#!/bin/bash\necho "$FORGE_STACK:$FORGE_DEMO_MODE" > {env_dump}\n')
     hook_path.chmod(hook_path.stat().st_mode | stat.S_IEXEC)
 
-    monkeypatch.setattr("ubundiforge.runner.POST_SCAFFOLD_HOOK", hook_path)
+    monkeypatch.setattr("projectforge.runner.POST_SCAFFOLD_HOOK", hook_path)
 
     project_dir = tmp_path / "env-project"
     project_dir.mkdir()

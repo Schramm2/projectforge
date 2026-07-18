@@ -1,0 +1,239 @@
+"""Configuration and tool availability checks."""
+
+from __future__ import annotations
+
+import json
+import shutil
+import subprocess
+from dataclasses import dataclass
+
+SUPPORTED_BACKENDS = ("claude", "antigravity", "codex")
+BACKEND_COMMANDS = {
+    "claude": "claude",
+    "antigravity": "agy",
+    "codex": "codex",
+}
+LEGACY_BACKEND_ALIASES = {"gemini": "antigravity"}
+
+
+def normalize_legacy_backend(backend: str) -> str:
+    """Map retired backend names found in saved Forge data to their replacement."""
+    return LEGACY_BACKEND_ALIASES.get(backend, backend)
+
+
+def check_backend_installed(backend: str) -> bool:
+    """Check if the given AI CLI tool is installed and available on PATH."""
+    command = BACKEND_COMMANDS.get(backend)
+    return command is not None and shutil.which(command) is not None
+
+
+def get_available_backends() -> list[str]:
+    """Return list of installed AI CLI backends."""
+    return [b for b in SUPPORTED_BACKENDS if check_backend_installed(b)]
+
+
+@dataclass(frozen=True)
+class BackendStatus:
+    """Runtime readiness for a supported AI backend."""
+
+    installed: bool
+    ready: bool | None
+    detail: str = ""
+    login_command: str = ""
+    auth_mode: str = ""
+
+    @property
+    def usable(self) -> bool:
+        """Return whether the backend should be considered routable."""
+        return self.installed and self.ready is True
+
+    @property
+    def status_label(self) -> str:
+        """Return a concise user-facing readiness label."""
+        if not self.installed:
+            return "Not found"
+        if self.ready is True:
+            return "Ready"
+        if self.ready is False:
+            return "Needs login"
+        return "Check inconclusive"
+
+
+def _run_status_command(
+    cmd: list[str],
+    timeout: int = 5,
+) -> subprocess.CompletedProcess[str] | None:
+    """Run a backend status command and return its process result."""
+    try:
+        return subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return None
+
+
+def _check_claude_status() -> BackendStatus:
+    """Inspect Claude Code authentication state."""
+    if not check_backend_installed("claude"):
+        return BackendStatus(installed=False, ready=False)
+
+    result = _run_status_command(["claude", "auth", "status"])
+    if result is None:
+        return BackendStatus(
+            installed=True,
+            ready=None,
+            detail="Forge could not run this tool's sign-in check.",
+            login_command="claude auth login",
+        )
+
+    stdout = (result.stdout or "").strip()
+    try:
+        payload = json.loads(stdout) if stdout else {}
+    except json.JSONDecodeError:
+        payload = {}
+
+    if result.returncode == 0 and payload.get("loggedIn") is True:
+        raw_auth_method = payload.get("authMethod")
+        auth_method = (
+            raw_auth_method
+            if raw_auth_method in {"claude.ai", "api_key", "console", "bedrock", "vertex"}
+            else "authenticated"
+        )
+        return BackendStatus(
+            installed=True,
+            ready=True,
+            detail=f"Logged in via {auth_method}.",
+            login_command="claude auth login",
+            auth_mode=auth_method,
+        )
+
+    if payload.get("loggedIn") is False or "not logged in" in stdout.lower():
+        return BackendStatus(
+            installed=True,
+            ready=False,
+            detail="This tool is installed but needs sign-in.",
+            login_command="claude auth login",
+        )
+
+    return BackendStatus(
+        installed=True,
+        ready=None,
+        detail="Forge could not confirm that this tool is ready.",
+        login_command="claude auth login",
+    )
+
+
+def _check_codex_status() -> BackendStatus:
+    """Inspect Codex authentication state."""
+    if not check_backend_installed("codex"):
+        return BackendStatus(installed=False, ready=False)
+
+    result = _run_status_command(["codex", "login", "status"])
+    if result is None:
+        return BackendStatus(
+            installed=True,
+            ready=None,
+            detail="Forge could not run this tool's sign-in check.",
+            login_command="codex login",
+        )
+
+    output = "\n".join(part for part in (result.stdout, result.stderr) if part).strip().lower()
+    if "not logged in" in output or "login required" in output:
+        return BackendStatus(
+            installed=True,
+            ready=False,
+            detail="This tool is installed but needs sign-in.",
+            login_command="codex login",
+        )
+    if result.returncode == 0 and "logged in" in output:
+        return BackendStatus(
+            installed=True,
+            ready=True,
+            detail="Codex login verified.",
+            login_command="codex login",
+            auth_mode="chatgpt" if "chatgpt" in output else "authenticated",
+        )
+
+    return BackendStatus(
+        installed=True,
+        ready=None,
+        detail="Forge could not confirm that this tool is ready.",
+        login_command="codex login",
+    )
+
+
+def _check_antigravity_status() -> BackendStatus:
+    """Inspect Antigravity installation and Google Sign-In state without a model call."""
+    if not check_backend_installed("antigravity"):
+        return BackendStatus(installed=False, ready=False)
+
+    version_result = _run_status_command(["agy", "--version"])
+    if version_result is None or version_result.returncode != 0:
+        return BackendStatus(
+            installed=True,
+            ready=None,
+            detail="Forge could not run this tool's version check.",
+            login_command="agy",
+        )
+
+    # `agy models` performs a lightweight authenticated API check. It does not
+    # submit a prompt, consume model quota, or expose account identity.
+    models_result = _run_status_command(["agy", "models"], timeout=15)
+    if models_result is None:
+        return BackendStatus(
+            installed=True,
+            ready=None,
+            detail="This tool's sign-in check took too long.",
+            login_command="agy",
+        )
+
+    output = "\n".join(
+        part for part in (models_result.stdout, models_result.stderr) if part
+    ).strip()
+    lowered = output.lower()
+    if models_result.returncode == 0 and output:
+        return BackendStatus(
+            installed=True,
+            ready=True,
+            detail="Google Sign-In verified through Antigravity CLI.",
+            login_command="agy",
+            auth_mode="google_sign_in",
+        )
+    if "please sign in" in lowered or "not signed in" in lowered or "login required" in lowered:
+        return BackendStatus(
+            installed=True,
+            ready=False,
+            detail="This tool is installed but needs sign-in.",
+            login_command="agy",
+        )
+
+    return BackendStatus(
+        installed=True,
+        ready=None,
+        detail="Forge could not confirm that this tool is ready.",
+        login_command="agy",
+    )
+
+
+def get_backend_status(backend: str) -> BackendStatus:
+    """Return a backend's installation and readiness status."""
+    if backend == "claude":
+        return _check_claude_status()
+    if backend == "codex":
+        return _check_codex_status()
+    if backend == "antigravity":
+        return _check_antigravity_status()
+    return BackendStatus(installed=False, ready=False, detail="That AI tool is not supported.")
+
+
+def get_backend_statuses() -> dict[str, BackendStatus]:
+    """Return statuses for every supported backend."""
+    return {backend: get_backend_status(backend) for backend in SUPPORTED_BACKENDS}
+
+
+def get_usable_backends() -> list[str]:
+    """Return installed backends whose readiness has been verified."""
+    return [backend for backend, status in get_backend_statuses().items() if status.usable]

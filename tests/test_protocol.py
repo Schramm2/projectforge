@@ -1,6 +1,6 @@
 """Tests for multi-agent orchestration protocol data structures."""
 
-from ubundiforge.protocol import AgentResult, AgentTask, DecompositionPlan, ProgressEvent
+from projectforge.protocol import AgentResult, AgentTask, DecompositionPlan, ProgressEvent
 
 
 class TestAgentTask:

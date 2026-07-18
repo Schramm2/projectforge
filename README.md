@@ -94,10 +94,10 @@ brew install schramm2/tap/projectforge
 projectforge --version
 ```
 
-ProjectForge is the product, repository, and Homebrew formula name. PyPI required the distinct
-`matt-projectforge` distribution name because `projectforge` was too similar to an existing
-project. `projectforge` is the preferred command, `forge` remains a short compatibility alias, and
-`ubundiforge` remains only the Python import namespace for compatibility.
+ProjectForge is the product, repository, Python package, and Homebrew formula name. PyPI required
+the distinct `matt-projectforge` distribution name because `projectforge` was too similar to an
+existing project. `projectforge` is the preferred command, while `forge` remains a short
+compatibility alias.
 
 ## Install and authenticate a provider
 
@@ -261,7 +261,7 @@ contract.
 ## Agent skill
 
 The release archive includes `skills/forge-scaffold/SKILL.md`; the wheel installs the same files
-under `ubundiforge/skills/forge-scaffold/`. The skill teaches agents to discover live Forge
+under `projectforge/skills/forge-scaffold/`. The skill teaches agents to discover live Forge
 behavior, preview with zero calls, preserve safe approval boundaries, and verify durable evidence
 without hard-coded release or model catalogs. Its behavioral evidence is in
 [the maintainer record](docs/maintainers/skill-behavioral-evidence.md).
@@ -309,12 +309,12 @@ them up or move that directory separately if you no longer need them.
 uv sync --dev
 uv run python scripts/scan_safety.py
 uv run python scripts/check_docs.py
-uv run ruff check src/ubundiforge tests
+uv run ruff check src/projectforge tests
 uv run pytest
 uv build
 ```
 
-The import namespace remains `ubundiforge` for compatibility. See [AGENTS.md](AGENTS.md) and the
+The canonical Python import namespace is `projectforge`. See [AGENTS.md](AGENTS.md) and the
 maintainer docs before changing release behavior.
 
 ## License

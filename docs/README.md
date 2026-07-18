@@ -3,7 +3,7 @@
 This repo separates product docs, maintainer docs, and reference captures so contributors can find the right source quickly.
 
 Current source behavior is documented in `guides/`, the live maintainer runbooks and roadmap, and
-the code under `src/ubundiforge/`. Dated evidence, completed release plans, changelog entries, and
+the code under `src/projectforge/`. Dated evidence, completed release plans, changelog entries, and
 provider prompt captures remain intentionally historical. Each historical document should state
 its evidence or release boundary rather than being rewritten to match current source.
 

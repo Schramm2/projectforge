@@ -13,7 +13,7 @@ The public naming contract is:
 - PyPI distribution: `matt-projectforge` (required by PyPI name-similarity policy)
 - preferred executable from the next release: `projectforge`
 - compatibility executable: `forge` (may collide with Foundry's Ethereum CLI)
-- Python import namespace: `ubundiforge` for compatibility only
+- canonical Python import namespace: `projectforge`
 
 ## Repository layout
 
@@ -31,7 +31,7 @@ The public naming contract is:
 
 ## Normal release
 
-1. Bump the version in `pyproject.toml` and `src/ubundiforge/__init__.py`.
+1. Bump the version in `pyproject.toml` and `src/projectforge/__init__.py`.
 2. Update `CHANGELOG.md` and refresh `uv.lock` if dependencies changed.
 3. Run the safety scan, documentation and skill validators, Ruff, pytest, `uv build`, and artifact
    inspection from the production-readiness checklist.

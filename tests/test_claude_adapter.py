@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from ubundiforge.adapters.claude_adapter import ClaudeAdapter
-from ubundiforge.protocol import AgentTask
+from projectforge.adapters.claude_adapter import ClaudeAdapter
+from projectforge.protocol import AgentTask
 
 # ---------------------------------------------------------------------------
 # Helpers

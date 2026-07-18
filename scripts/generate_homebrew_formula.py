@@ -12,7 +12,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from ubundiforge.homebrew import (  # noqa: E402
+from projectforge.homebrew import (  # noqa: E402
     DEFAULT_HOMEPAGE,
     DEFAULT_PYTHON_FORMULA,
     DEFAULT_SOURCE_URL,

@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from ubundiforge.history import repair_history
+from projectforge.history import repair_history
 
 
 def _write_jsonl(path: Path, entries: list[dict]) -> None:

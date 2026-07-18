@@ -3,7 +3,7 @@ from pathlib import Path
 
 from rich.console import Console
 
-from ubundiforge.ui import make_file_tree, make_loader_panel, make_phase_timeline
+from projectforge.ui import make_file_tree, make_loader_panel, make_phase_timeline
 
 
 def test_loader_panel_with_activity_feed():

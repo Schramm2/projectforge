@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from rich.console import Console
 
-from ubundiforge.verify import (
+from projectforge.verify import (
     CheckResult,
     VerifyReport,
     _check_health,
@@ -80,9 +80,9 @@ def test_extract_port_default():
     assert _extract_port("uvicorn api.app:app") == 8000
 
 
-@patch("ubundiforge.verify.time.sleep", return_value=None)
-@patch("ubundiforge.verify.urlopen")
-@patch("ubundiforge.verify.subprocess.Popen")
+@patch("projectforge.verify.time.sleep", return_value=None)
+@patch("projectforge.verify.urlopen")
+@patch("projectforge.verify.subprocess.Popen")
 def test_health_result_records_configured_endpoint_and_command(
     mock_popen, mock_urlopen, _mock_sleep, tmp_path
 ):
@@ -136,7 +136,7 @@ def test_health_settings_rejects_unsafe_generated_metadata(tmp_path, toml_body):
 # --- _run_check ---
 
 
-@patch("ubundiforge.verify.subprocess.run")
+@patch("projectforge.verify.subprocess.run")
 def test_run_check_pass(mock_run, tmp_path):
     mock_run.return_value = MagicMock(returncode=0)
     result = _run_check("lint", "uv run ruff check .", tmp_path)
@@ -148,7 +148,7 @@ def test_run_check_pass(mock_run, tmp_path):
     assert result.exit_code == 0
 
 
-@patch("ubundiforge.verify.subprocess.run")
+@patch("projectforge.verify.subprocess.run")
 def test_run_check_does_not_leak_parent_virtual_environment(mock_run, monkeypatch, tmp_path):
     monkeypatch.setenv("VIRTUAL_ENV", "/private/parent/.venv")
     mock_run.return_value = MagicMock(returncode=0)
@@ -158,22 +158,23 @@ def test_run_check_does_not_leak_parent_virtual_environment(mock_run, monkeypatc
     assert "VIRTUAL_ENV" not in mock_run.call_args.kwargs["env"]
 
 
-@patch("ubundiforge.verify.subprocess.run")
+@patch("projectforge.verify.subprocess.run")
 def test_run_check_fail(mock_run, tmp_path):
     mock_run.return_value = MagicMock(returncode=1, stderr="some error output")
     result = _run_check("lint", "uv run ruff check .", tmp_path)
     assert result.passed is False
-    assert "some error output" in result.detail
+    assert result.detail == "This check did not pass."
+    assert "some error output" not in result.detail
     assert result.exit_code == 1
     assert "uv run ruff check ." in result.remediation
 
 
-@patch("ubundiforge.verify.subprocess.run")
+@patch("projectforge.verify.subprocess.run")
 def test_run_check_timeout(mock_run, tmp_path):
     mock_run.side_effect = subprocess.TimeoutExpired(cmd="test", timeout=60)
     result = _run_check("test", "uv run pytest tests/", tmp_path)
     assert result.passed is False
-    assert "timed out" in result.detail
+    assert result.detail == "This check took too long and was stopped."
     assert result.exit_code is None
     assert result.timeout_seconds == 60
 
@@ -181,7 +182,7 @@ def test_run_check_timeout(mock_run, tmp_path):
 # --- _install_deps ---
 
 
-@patch("ubundiforge.verify._run_check")
+@patch("projectforge.verify._run_check")
 def test_install_deps_python_stack(mock_check, tmp_path):
     mock_check.return_value = CheckResult(name="install", passed=True)
     result = _install_deps("fastapi", tmp_path)
@@ -189,7 +190,7 @@ def test_install_deps_python_stack(mock_check, tmp_path):
     mock_check.assert_called_once_with("install", "uv sync", tmp_path, timeout=60)
 
 
-@patch("ubundiforge.verify._run_check")
+@patch("projectforge.verify._run_check")
 def test_install_deps_node_stack(mock_check, tmp_path):
     mock_check.return_value = CheckResult(name="install", passed=True)
     result = _install_deps("nextjs", tmp_path)
@@ -197,7 +198,7 @@ def test_install_deps_node_stack(mock_check, tmp_path):
     mock_check.assert_called_once_with("install", "npm install", tmp_path, timeout=60)
 
 
-@patch("ubundiforge.verify._run_check")
+@patch("projectforge.verify._run_check")
 def test_install_deps_fullstack(mock_check, tmp_path):
     # Create frontend dir so npm install runs
     (tmp_path / "frontend").mkdir()
@@ -210,15 +211,17 @@ def test_install_deps_fullstack(mock_check, tmp_path):
 def test_install_deps_unknown_stack(tmp_path):
     result = _install_deps("unknown", tmp_path)
     assert result.passed is False
-    assert "unknown stack" in result.detail
+    assert result.detail == "Forge cannot verify this project type."
+    assert "unknown" not in result.detail
+    assert result.remediation
 
 
 # --- verify_scaffold ---
 
 
-@patch("ubundiforge.verify._check_health")
-@patch("ubundiforge.verify._run_check")
-@patch("ubundiforge.verify._install_deps")
+@patch("projectforge.verify._check_health")
+@patch("projectforge.verify._run_check")
+@patch("projectforge.verify._install_deps")
 def test_verify_scaffold_all_pass(mock_install, mock_check, mock_health, tmp_path):
     mock_install.return_value = CheckResult(name="install", passed=True)
     mock_check.return_value = CheckResult(name="check", passed=True)
@@ -230,7 +233,7 @@ def test_verify_scaffold_all_pass(mock_install, mock_check, mock_health, tmp_pat
     assert len(report.checks) == 5
 
 
-@patch("ubundiforge.verify._install_deps")
+@patch("projectforge.verify._install_deps")
 def test_verify_scaffold_install_failure_skips_rest(mock_install, tmp_path):
     mock_install.return_value = CheckResult(name="install", passed=False, detail="failed")
 
@@ -247,8 +250,8 @@ def test_verify_scaffold_unknown_stack(tmp_path):
     assert report.all_passed is False
 
 
-@patch("ubundiforge.verify._run_check")
-@patch("ubundiforge.verify._install_deps")
+@patch("projectforge.verify._run_check")
+@patch("projectforge.verify._install_deps")
 def test_verify_scaffold_no_health_for_cli(mock_install, mock_check, tmp_path):
     """python-cli has no run command, so health check should not appear."""
     mock_install.return_value = CheckResult(name="install", passed=True)
@@ -260,8 +263,8 @@ def test_verify_scaffold_no_health_for_cli(mock_install, mock_check, tmp_path):
     assert "health" not in check_names
 
 
-@patch("ubundiforge.verify._check_health")
-@patch("ubundiforge.verify._run_check")
+@patch("projectforge.verify._check_health")
+@patch("projectforge.verify._run_check")
 def test_python_verification_uses_generated_project_metadata(mock_check, mock_health, tmp_path):
     """Regression: the showcase layout must not inherit stale stack command assumptions."""
     (tmp_path / "tests").mkdir()

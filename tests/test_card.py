@@ -3,7 +3,7 @@
 
 from pathlib import Path
 
-from ubundiforge.card import generate_badge_svg, generate_card_svg, inject_badge_into_readme
+from projectforge.card import generate_badge_svg, generate_card_svg, inject_badge_into_readme
 
 
 def test_generate_badge_svg():
