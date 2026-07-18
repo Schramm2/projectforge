@@ -1,12 +1,12 @@
 # Forge Scaffolding Assistant - Usage Guide
 
-Portable skill for AI agents that need to use Forge professionally. Updated for v0.4.0.
+Portable skill for AI agents that need to use Forge professionally. Updated for v0.4.1.
 
 ## Requirements
 
 - Access to this repository
 - Python 3.12+
-- `brew install projectforge` (Homebrew) or `uv sync --dev` (repo-local)
+- `uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1` or `uv sync --dev` (repo-local)
 - At least one installed AI backend CLI:
   - `claude`
   - `gemini`
@@ -28,13 +28,14 @@ At minimum, the agent should read:
 
 ### 2. Prepare Forge
 
-**Homebrew (recommended):**
+**Supported public install:**
 
 ```bash
-brew tap <tap-owner>/<tap>
-brew install projectforge
+uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1
 forge --version
 ```
+
+ProjectForge is not currently published to PyPI or a supported Homebrew tap.
 
 **Repo-local mode:**
 
@@ -95,7 +96,7 @@ This detects installed backends, lets you choose default models, and writes Forg
 ## Troubleshooting
 
 **`forge` command not found**
-- Install via Homebrew: `brew tap <tap-owner>/<tap> && brew install projectforge`
+- Install from GitHub: `uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1`
 - Or use repo-local: `uv sync --dev && ./forge --version`
 
 **Forge says no AI backend is installed**
@@ -123,4 +124,4 @@ This detects installed backends, lets you choose default models, and writes Forg
 
 ## Privacy & Support
 
-**Data processing:** Forge sends the scaffold brief and related context to the chosen AI CLI. Quality signals and preferences are stored locally under `~/.forge/`. **User controls:** Inspect prompts with `--dry-run` or `--export`, keep `--demo` enabled for secret-free startup, and review `.forge/scaffold.json` for provenance. **Support:** Repository: ProjectForge.
+**Data processing:** Forge sends the scaffold brief and related context to the chosen AI CLI. Quality signals and preferences are stored locally under `~/.forge/`. **User controls:** Inspect prompts with `--dry-run` or `--export`, keep `--demo` enabled for secret-free generated applications, and review `.forge/scaffold.json` for provenance. The AI CLI still requires its own authentication for live generation. **Support:** [Schramm2/projectforge](https://github.com/Schramm2/projectforge).

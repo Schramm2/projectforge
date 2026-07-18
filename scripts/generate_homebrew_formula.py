@@ -15,7 +15,6 @@ if str(SRC) not in sys.path:
 from ubundiforge.homebrew import (  # noqa: E402
     DEFAULT_HOMEPAGE,
     DEFAULT_PYTHON_FORMULA,
-    DEFAULT_SOURCE_SHA256,
     DEFAULT_SOURCE_URL,
     write_homebrew_formula,
 )
@@ -45,7 +44,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--source-sha256",
-        default=DEFAULT_SOURCE_SHA256,
+        required=True,
         help="SHA-256 for the public source tarball.",
     )
     parser.add_argument(

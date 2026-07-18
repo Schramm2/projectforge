@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "projectforge"
-version = "0.4.0"
+version = "0.4.1"
 description = "A CLI wrapper that scaffolds new projects using AI coding tools with your conventions baked in."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -26,6 +26,12 @@ dependencies = [
     "questionary>=2.1.0",
     "PyYAML>=6.0.2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Schramm2/projectforge"
+Repository = "https://github.com/Schramm2/projectforge"
+Issues = "https://github.com/Schramm2/projectforge/issues"
+Releases = "https://github.com/Schramm2/projectforge/releases"
 
 [project.scripts]
 forge = "ubundiforge.__main__:main"

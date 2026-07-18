@@ -3,6 +3,7 @@
 ## Prerequisites
 
 - **Python 3.12+** installed and on your PATH.
+- **uv** installed from the [official installation guide](https://docs.astral.sh/uv/getting-started/installation/).
 - **At least one AI CLI tool** installed:
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude`)
   - [Gemini CLI](https://github.com/google-gemini/gemini-cli) (`gemini`)
@@ -12,25 +13,42 @@ Forge will detect which tools are available and route to the best one automatica
 
 ## Installation
 
-### Homebrew (recommended for macOS)
+### Supported public install
 
 ```bash
-brew tap <tap-owner>/<tap>
-brew install projectforge
+uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1
+forge --version
+forge --help
 ```
 
-### From source
+This installs the `projectforge` distribution from an immutable release and exposes the `forge`
+command. ProjectForge is not currently published to PyPI.
+
+### Development checkout
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Schramm2/projectforge.git
 cd projectforge
 uv sync --dev
-./forge
+./forge --version
 ```
 
-Maintainer note: keep `<tap-owner>/<tap>` and `<repository-url>` placeholders until the
-final public GitHub repository and Homebrew tap owner/name are chosen. Finalize those
-release URLs after the repository transfer or rename.
+The distribution is `projectforge`, the command is `forge`, and the Python import namespace
+remains `ubundiforge` as a compatibility constraint.
+
+## Verify before generating
+
+Prompt inspection does not require an authenticated AI backend and does not create a project:
+
+```bash
+forge --dry-run \
+  --name hello-forge \
+  --stack python-cli \
+  --description "A tiny greeting CLI" \
+  --no-docker \
+  --no-open \
+  --no-verify
+```
 
 ## First run
 
@@ -75,6 +93,21 @@ When complete, Forge will:
 - Run verification checks if enabled (lint, typecheck, tests, build, health).
 - Play a completion sound if enabled (`"sound": true` in `~/.forge/config.json`).
 - Open the project in your editor (if configured).
+
+For a small non-interactive verification scaffold:
+
+```bash
+forge --name hello-forge \
+  --stack python-cli \
+  --description "A tiny greeting CLI" \
+  --no-docker \
+  --no-open \
+  --verify
+```
+
+Live generation sends the assembled prompt and conventions to the selected AI CLI and requires
+that CLI to be authenticated. Demo mode controls whether the generated app needs service
+credentials; it does not replace AI CLI authentication.
 
 If the target directory already exists, Forge will offer safer choices instead of only asking to overwrite it. You can rename the project, overwrite the directory, or cancel.
 

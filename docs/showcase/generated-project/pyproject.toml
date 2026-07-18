@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "forge-proof-cli"
+version = "0.1.0"
+description = "Minimal ProjectForge showcase fixture"
+requires-python = ">=3.12"
+dependencies = ["typer>=0.15.0"]
+
+[project.scripts]
+hello-forge = "hello_forge.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hello_forge"]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+python_files = ["verify_*.py"]
+testpaths = ["checks"]
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.2",
+  "ruff>=0.15.6",
+]
