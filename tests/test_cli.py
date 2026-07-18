@@ -25,6 +25,55 @@ def test_version_output_uses_public_project_name():
     assert "ubundiforge" not in result.stdout.lower()
 
 
+def test_stats_empty_shows_first_scaffold_guidance():
+    result = runner.invoke(app, ["stats"])
+
+    assert result.exit_code == 0
+    assert "No scaffolds recorded yet" in result.stdout
+    assert "0% success rate" not in result.stdout
+
+
+def test_stats_repair_quarantines_synthetic_history(monkeypatch, tmp_path):
+    scaffold_path = tmp_path / "scaffold.log"
+    quality_path = tmp_path / "quality.jsonl"
+    scaffold_path.write_text(
+        json.dumps(
+            {
+                "name": "mocked-flow",
+                "directory": "mocked-flow",
+                "stack": "fastapi",
+                "timestamp": "2026-07-18T12:00:02+00:00",
+            }
+        )
+        + "\n"
+    )
+    quality_path.write_text(
+        json.dumps(
+            {
+                "stack": "fastapi",
+                "phase": "architecture",
+                "timestamp": "2026-07-18T12:00:00+00:00",
+                "lint_clean": False,
+                "tests_passed": False,
+                "typecheck_clean": False,
+                "health_ok": False,
+                "built": False,
+            }
+        )
+        + "\n"
+    )
+    monkeypatch.setattr("ubundiforge.cli.SCAFFOLD_LOG_PATH", scaffold_path)
+    monkeypatch.setattr("ubundiforge.quality.QUALITY_LOG_PATH", quality_path)
+
+    result = runner.invoke(app, ["stats", "--repair"])
+
+    assert result.exit_code == 0
+    assert "Quarantined 1 scaffold and 1 quality entries" in result.stdout
+    assert "No scaffolds recorded yet" in result.stdout
+    assert list((tmp_path / "quarantine").glob("*/scaffold.log"))
+    assert list((tmp_path / "quarantine").glob("*/quality.jsonl"))
+
+
 def test_doctor_json_has_deterministic_exit_semantics(monkeypatch):
     report = {
         "schema_version": 1,
@@ -544,7 +593,7 @@ def test_resume_preserves_completed_phases_and_finishes_failed_scaffold(monkeypa
     monkeypatch.setattr("ubundiforge.cli.load_claude_md_template", lambda: None)
     monkeypatch.setattr("ubundiforge.cli.ensure_git_init", lambda project_dir: True)
     monkeypatch.setattr("ubundiforge.cli.append_quality_signal", lambda **kwargs: None)
-    monkeypatch.setattr("ubundiforge.cli.append_scaffold_log", lambda *args: None)
+    monkeypatch.setattr("ubundiforge.cli.append_scaffold_log", lambda *args, **kwargs: None)
     monkeypatch.setattr("ubundiforge.cli.record_preferences", lambda answers: None)
     monkeypatch.setattr("ubundiforge.cli.run_post_scaffold_hook", lambda *args: None)
     monkeypatch.setattr("ubundiforge.cli.write_card", lambda *args, **kwargs: None)

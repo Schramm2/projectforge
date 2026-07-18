@@ -4,6 +4,7 @@ import json
 
 from ubundiforge.convention_models import ConventionContribution
 from ubundiforge.scaffold_log import append_scaffold_log, write_scaffold_manifest
+from ubundiforge.verify import CheckResult, VerifyReport
 
 
 def test_append_scaffold_log_creates_file(tmp_path, monkeypatch):
@@ -23,8 +24,28 @@ def test_append_scaffold_log_creates_file(tmp_path, monkeypatch):
     assert set(entry["backends"]) == {"claude", "codex"}
     assert entry["demo_mode"] is True
     assert entry["directory"] == "demo"
+    assert entry["verification_status"] == "not_run"
     assert str(tmp_path) not in log_path.read_text()
     assert "timestamp" in entry
+
+
+def test_append_scaffold_log_records_successful_verification(tmp_path, monkeypatch):
+    log_path = tmp_path / "scaffold.log"
+    monkeypatch.setattr("ubundiforge.scaffold_log.SCAFFOLD_LOG_PATH", log_path)
+    monkeypatch.setattr("ubundiforge.scaffold_log.FORGE_DIR", tmp_path)
+    report = VerifyReport(checks=[CheckResult(name="test", passed=True)])
+
+    append_scaffold_log(
+        {"name": "verified", "stack": "fastapi"},
+        [("verify", "claude")],
+        tmp_path / "verified",
+        verify_report=report,
+        verification_requested=True,
+    )
+
+    entry = json.loads(log_path.read_text())
+    assert entry["verification_status"] == "passed"
+    assert entry["verification_requested"] is True
 
 
 def test_append_scaffold_log_appends(tmp_path, monkeypatch):

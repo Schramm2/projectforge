@@ -1,5 +1,7 @@
 """Tests for scaffold prompt assembly."""
 
+import pytest
+
 from ubundiforge.prompt_builder import (
     build_architecture_prompt,
     build_frontend_prompt,
@@ -224,6 +226,39 @@ def test_phase_prompt_tests_only():
     )
     assert "comprehensive tests" in prompt
     assert "Do NOT modify application code" in prompt
+
+
+@pytest.mark.parametrize(
+    ("stack", "backend"),
+    [
+        (stack, backend)
+        for stack in ("fastapi", "fastapi-ai", "python-cli", "python-worker", "ts-package")
+        for backend in ("claude", "antigravity", "codex")
+    ],
+)
+def test_verify_prompts_exclude_frontend_only_guidance(stack, backend):
+    answers = {
+        **_BASE_ANSWERS,
+        "stack": stack,
+        "demo_mode": True,
+    }
+    prompt = build_phase_prompt(
+        ["verify"],
+        ["architecture", "tests", "verify"],
+        answers,
+        "conventions",
+        backend=backend,
+    )
+
+    for frontend_only_text in (
+        "Clerk",
+        "NEXT_PUBLIC_",
+        "visible banner",
+        "visual design",
+        "in the browser",
+    ):
+        assert frontend_only_text not in prompt
+    assert "startup or smoke command" in prompt
 
 
 def test_phase_prompt_verify_only_uses_codex_guidance_for_codex_backend():

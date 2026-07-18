@@ -14,6 +14,7 @@ from pathlib import Path
 from rich.live import Live
 from rich.text import Text
 
+from ubundiforge.conventions import FORGE_DIR
 from ubundiforge.execution_policy import build_provider_command
 from ubundiforge.failure_taxonomy import classify_provider_failure
 from ubundiforge.subprocess_utils import (
@@ -618,7 +619,7 @@ def open_in_editor(project_dir: Path, preferred_editor: str = "") -> None:
     console.print(status_line("No editor found. Open the project manually.", accent="amber"))
 
 
-HOOKS_DIR = Path.home() / ".forge" / "hooks"
+HOOKS_DIR = FORGE_DIR / "hooks"
 POST_SCAFFOLD_HOOK = HOOKS_DIR / "post-scaffold.sh"
 
 

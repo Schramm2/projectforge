@@ -1,6 +1,7 @@
 """Load deterministic bundled, profile, user-wide, and project convention layers."""
 
 import hashlib
+import os
 import re
 from pathlib import Path
 
@@ -41,7 +42,17 @@ def resolve_bundled_conventions_dir(
 
 BUNDLED_CONVENTIONS_DIR = resolve_bundled_conventions_dir()
 
-FORGE_DIR = Path.home() / ".forge"
+
+def resolve_forge_dir() -> Path:
+    """Return the user data directory, honoring the test/automation override."""
+
+    override = os.environ.get("FORGE_HOME")
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / ".forge"
+
+
+FORGE_DIR = resolve_forge_dir()
 CONVENTIONS_PATH = FORGE_DIR / "conventions.md"
 PROFILES_DIR = FORGE_DIR / "profiles"
 CLAUDE_MD_TEMPLATE_PATH = Path(__file__).parent / "templates" / "claude-md-template.md"

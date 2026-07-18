@@ -13,6 +13,8 @@ This directory ties portfolio claims to reproducible commands and measured resul
   to an immutable archive URL to capture a specific release instead.
 - [terminal-demo-shot-list.md](terminal-demo-shot-list.md) defines a truthful 30–60 second edit from
   the real terminal capture.
+- [`assets/terminal-demo.svg`](../../assets/terminal-demo.svg) is the lightweight README walkthrough;
+  its caption explicitly distinguishes the illustration from provider-dependent live output.
 
 ## Independently verifiable proof points
 

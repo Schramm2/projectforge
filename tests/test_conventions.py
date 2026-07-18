@@ -9,7 +9,15 @@ from ubundiforge.conventions import (
     load_conventions,
     load_conventions_bundle,
     resolve_bundled_conventions_dir,
+    resolve_forge_dir,
 )
+
+
+def test_resolve_forge_dir_honors_environment_override(tmp_path, monkeypatch):
+    forge_home = tmp_path / "isolated-forge-home"
+    monkeypatch.setenv("FORGE_HOME", str(forge_home))
+
+    assert resolve_forge_dir() == forge_home
 
 
 def test_resolve_bundled_conventions_dir_prefers_package_dir(tmp_path):

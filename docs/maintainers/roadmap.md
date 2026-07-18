@@ -210,12 +210,11 @@ truth.
 
 ## Deployment & Distribution
 
-The v0.5.0 package is available from its immutable GitHub release through uv and from the public
-Homebrew tap. The current source replaces Gemini with Antigravity but remains unreleased; PyPI is
-an optional future channel.
+The v0.5.1 package is available from its immutable GitHub release through uv and from the public
+Homebrew tap. It replaces Gemini with Antigravity; PyPI remains an optional future channel.
 
 The current workflow:
-1. User runs `uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.0.tar.gz`
+1. User runs `uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.1.tar.gz`
    or `brew install --build-from-source schramm2/tap/projectforge`
 2. Runs `forge` from any directory
 3. Setup wizard runs on first use (detects tools, configures preferences)
@@ -223,8 +222,8 @@ The current workflow:
 
 Steps to ship:
 - [DONE] **Homebrew formula source**: The repo includes `Formula/projectforge.rb`, a formula generator, and documented release steps.
-- [DONE] **Publish and verify Homebrew**: `Formula/projectforge.rb` is synchronized into `Schramm2/homebrew-tap`; clean install, formula test, version, help, and dry-run checks passed for v0.5.0.
-- [DONE] **Homebrew release automation**: `.github/workflows/release-homebrew.yml` tagged, released, regenerated, and synchronized v0.5.0 successfully.
+- [DONE] **Publish and verify Homebrew**: `Formula/projectforge.rb` is synchronized into `Schramm2/homebrew-tap`; clean install, formula test, version, help, and dry-run checks passed for the release channel.
+- [DONE] **Homebrew release automation**: `.github/workflows/release-homebrew.yml` tags releases, regenerates the formula, and synchronizes the public tap.
 - [DONE] **Buildable package metadata**: `pyproject.toml` is set up for versioned source/wheel builds.
 - **Publish releases to PyPI**: optional later, if Forge needs a Python package distribution channel.
 - Transfer repo to a shared organization when ready

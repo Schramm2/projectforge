@@ -860,12 +860,38 @@ def admin_conventions(
 
 
 @app.command()
-def stats() -> None:
+def stats(
+    repair: Annotated[
+        bool,
+        typer.Option(
+            "--repair",
+            help="Quarantine recognizable pytest artifacts before showing stats.",
+        ),
+    ] = False,
+) -> None:
     """Show scaffold analytics and backend performance."""
     import json
 
     from ubundiforge.analytics import aggregate_stats, render_stats
-    from ubundiforge.quality import read_quality_signals
+    from ubundiforge.history import repair_history
+    from ubundiforge.quality import QUALITY_LOG_PATH, read_quality_signals
+
+    if repair:
+        repair_result = repair_history(
+            scaffold_log_path=SCAFFOLD_LOG_PATH,
+            quality_log_path=QUALITY_LOG_PATH,
+        )
+        if repair_result.total_entries:
+            console.print(
+                status_line(
+                    f"Quarantined {repair_result.scaffold_entries} scaffold and "
+                    f"{repair_result.quality_entries} quality entries at "
+                    f"{repair_result.quarantine_dir}.",
+                    accent="aqua",
+                )
+            )
+        else:
+            console.print(status_line("No recognizable pytest history found.", accent="aqua"))
 
     scaffold_entries: list[dict] = []
     if SCAFFOLD_LOG_PATH.exists():
@@ -2449,10 +2475,17 @@ def main(
         stack=answers["stack"],
         phase_backends=phase_backends,
         verify_report=verify_report,
+        project_dir=project_dir,
     )
 
     run_post_scaffold_hook(project_dir, answers)
-    append_scaffold_log(answers, phase_backends, project_dir)
+    append_scaffold_log(
+        answers,
+        phase_backends,
+        project_dir,
+        verify_report=verify_report,
+        verification_requested=verify,
+    )
     record_preferences(answers)
 
     elapsed = time.monotonic() - scaffold_start

@@ -1,29 +1,41 @@
 # ProjectForge
 
-ProjectForge is a local CLI that turns a project brief and your conventions into a verified starter
-repository through Claude Code, Google Antigravity CLI, or Codex CLI.
+Run `forge --name atlas --stack fastapi --description "Customer support API" --verify` and get a
+working starter repository shaped by your conventions—not just a pile of generated files.
+ProjectForge scaffolds Python and TypeScript projects through Claude Code, Google Antigravity CLI,
+or Codex CLI, then installs, checks, and verifies the result.
 
-> This README tracks the current, unreleased source after v0.5.0. The published v0.5.0 package
-> still supports Gemini CLI; use the documentation bundled with that tag for released behavior.
+A live scaffold usually takes minutes rather than seconds because providers write code and Forge
+runs the generated project's checks. Duration varies by stack and provider; `forge --dry-run`
+previews the complete plan instantly and makes no provider call.
+
+The result includes the project, its development commands, and local evidence showing what was
+requested, which conventions and providers were used, and whether verification actually passed.
 
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB)
 
-Forge shows the complete prompt before execution, uses bounded provider workspace modes by default,
-records convention provenance, preserves failed runs for resume, and separates “provider finished”
-from “generated project verified.”
+![ProjectForge terminal scaffold walkthrough](assets/terminal-demo.svg)
+
+> This README documents ProjectForge v0.5.1, including the Antigravity provider migration and
+> the trust-surface fixes listed in the changelog.
 
 ## What you get
 
 - Interactive and flag-driven scaffolding for seven Python and TypeScript stacks.
-- Zero-provider-call prompt previews with `--dry-run`.
-- `forge doctor` installation and authentication diagnostics without a model call or credential
-  output.
-- Provider-default models unless you deliberately request an override.
-- Deterministic bundled, profile, user-wide, and project-local conventions with source hashes.
-- Safe provider execution by default; blanket bypass requires two explicit unsafe flags.
-- Atomic phase progress, failure classification, and `--resume` without rerunning completed phases.
 - Metadata-aware install, lint, type-check, build, test, and health verification.
-- Durable scaffold, convention, and verification evidence under the generated project's `.forge/`.
+- A generated README, development setup, and stack-specific starter structure.
+- Zero-provider-call prompt previews with `--dry-run`.
+- Failure recovery with `--resume` instead of paying to rerun completed phases.
+
+## Why trust the output
+
+- Forge shows the complete prompt before execution and uses bounded provider workspaces by default.
+- `forge doctor` checks installation and authentication without a model call or credential output.
+- Provider-default models remain in control unless you deliberately request an override.
+- Convention layers are deterministic and recorded with source hashes.
+- Blanket provider bypass requires two explicit unsafe flags.
+- Atomic progress, failure classification, and resume contracts preserve partial work safely.
+- `.forge/` records distinguish “provider finished” from “generated project verified.”
 
 ## Supported stacks
 
@@ -62,12 +74,10 @@ Run `./forge` from the checkout anywhere this guide shows `forge`.
 
 ## Install the latest published release
 
-The immutable v0.5.0 release and Homebrew formula use the earlier Claude/Gemini/Codex provider
-set. Consult the [v0.5.0 README](https://github.com/Schramm2/projectforge/blob/v0.5.0/README.md)
-for its provider setup and runtime behavior.
+The immutable v0.5.1 release supports Claude Code, Google Antigravity CLI, and Codex CLI:
 
 ```bash
-uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.0.tar.gz
+uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.1.tar.gz
 forge --version
 forge --help
 ```
@@ -228,6 +238,7 @@ maintainers use the separate `forge admin conventions` command for bundled conve
 forge                         # Interactive scaffold
 forge doctor                  # Readiness diagnostics, no model call
 forge stats                   # Local scaffold analytics
+forge stats --repair          # Quarantine recognizable legacy pytest artifacts
 forge check                   # Read-only convention audit
 forge check --fix             # Add supported missing convention files
 forge evolve auth --dry-run   # Preview an existing-project change

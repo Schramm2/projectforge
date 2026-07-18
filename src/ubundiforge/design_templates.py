@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from ubundiforge.conventions import FORGE_DIR
+
 
 @dataclass(frozen=True)
 class DesignTemplateOption:
@@ -30,7 +32,7 @@ MIN_DESIGN_TEMPLATE_LENGTH = 50
 
 BUNDLED_DESIGN_TEMPLATES_DIR = Path(__file__).parent / "templates" / "design-templates"
 LOCAL_DESIGN_TEMPLATES_DIR = Path.cwd() / ".forge" / "design-templates"
-GLOBAL_DESIGN_TEMPLATES_DIR = Path.home() / ".forge" / "design-templates"
+GLOBAL_DESIGN_TEMPLATES_DIR = FORGE_DIR / "design-templates"
 
 
 def design_template_choices_for_stack(stack: str) -> list[tuple[str, str]]:

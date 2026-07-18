@@ -1,8 +1,6 @@
 # Getting Started
 
-> This guide tracks the current, unreleased source after v0.5.0. The immutable v0.5.0 release and
-> Homebrew formula still use Gemini CLI; consult the documentation bundled with that tag for
-> released behavior.
+> This guide documents ProjectForge v0.5.1 and its Claude, Antigravity, and Codex provider set.
 
 ## 1. Use the current source
 
@@ -20,14 +18,14 @@ uv sync --dev
 
 Use `./forge` from the repository root anywhere the examples below show `forge`.
 
-The latest published release remains available through its immutable archive or Homebrew:
+The latest published release is available through its immutable archive or Homebrew:
 
 ```bash
-uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.0.tar.gz
+uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.1.tar.gz
 # or: brew install schramm2/tap/projectforge
 ```
 
-Those v0.5.0 installs use Gemini CLI, not Antigravity. ProjectForge is not published to PyPI.
+ProjectForge is not published to PyPI.
 
 ## 2. Install and authenticate one provider
 

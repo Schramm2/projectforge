@@ -33,6 +33,8 @@ def test_append_quality_signal_creates_file(tmp_path: Path, monkeypatch):
     assert entry["stack"] == "fastapi"
     assert entry["backend"] == "claude"
     assert entry["phase"] == "architecture"
+    assert entry["type"] == "scaffold_phase"
+    assert entry["verification_passed"] is False
     assert entry["lint_clean"] is True
     assert entry["tests_passed"] is True
     assert entry["typecheck_clean"] is False
@@ -40,7 +42,7 @@ def test_append_quality_signal_creates_file(tmp_path: Path, monkeypatch):
     assert "timestamp" in entry
 
 
-def test_append_quality_signal_without_verify(tmp_path: Path, monkeypatch):
+def test_append_quality_signal_without_verify_is_not_recorded(tmp_path: Path, monkeypatch):
     quality_path = tmp_path / "quality.jsonl"
     monkeypatch.setattr("ubundiforge.quality.QUALITY_LOG_PATH", quality_path)
     monkeypatch.setattr("ubundiforge.quality.FORGE_DIR", tmp_path)
@@ -51,10 +53,7 @@ def test_append_quality_signal_without_verify(tmp_path: Path, monkeypatch):
         verify_report=None,
     )
 
-    lines = quality_path.read_text().strip().splitlines()
-    entry = json.loads(lines[0])
-    assert entry["lint_clean"] is False
-    assert entry["tests_passed"] is False
+    assert not quality_path.exists()
 
 
 def test_read_quality_signals_empty(tmp_path: Path, monkeypatch):
