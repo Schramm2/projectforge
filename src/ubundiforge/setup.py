@@ -19,6 +19,7 @@ from ubundiforge.config import (
 )
 from ubundiforge.conventions import BUNDLED_CONVENTIONS_DIR, CONVENTIONS_PATH, FORGE_DIR
 from ubundiforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
+from ubundiforge.safety import check_for_secrets
 from ubundiforge.ui import (
     badge,
     grouped_lines,
@@ -56,6 +57,11 @@ SUPPORTED_EDITORS = [
 _BACKEND_LOGIN_HINTS = {
     "claude": "claude auth login",
     "codex": "codex login",
+}
+_BACKEND_INSTALL_URLS = {
+    "claude": "https://code.claude.com/docs/en/setup",
+    "gemini": "https://geminicli.com/docs/get-started/installation/",
+    "codex": "https://github.com/openai/codex",
 }
 
 
@@ -134,8 +140,7 @@ def _normalize_forge_config(payload: object) -> dict:
 
     backends = normalized.get("available_backends", [])
     if any(
-        not isinstance(backend, str) or backend not in SUPPORTED_BACKENDS
-        for backend in backends
+        not isinstance(backend, str) or backend not in SUPPORTED_BACKENDS for backend in backends
     ):
         raise ValueError("available_backends contains an unsupported backend")
     backend_models = normalized.get("backend_models", {})
@@ -144,6 +149,8 @@ def _normalize_forge_config(payload: object) -> dict:
         for backend, model in backend_models.items()
     ):
         raise ValueError("backend_models contains an invalid override")
+    if any(check_for_secrets(model) for model in backend_models.values()):
+        raise ValueError("backend_models contains a credential-like value")
     return normalized
 
 
@@ -325,7 +332,14 @@ def run_setup(console: Console) -> dict:
                     [
                         "No AI CLI tools found.",
                         subtle("Forge needs at least one of: claude, gemini, or codex."),
-                        muted("Install one and run forge --setup again."),
+                        *[
+                            muted(f"{backend}: {_BACKEND_INSTALL_URLS[backend]}")
+                            for backend in SUPPORTED_BACKENDS
+                        ],
+                        muted(
+                            "Install one, complete its provider-owned login, then run "
+                            "forge doctor and forge --setup."
+                        ),
                     ]
                 ),
                 title="Setup",
@@ -347,7 +361,12 @@ def run_setup(console: Console) -> dict:
             )
             for backend in not_ready_backends
         ]
-        lines.append(muted("Automatic routing will skip these backends until they are ready."))
+        lines.append(
+            muted(
+                "Complete provider-owned login, then run forge doctor. Automatic routing skips "
+                "these backends until they are ready."
+            )
+        )
         console.print(make_panel(grouped_lines(lines), title="Backend Login", accent="amber"))
 
     unknown_backends = [
@@ -363,7 +382,8 @@ def run_setup(console: Console) -> dict:
         lines.append(
             muted(
                 "Forge will not route to these backends until readiness is confirmed by a "
-                "provider-specific preflight."
+                "provider-specific preflight. Complete official authentication, then run "
+                "forge doctor for the current classification."
             )
         )
         console.print(make_panel(grouped_lines(lines), title="Backend Checks", accent="amber"))
