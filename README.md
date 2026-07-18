@@ -13,7 +13,8 @@ from “generated project verified.”
 
 - Interactive and flag-driven scaffolding for seven Python and TypeScript stacks.
 - Zero-provider-call prompt previews with `--dry-run`.
-- `forge doctor` readiness diagnostics without a model call or credential output.
+- `forge doctor` readiness diagnostics without a model call or credential output; Gemini has a
+  separate, opt-in readiness preflight.
 - Provider-default models unless you deliberately request an override.
 - Deterministic bundled, profile, user-wide, and project-local conventions with source hashes.
 - Safe provider execution by default; blanket bypass requires two explicit unsafe flags.
@@ -78,11 +79,14 @@ After provider login, run:
 ```bash
 forge doctor
 forge doctor --json
+# Gemini only, after provider-owned authentication (one read-only model call):
+forge doctor --preflight gemini
 ```
 
 A live scaffold requires one provider reported as `ready`. Missing optional providers do not block
-the run. An installed Gemini CLI may remain `preflight_required` because it exposes no deterministic
-credential-status command; Forge does not infer authentication from `--version`.
+the run. An installed Gemini CLI remains `preflight_required` because it exposes no deterministic
+credential-status command. Its explicit preflight runs in a temporary workspace with plan mode and
+sandboxing, may consume quota, and stores only a version-bound readiness timestamp for 24 hours.
 
 ## Preview first
 
@@ -200,6 +204,7 @@ maintainers use the separate `forge admin conventions` command for bundled conve
 ```bash
 forge                         # Interactive scaffold
 forge doctor                  # Readiness diagnostics, no model call
+forge doctor --preflight gemini  # Explicit Gemini readiness call; quota may apply
 forge stats                   # Local scaffold analytics
 forge check                   # Read-only convention audit
 forge check --fix             # Add supported missing convention files

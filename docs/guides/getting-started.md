@@ -44,8 +44,10 @@ forge doctor
 forge doctor --json
 ```
 
-One `ready` provider is enough. An installed Gemini CLI can remain `preflight_required` because the
-provider exposes no deterministic credential-status command; installation alone is not readiness.
+One `ready` provider is enough. An installed Gemini CLI remains `preflight_required` because the
+provider exposes no deterministic credential-status command. After authenticating in Gemini's own
+CLI, run `forge doctor --preflight gemini`. This makes one read-only model call in a temporary
+sandbox, may consume quota, and stores only a version-bound readiness timestamp for 24 hours.
 
 ## 3. Preview with zero provider calls
 

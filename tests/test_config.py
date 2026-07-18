@@ -71,6 +71,31 @@ def test_gemini_status_reports_unknown_when_cli_responds(monkeypatch):
     assert "authentication" in status.detail.lower()
 
 
+def test_gemini_status_reports_ready_from_matching_fresh_preflight(monkeypatch):
+    monkeypatch.setattr(
+        "ubundiforge.config.check_backend_installed",
+        lambda backend: backend == "gemini",
+    )
+    monkeypatch.setattr(
+        "ubundiforge.config._run_status_command",
+        lambda cmd, timeout=5: CompletedProcess(
+            args=cmd,
+            returncode=0,
+            stdout="0.51.0\n",
+            stderr="",
+        ),
+    )
+    monkeypatch.setattr(
+        "ubundiforge.config.load_valid_preflight",
+        lambda backend, *, version: backend == "gemini" and version == "0.51.0",
+    )
+
+    status = get_backend_status("gemini")
+
+    assert status.ready is True
+    assert status.auth_mode == "verified_preflight"
+
+
 def test_get_usable_backends_requires_verified_readiness(monkeypatch):
     monkeypatch.setattr(
         "ubundiforge.config.get_backend_statuses",

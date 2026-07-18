@@ -68,6 +68,7 @@ from ubundiforge.media_assets import (
 from ubundiforge.preferences import record_preferences
 from ubundiforge.prompt_builder import build_phase_prompt
 from ubundiforge.prompts import collect_answers
+from ubundiforge.provider_preflight import run_gemini_preflight
 from ubundiforge.quality import append_quality_signal, compute_backend_scores, read_quality_signals
 from ubundiforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
 from ubundiforge.router import (
@@ -150,14 +151,51 @@ def doctor(
         bool,
         typer.Option("--json", help="Emit deterministic machine-readable diagnostics."),
     ] = False,
+    preflight: Annotated[
+        str | None,
+        typer.Option(
+            "--preflight",
+            help="Make one opt-in readiness model call for a provider without a status API.",
+        ),
+    ] = None,
 ) -> None:
-    """Check configuration and AI provider readiness without running a model."""
+    """Check configuration and provider readiness; normal checks make no model calls."""
     import json
 
+    preflight_result = None
+    if preflight is not None:
+        if preflight != "gemini":
+            raise typer.BadParameter(
+                "only gemini needs an explicit model preflight",
+                param_hint="--preflight",
+            )
+        if not json_output:
+            console.print(
+                status_line(
+                    "Gemini preflight: making one isolated, read-only model call; quota may apply",
+                    accent="amber",
+                )
+            )
+        preflight_result = run_gemini_preflight()
+
     report = build_doctor_report()
+    if preflight_result is not None and json_output:
+        report["preflight"] = {
+            "provider": "gemini",
+            "success": preflight_result.success,
+            "category": preflight_result.category,
+            "detail": preflight_result.detail,
+        }
     if json_output:
         console.print_json(json.dumps(report))
     else:
+        if preflight_result is not None:
+            console.print(
+                status_line(
+                    preflight_result.detail,
+                    accent="aqua" if preflight_result.success else "amber",
+                )
+            )
         console.print(header_panel(__version__))
         config_status = report["config"]["status"]
         console.print(status_line(f"Configuration: {config_status}", accent="violet"))
@@ -204,6 +242,8 @@ def doctor(
             if provider.get("repair") != "No action required.":
                 console.print(muted(f"  repair: {provider['repair']}"))
     exit_code = doctor_exit_code(report)
+    if preflight_result is not None and not preflight_result.success:
+        exit_code = 1
     if exit_code:
         raise typer.Exit(exit_code)
 
@@ -280,6 +320,7 @@ def _render_loaded_context(
     backend_models: dict[str, str],
     *,
     model_override: str | None,
+    approval_mode: str,
     conventions: str,
     claude_md_loaded: bool,
     design_template_label: str | None,
@@ -289,13 +330,10 @@ def _render_loaded_context(
 ) -> None:
     """Render loaded scaffold context."""
     lines: list[Text] = []
-    if model_override:
-        lines.append(subtle(f"Model override: {model_override}"))
-    elif backend_models:
-        for backend in sorted(required_backends):
-            configured_model = backend_models.get(backend)
-            if configured_model:
-                lines.append(subtle(f"{backend} model: {configured_model}"))
+    for backend in sorted(required_backends):
+        configured_model = model_override or backend_models.get(backend)
+        lines.append(subtle(f"{backend} model: {configured_model or 'provider default'}"))
+    lines.append(subtle(f"Approval mode: {approval_mode}"))
 
     lines.append(subtle(f"Conventions: {len(conventions)} chars loaded"))
     for source in convention_sources:
@@ -1800,6 +1838,7 @@ def main(
         required_backends,
         backend_models,
         model_override=model,
+        approval_mode=approval_mode,
         conventions=conventions,
         claude_md_loaded=bool(claude_md_template),
         design_template_label=answers.get("design_template_label"),

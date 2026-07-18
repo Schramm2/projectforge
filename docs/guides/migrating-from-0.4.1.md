@@ -44,7 +44,9 @@ provider bypass/yolo behavior is removed. A blanket bypass requires both
 
 Run `forge doctor` after upgrading. A provider must be both installed and verifiably ready before
 Forge routes a live phase to it. Gemini may remain `preflight_required` because its CLI does not
-offer a deterministic credential-status command.
+offer a deterministic credential-status command. After provider-owned authentication, opt in to
+one read-only readiness call with `forge doctor --preflight gemini`; the resulting version-bound
+proof expires after 24 hours.
 
 ## Evidence and recovery
 

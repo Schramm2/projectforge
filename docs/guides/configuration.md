@@ -31,6 +31,11 @@ forge doctor
 An invalid config is moved to `config.json.corrupt-<timestamp>` when possible. Forge then uses safe
 defaults and asks you to run setup. Review the recovery copy locally before removing it.
 
+`~/.forge/provider-preflight.json` is separate from user preferences. When an explicit Gemini
+preflight succeeds, it records only schema version, provider name, CLI version, and verification
+timestamp with owner-only permissions. Proofs expire after 24 hours and must match the running CLI
+version. Provider output, identity, and credentials are never stored.
+
 The unversioned 0.4.1 config is normalized in memory. Existing model overrides are preserved; a
 fresh setup omits them so providers choose their current defaults. See
 [Migrating from 0.4.1](migrating-from-0.4.1.md).

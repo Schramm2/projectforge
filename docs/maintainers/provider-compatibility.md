@@ -24,8 +24,8 @@ only for the tested version. Account identity and credential values are delibera
 | Provider | Local evidence | Authentication status | Default model behavior | Safe non-interactive baseline | Dangerous escape hatch |
 | --- | --- | --- | --- | --- | --- |
 | Claude Code | 2.1.214 | `claude auth status`; JSON `loggedIn=true`, auth method recorded without identity | Omit `--model`; Claude settings/default apply. Stable aliases include `sonnet`, `opus`, and `haiku` | `claude -p --permission-mode acceptEdits --no-session-persistence <prompt>` with workspace permissions/settings constrained by the provider | `--permission-mode bypassPermissions` / `--dangerously-skip-permissions` |
-| Codex CLI | 0.144.0 installed; current GitHub release observed as 0.144.5 | `codex login status`; exit 0 and auth mode only | Omit `--model`; Codex uses the configured/recommended model | `codex exec --sandbox workspace-write --cd <workspace> <prompt>`; `--json` and `--output-last-message` are available for inspection | `--dangerously-bypass-approvals-and-sandbox` / `--yolo`, only in an externally hardened environment |
-| Gemini CLI | Not installed locally | No documented deterministic status command; installation must remain unknown/preflight-required | CLI default is `auto`; omit `--model` | `gemini --prompt <prompt> --approval-mode auto_edit --sandbox` only after runtime capability and authentication preflight; exact safe default remains under live validation | `--approval-mode yolo`; deprecated `--yolo` / `-y` |
+| Codex CLI | 0.144.0 installed; 0.144.5 probed through the official latest npm package | `codex login status`; exit 0 and auth mode only | Omit `--model`; Codex uses the configured/recommended model | `codex --ask-for-approval never --sandbox workspace-write exec --cd <workspace> <prompt>`; `--json` and `--output-last-message` are available for inspection | `--dangerously-bypass-approvals-and-sandbox` / `--yolo`, only in an externally hardened environment |
+| Gemini CLI | No global binary; 0.51.0 version/help probed through the official no-install route | No documented deterministic status command; installation remains unknown/preflight-required until an explicit model preflight succeeds | CLI default is `auto`; omit `--model` | `gemini --prompt <prompt> --approval-mode auto_edit --sandbox` only after an explicit readiness preflight | `--approval-mode yolo`; deprecated `--yolo` / `-y` |
 
 ProjectForge now maps its provider-neutral modes as follows: `safe` uses Claude `acceptEdits`,
 Codex `workspace-write` with non-interactive denial, and Gemini `auto_edit` plus sandboxing; `plan`
@@ -116,9 +116,9 @@ present; Forge should use the exit code plus a non-identifying mode classificati
 - `--dangerously-bypass-approvals-and-sandbox` disables both boundaries and is documented only for
   an isolated/external sandbox. Forge must never select it implicitly.
 
-Known limitation: the installed 0.144.0 runtime is behind the 0.144.5 GitHub release observed on
-the evidence date. Help/status evidence is valid for 0.144.0; current-stable behavior still needs
-an isolated latest-version probe before release.
+Known limitation: authentication evidence applies to the installed 0.144.0 runtime. The official
+latest npm package reported 0.144.5 and accepted the relevant version/help surface in an isolated
+probe, but it was not given access to host authentication and made no model call.
 
 ## Gemini CLI
 
@@ -142,8 +142,10 @@ cached credential or provider environment variables.
 
 The official authentication and CLI references expose no safe deterministic login-status command.
 Therefore Forge must report an installed Gemini CLI as `unknown/preflight-required`, not ready.
-The explicit verification path is a consented, minimal provider prompt in an isolated workspace or
-starting the provider-owned interactive authentication flow, followed by recheck.
+The explicit verification path is `forge doctor --preflight gemini`, after completing the
+provider-owned authentication flow. It makes one sentinel-only call in a temporary workspace using
+plan mode, sandboxing, and JSON output. A success stores only the CLI version and verification
+timestamp with a 24-hour lifetime and owner-only permissions; provider output is not persisted.
 
 ### Invocation, models, policies, and exits
 
@@ -159,9 +161,25 @@ starting the provider-owned interactive authentication flow, followed by recheck
 - `--yolo` / `-y` is deprecated in favor of `--approval-mode=yolo` and must be removed from normal
   Forge commands.
 
-Known limitations: no local binary or authentication evidence exists yet; there is no official
-status API; and a safe headless write preflight may consume quota. Release evidence must label
-Gemini live validation partial/unavailable if those conditions remain.
+Known limitations: no global binary or authentication evidence exists; there is no official status
+API; and a safe headless write preflight may consume quota. The official no-install route reported
+0.51.0 and exposed the documented prompt, model, sandbox, approval-mode, and output-format options,
+but no model call was made. Release evidence must label Gemini live validation unavailable until an
+explicit preflight succeeds.
+
+## Runtime evidence, 2026-07-18
+
+- Claude Code 2.1.214 accepted the generated safe and plan command surfaces. Its provider-owned
+  status command reported authenticated through Claude.ai; Forge retained no identity.
+- The installed Codex CLI 0.144.0 accepted the generated safe and plan command surfaces. Its
+  provider-owned status command reported authenticated through ChatGPT; Forge retained no identity.
+- The official latest Codex npm package reported 0.144.5 and exposed the required `exec`, sandbox,
+  approval, model, JSON, and final-message options in a clean no-install probe.
+- The official latest Gemini npm package reported 0.51.0 and exposed prompt, model, sandbox,
+  approval modes (`default`, `auto_edit`, `yolo`, and `plan`), and structured output in a clean
+  no-install probe. Authentication and live write behavior remain unavailable evidence.
+- All probes above were version/help/status-only. They made no model calls and recorded no account
+  identifier, credential, token, or provider response body.
 
 ## Failure taxonomy
 
@@ -182,9 +200,9 @@ retaining a redacted diagnostic summary:
 
 ## Remaining live evidence
 
-- Run current-stable Codex help/status and isolated bounded-write behavior.
-- Run stable Gemini through the official no-install route, capture version/help, and classify
-  authentication without inferring it from installation.
+- Run an isolated bounded-write probe with a current-stable authenticated provider.
+- Run Gemini's explicit opt-in readiness preflight when authentication is available; do not infer
+  readiness from the successful 0.51.0 version/help probe.
 - Run bounded Claude and Codex failure probes for permission/model/network classification where
   they can be done without secrets or external side effects.
 - Complete at least one authenticated end-to-end Forge scaffold and independently verify every
