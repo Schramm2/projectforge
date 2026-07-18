@@ -2,6 +2,11 @@
 
 Forge currently supports 7 scaffold stacks. Each stack contributes structure, common libraries, default dev commands, optional services, and Docker defaults to the generated prompt.
 
+These are scaffold recipe defaults, not a promise that every provider emits an identical layout.
+After generation, executable project metadata and `.forge/verification.json` are authoritative.
+For Python projects, Forge derives install and available lint/type/test checks from the generated
+`pyproject.toml` instead of blindly running every recipe command.
+
 All Python-oriented stacks share these broad defaults:
 
 - `uv` for package management

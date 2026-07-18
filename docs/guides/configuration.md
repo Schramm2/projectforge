@@ -1,173 +1,149 @@
 # Configuration
 
-All Forge user configuration lives under `~/.forge/`. This document covers every config file and customization point.
+ProjectForge keeps user-owned configuration under `~/.forge/` and project evidence under each
+generated project's `.forge/` directory.
 
-## Config file
+## User config
 
-**Path:** `~/.forge/config.json`
+`~/.forge/config.json` is created by `forge --setup`. Forge validates its schema, writes it
+atomically with user-only permissions, and rejects unknown keys.
 
-Created automatically by the setup wizard on first run. Contains:
+| Key | Meaning |
+| --- | --- |
+| `config_version` | Current config schema version. |
+| `preferred_editor` | Editor command used for optional project opening. |
+| `available_backends` | Provider names detected during the last setup run; readiness is rechecked. |
+| `backend_models` | Optional advanced model overrides keyed by provider. Empty means provider default/auto. |
+| `docker_available` | Docker availability observed during setup. |
+| `projects_dir` | Default parent directory for generated projects. |
+| `agents` | Default standard versus multi-agent execution preference. |
+| `sound` | Whether a successful scaffold plays the local completion sound. |
+| `conventions_profile` | Selected user convention profile name. |
 
-| Key | Description |
-|-----|-------------|
-| `preferred_editor` | Editor command Forge tries first when opening the generated project. |
-| `available_backends` | Backends that were detected during setup. |
-| `backend_models` | Optional model overrides keyed by backend name. |
-| `docker_available` | Whether Docker was available during setup. |
-| `projects_dir` | Default parent directory for new projects. |
-
-To re-run the setup wizard and regenerate this file:
+Do not place credentials, provider identity, or arbitrary extra keys in this file. Provider login
+belongs to the provider CLI. Re-run setup to change normal preferences:
 
 ```bash
 forge --setup
+forge doctor
 ```
 
-You can also edit the file directly. It is standard JSON.
+An invalid config is moved to `config.json.corrupt-<timestamp>` when possible. Forge then uses safe
+defaults and asks you to run setup. Review the recovery copy locally before removing it.
 
-## Conventions
+The unversioned 0.4.1 config is normalized in memory. Existing model overrides are preserved; a
+fresh setup omits them so providers choose their current defaults. See
+[Migrating from 0.4.1](migrating-from-0.4.1.md).
 
-Forge now treats the bundled `conventions/` tree in this repository as the canonical conventions source for released behavior.
+## Convention profiles and precedence
 
-Use the admin command to inspect and validate that tree:
+Effective convention order is deterministic, from lowest to highest precedence:
+
+1. bundled release defaults;
+2. selected `~/.forge/profiles/<name>.md`;
+3. legacy-compatible `~/.forge/conventions.md`; and
+4. project-local `.forge/conventions.md`.
+
+Later layers have higher precedence. Empty, placeholder-only, or known generated legacy mirrors are
+ignored with a warning. Credential-shaped content is rejected before a provider call.
+
+Manage user-owned profiles without editing JSON:
 
 ```bash
-forge admin conventions --validate
-forge admin conventions --preview-stack fastapi
+forge conventions init team
+forge conventions import ./CLAUDE.md --name imported-team
+forge conventions list
+forge conventions select team
+forge conventions inspect --stack fastapi --json
+forge conventions preview --stack fastapi
+forge conventions validate --stack fastapi
+forge conventions edit team
 ```
 
-The bundled tree is organized by reusable layers:
+`init` and `import` never overwrite an existing profile. Imports must be Markdown and no larger
+than 1 MB. `inspect` shows the exact ordered paths, warnings, and SHA-256 hashes; `preview` prints
+the effective content and starts no provider.
 
-```text
-conventions/
-  global/
-  languages/
-  stacks/
-  prompts/
-  manifests/
+Repository maintainers change bundled rules through `forge admin conventions`; that command is not
+the user-profile interface.
+
+## Project evidence
+
+### `.forge/progress.json`
+
+Written before the first provider phase. It stores schema version, project name and stack, approval
+mode, provider routing, prompt hashes, phase status, attempts, durations, exit codes, and stable
+failure categories. It never stores prompt or provider output. `--resume` requires this file and an
+exact execution-contract match.
+
+### `.forge/scaffold.json`
+
+Written after provider phases complete. It records Forge version, requested project facts, routing,
+provider-default versus explicit model behavior, approval mode, design/media/auth selections, demo
+mode, effective convention hash, ordered convention sources, and timestamp.
+
+### `.forge/conventions-snapshot.md`
+
+The exact effective convention content used for replay. It can contain private organization or
+personal guidance; do not paste it into public issues or external messages by default.
+
+### `.forge/verification.json`
+
+Records each generated-project check with command, project-relative working directory, startup and
+request timeouts, exit, skip reason, attempted localhost health endpoints, duration, redacted
+detail, and remediation. Its `all_passed` value drives dashboard readiness.
+
+## Generated health settings
+
+Python projects can declare bounded health-probe settings in their generated `pyproject.toml`:
+
+```toml
+[tool.forge.verification]
+health_endpoints = ["/healthz", "/readyz"]
+health_startup_timeout = 20
+health_request_timeout = 4
 ```
 
-Markdown files hold the human-authored guidance, while metadata files and manifests control inheritance, ordering, and prompt bundle assembly.
-
-### Local override compatibility
-
-Forge still supports override files for local experimentation and project-specific behavior:
-
-- `.forge/conventions.md` inside a project
-- `~/.forge/conventions.md` for a user-level override
-
-These remain compatibility paths, not the primary maintainer workflow. Repo-admin changes intended for future releases should be made in the bundled `conventions/` tree and reviewed through `forge admin conventions`.
+Forge accepts one to eight local path-only endpoints, a 1–120 second startup timeout, and a 1–30
+second request timeout. Invalid metadata falls back to `/health`, `/ready`, 12 seconds, and 3
+seconds. The host and port remain derived from the local generated-project run command.
 
 ## Design templates
 
-Design templates encode visual guidelines as prompt tokens so AI backends produce visually consistent UIs.
+Design templates apply only to frontend-capable stacks. Override order is:
 
-**Built-in template:** `default-design-guide`
+1. project-local `.forge/design-templates/<template-id>.md`;
+2. `~/.forge/design-templates/<template-id>.md`; and
+3. the template bundled with Forge.
 
-**Override paths (checked in order):**
-
-1. `.forge/design-templates/<template-id>.md` -- project-local override
-2. `~/.forge/design-templates/<template-id>.md` -- user-level override
-3. Built-in templates bundled with Forge
-
-Design templates only apply to stacks that produce frontend output: `nextjs` and `both` (monorepo). They are ignored for backend-only and CLI stacks.
-
-Today, Forge exposes one selectable design template id: `default-design-guide`. To customize it without changing code, create an override file at either `.forge/design-templates/default-design-guide.md` or `~/.forge/design-templates/default-design-guide.md`.
+The current built-in identifier is `default-design-guide`. Use live `forge --help` rather than a
+copied provider or model catalog when scripting options.
 
 ## Media assets
 
-Media assets are image files (logos, banners, icons) that get copied into scaffolded projects.
+Named collections live under the repository's `media/<collection>/` directory. `--media` accepts a
+collection name, not an arbitrary path. If exactly one collection exists, Forge can select it
+unless `--no-media` is present.
 
-**Structure:**
+Destination depends on stack: `public/` for Next.js, `static/` for FastAPI, `frontend/public/` for a
+monorepo, and `assets/` for CLI/package/worker stacks.
 
-```
-media/
-  <collection-name>/
-    logo.svg
-    banner.png
-    favicon.ico
-    ...
-```
+## Post-scaffold hook
 
-Forge currently reads media collections from the repo's top-level `media/` directory. The `--media` flag takes a collection name, not an arbitrary filesystem path:
+`~/.forge/hooks/post-scaffold.sh` runs after scaffold verification and must be executable. It is
+user-authored shell code running with your account's permissions and a 60-second limit. Review it
+before use.
 
-For example:
+Available variables are `FORGE_PROJECT_DIR`, `FORGE_PROJECT_NAME`, `FORGE_STACK`, and
+`FORGE_DEMO_MODE`. Avoid credentials in command arguments or output because hooks are outside
+Forge's provider-output redaction boundary.
 
-```bash
-forge --media sample-assets
-```
+## Local history
 
-If exactly one collection exists, Forge auto-selects it unless you pass `--no-media`.
+- `~/.forge/scaffold.log` is append-only JSONL with project name, stack, providers, target directory
+  name, demo-mode value, and timestamp. It does not store the absolute target path.
+- `~/.forge/quality.jsonl` stores local verification quality signals used for routing.
+- `~/.forge/preferences.json` stores local answer frequencies used for interactive defaults.
 
-Files from the selected collection are copied into the generated project's static asset directory depending on the stack:
-
-- `nextjs` -> `public/`
-- `fastapi` / `fastapi-ai` -> `static/`
-- `both` -> `frontend/public/`
-- `python-cli`, `ts-package`, `python-worker` -> `assets/`
-
-## Post-scaffold hooks
-
-**Path:** `~/.forge/hooks/post-scaffold.sh`
-
-A shell script that runs after every successful scaffold. Use it for custom setup steps like installing additional tools, running migrations, or sending notifications.
-
-**Available environment variables:**
-
-| Variable | Description |
-|----------|-------------|
-| `FORGE_PROJECT_DIR` | Absolute path to the generated project |
-| `FORGE_PROJECT_NAME` | Name of the project |
-| `FORGE_STACK` | Stack identifier (e.g., `fastapi`, `nextjs`) |
-| `FORGE_DEMO_MODE` | `1` when demo mode is enabled, otherwise `0` |
-
-The hook must be executable (`chmod +x`) and must exit within 60 seconds or it will be killed.
-
-Example:
-
-```bash
-#!/usr/bin/env bash
-cd "$FORGE_PROJECT_DIR"
-git remote add origin "git@github.com:myorg/${FORGE_PROJECT_NAME}.git"
-```
-
-## Scaffold log
-
-**Path:** `~/.forge/scaffold.log`
-
-An append-only JSON-lines file recording every scaffold run. Each line is a JSON object with:
-
-| Field | Description |
-|-------|-------------|
-| `name` | Project name |
-| `stack` | Stack identifier |
-| `backends` | List of AI backends used |
-| `directory` | Absolute path to the generated project |
-| `demo_mode` | Whether demo mode was enabled |
-| `timestamp` | ISO 8601 timestamp |
-
-This log is never modified or truncated by Forge. Delete or rotate it manually if needed.
-
-## Scaffold manifest
-
-**Path:** `.forge/scaffold.json` (inside every generated project)
-
-Written into every scaffolded project for provenance tracking. Contains:
-
-| Field | Description |
-|-------|-------------|
-| `forge_version` | Version of Forge that created the project |
-| `name` | Project name |
-| `stack` | Stack identifier |
-| `description` | Project description provided by the user |
-| `backends` | AI backends used during generation |
-| `routing` | Phase-to-backend mapping used for the scaffold |
-| `model_override` | Explicit `--model` value, when provided |
-| `backend_models` | Per-backend model preferences from config |
-| `design_template` | Design template applied, if any |
-| `media_collection` | Imported media collection, if any |
-| `auth_provider` | Auth provider requested, if any |
-| `demo_mode` | Whether demo mode was enabled |
-| `conventions_hash` | SHA-256 hash of the conventions file at generation time |
-| `timestamp` | ISO 8601 timestamp |
-
-This file is committed to the project's git repository. It provides a permanent record of how the project was scaffolded.
+Forge does not transmit these local analytics. Back up or move `~/.forge/` before uninstalling if
+you want to retain them. See [Security and Privacy](security-privacy.md) for the complete boundary.

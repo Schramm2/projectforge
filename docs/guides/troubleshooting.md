@@ -1,121 +1,127 @@
 # Troubleshooting
 
-## "No AI CLI tools found"
-
-**Cause:** Forge requires at least one of `claude`, `gemini`, or `codex` on your PATH.
-
-**Fix:** Install one or more:
-
-- **Claude Code:** follow the [official setup guide](https://docs.anthropic.com/en/docs/claude-code), typically `npm install -g @anthropic-ai/claude-code`
-- **Gemini CLI:** follow the [official repository README](https://github.com/google-gemini/gemini-cli), typically `npm install -g @google/gemini-cli`
-- **Codex:** follow the [official repository README](https://github.com/openai/codex), typically `npm install -g @openai/codex`
-
-Verify with:
+Start with the credential-free diagnostic:
 
 ```bash
-which claude
-which gemini
-which codex
+forge doctor
+forge doctor --json
 ```
 
-## "forge: command not found"
+The human report explains repair actions. JSON is deterministic for automation and returns zero
+only when config is valid and at least one provider is verifiably ready.
 
-**Cause:** The `forge` binary is not on your PATH.
+## `forge: command not found`
 
-**Fix by install method:**
+Check the install route:
 
-- **GitHub tool install:** Re-run `uv tool install --force https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz`, then follow uv's PATH guidance if it reports that its tool bin directory is not on PATH.
-- **Homebrew:** Run `brew reinstall --build-from-source schramm2/tap/projectforge`, then check
-  `brew --prefix` is represented on your PATH.
-- **Development checkout:** Run `uv sync --dev`, then use `./forge` from the repository root.
+- GitHub/uv: run `uv tool list`, then reinstall the immutable release if needed.
+- Homebrew: run `brew list projectforge` and `brew info schramm2/tap/projectforge`.
+- Repository checkout: run `uv sync --dev`, then use `./forge` from the repository root.
 
-ProjectForge is not currently published to PyPI.
+ProjectForge is not published to PyPI. Follow any PATH guidance printed by `uv tool install` or
+Homebrew rather than installing a similarly named package from another channel.
 
-## Setup wizard keeps running
+## Provider is missing or needs login
 
-**Cause:** The config file is missing or corrupted, so Forge triggers setup on every launch.
+Use the provider's current official installation guide:
 
-**Fix:** Delete the config and re-run setup cleanly:
+- [Claude Code](https://code.claude.com/docs/en/setup), then `claude auth login`.
+- [Codex CLI](https://github.com/openai/codex), then `codex login`.
+- [Gemini CLI](https://geminicli.com/docs/get-started/installation/) and its
+  [authentication guide](https://geminicli.com/docs/get-started/authentication/).
+
+Then rerun `forge doctor`. Forge never asks you to paste a credential.
+
+## Gemini says `preflight_required`
+
+Gemini CLI does not expose a deterministic credential-status command. Forge therefore does not
+mark it ready from installation or `--version`. Authenticate through Gemini's own flow. A future
+explicit minimal preflight can consume provider quota, so it must be deliberate; use another
+`ready` provider in the meantime.
+
+## Config is corrupted
+
+Forge preserves invalid config as `~/.forge/config.json.corrupt-<timestamp>` when possible and
+continues with safe defaults. Run:
 
 ```bash
-rm ~/.forge/config.json
 forge --setup
+forge doctor
 ```
 
-## Scaffold fails mid-generation
+Review the recovery copy locally before removing it. Unknown keys and invalid model/backend values
+are rejected; do not put provider credentials in Forge config.
 
-**Cause:** The AI CLI subprocess crashed, timed out, or returned an error.
+## Provider phase fails
 
-**Fix:**
+Forge classifies missing binary, authentication, unavailable model, quota/rate limit, network,
+permission, timeout, and unknown failures. Preserve the partial project and `.forge/progress.json`.
 
-1. Re-run with verbose output to see the full subprocess log:
-   ```bash
-   forge --verbose
-   ```
-2. Try a different backend:
-   ```bash
-   forge --use gemini
-   ```
-3. Verify the prompt is well-formed:
-   ```bash
-   forge --dry-run
-   ```
-4. Check that the AI CLI works independently (e.g., run `claude` directly in your terminal).
+1. Follow the redacted remediation shown for the category.
+2. Rerun `forge doctor` for install/auth/network readiness when applicable.
+3. Repeat the original scaffold command with `--resume`.
 
-## "git init failed"
+Resume rejects a different name, stack, routing, prompt hash, or approval mode and skips completed
+phases. Do not delete successful phase output or rerun the entire scaffold blindly.
 
-**Cause:** Git is not installed or not on PATH.
+For an explicit model failure, remove `--model` to return to the provider default or choose a value
+the provider supports. Forge does not maintain a volatile model catalog.
 
-**Fix:** Install git from [git-scm.com](https://git-scm.com) or via your package manager. Verify with:
+## Permission or sandbox failure
 
-```bash
-which git
-git --version
-```
+Keep `--approval-mode safe`. Confirm the target workspace is correct and adjust only the provider's
+scoped workspace policy. Do not jump to unsafe mode as a general fix.
 
-## Post-scaffold hook not running
+`--approval-mode unsafe --allow-unsafe` removes provider approval or sandbox boundaries. It is for
+an externally isolated environment and explicit user intent, not routine recovery.
 
-**Cause:** The hook file is missing, not executable, or exceeds the timeout.
+## Resume contract differs
 
-**Checklist:**
+Repeat the original flags and restore the same effective convention sources. `forge conventions
+inspect --stack <stack> --json` shows current source hashes. If you intentionally changed the
+brief, conventions, routing, model, or approval mode, choose a new target rather than mixing
+contracts.
 
-1. File exists at `~/.forge/hooks/post-scaffold.sh`.
-2. File is executable: `chmod +x ~/.forge/hooks/post-scaffold.sh`.
-3. Script exits within 60 seconds. Long-running tasks should be backgrounded or moved to a separate script.
+Scaffolds created by 0.4.1 have no phase ledger and cannot be resumed retroactively.
 
-Test the hook manually:
+## Verification fails after generation
 
-```bash
-FORGE_PROJECT_DIR=/tmp/test FORGE_PROJECT_NAME=test FORGE_STACK=fastapi FORGE_DEMO_MODE=0 bash ~/.forge/hooks/post-scaffold.sh
-```
+Open `.forge/verification.json` and find the first required failure. Run its recorded command from
+its recorded project-relative working directory. The report includes startup/request timeouts,
+exit, attempted endpoints, redacted detail, and remediation.
 
-## Shell completions not working
+Do not interpret a successful provider exit as a verified project. The dashboard reports
+`Project Ready` only when required checks pass.
 
-**Cause:** The completion script is missing or the completion cache is stale.
+If health probing uses the wrong project path or timing, declare bounded settings in the generated
+`pyproject.toml` as described in [Configuration](configuration.md), then rerun the recorded local
+server/check flow.
 
-**Fix (zsh):**
+## Existing target directory
+
+For a new scaffold, interactive Forge offers rename, confirmed overwrite, or cancel. Use
+`--resume` only when the target contains matching `.forge/progress.json` evidence. Never point an
+automated run at a non-empty unrelated directory.
+
+## Post-scaffold hook fails
+
+Check that `~/.forge/hooks/post-scaffold.sh` exists, is executable, and finishes within 60 seconds.
+Run it manually only after reviewing it as user-authored shell code. Hook output can contain data
+outside Forge's provider redaction boundary.
+
+## Shell completion is stale
+
+Regenerate it with:
 
 ```bash
 forge --install-completion
-exec zsh
 ```
 
-If you want to manage the script manually, export it and place it on your `fpath`:
+Start a new shell after installation.
 
-```bash
-mkdir -p ~/.zfunc
-forge --show-completion > ~/.zfunc/_forge
-fpath=(~/.zfunc $fpath)
-autoload -Uz compinit && compinit
-```
+## Still blocked
 
-## Corrupted config
-
-**Cause:** `~/.forge/config.json` contains invalid JSON, usually from a crash during setup.
-
-**Fix:** Delete and regenerate:
-
-```bash
-rm ~/.forge/config.json
-forge --setup
-```
+Check [Security and Privacy](security-privacy.md), then open a
+[GitHub issue](https://github.com/Schramm2/projectforge/issues) with Forge/provider versions,
+operating system, approval mode, minimal reproduction steps, and redacted evidence. Do not attach
+credentials, `.env` content, raw prompts, provider identity, or convention snapshots.

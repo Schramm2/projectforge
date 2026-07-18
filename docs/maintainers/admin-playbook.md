@@ -4,14 +4,16 @@ This guide explains how to maintain ProjectForge as an administrator: where orga
 
 ## Mental model
 
-There are now two distinct layers:
+There are now two ownership surfaces:
 
 1. Canonical bundled conventions, owned in this repository under `conventions/` and shipped in Forge releases.
-2. Local compatibility overrides, which still live in project-local `.forge/` folders or `~/.forge/` on a user's machine.
+2. User-owned profiles and overrides under `~/.forge/` or a project's `.forge/` directory.
 
 If the change should become part of the product, edit the bundled `conventions/` tree in this repo and ship a release.
 
-If the change is only for a local experiment or one project, use `.forge/conventions.md` or `~/.forge/conventions.md`.
+If the change is user-specific, use `forge conventions` profiles. For a one-project exception, use
+`.forge/conventions.md`. Effective order is bundled defaults, selected profile, user-wide override,
+then project-local override.
 
 ## The canonical conventions tree
 
@@ -95,10 +97,11 @@ If you want to add a new selectable design template, add it to `DESIGN_TEMPLATE_
 
 ## Important behavior: local overrides still exist
 
-Forge still honors local override files when present:
+Forge composes user-owned layers after bundled sources:
 
-1. `.forge/conventions.md` inside a project
-2. `~/.forge/conventions.md` for a user
+1. selected `~/.forge/profiles/<name>.md`
+2. `~/.forge/conventions.md` compatibility override
+3. `.forge/conventions.md` project override
 
 Those are compatibility paths and should not be treated as the repo-admin source of truth.
 
@@ -173,8 +176,13 @@ Homebrew resource blocks are generated from `uv.lock`, not maintained by hand.
 Run:
 
 ```bash
+uv run python scripts/scan_safety.py
+uv run python scripts/check_docs.py
+uv run python scripts/validate_forge_skill.py
+uv run ruff check src/ubundiforge tests
 uv run pytest
-uv run ruff check .
+uv build
+uv run python scripts/inspect_artifacts.py
 ```
 
 If you changed stack behavior, also run a dry-run smoke test:
@@ -189,7 +197,7 @@ If you changed stack behavior, also run a dry-run smoke test:
 Use the repository's normal reviewed branch flow. Do not bypass review by committing directly to
 `main` unless a maintainer explicitly authorizes it.
 
-The Homebrew release workflow handles the rest automatically:
+The Homebrew release workflow first verifies tap publication authorization, then handles the rest:
 
 - creates `vX.Y.Z` if it does not already exist
 - creates the GitHub release
@@ -199,7 +207,9 @@ The Homebrew release workflow handles the rest automatically:
 
 See `docs/maintainers/homebrew-release.md` for the Homebrew release runbook, including the release steps, expected workflow behavior, verification checks, and the `sync_only=true` recovery flow.
 
-If the workflow creates the tag but fails before the formula or tap update completes, re-run `.github/workflows/release-homebrew.yml` manually with `sync_only=true`. That recovery mode re-syncs the formula and tap without trying to cut the tag again.
+If an unexpected post-tag failure occurs before formula or tap synchronization completes, re-run
+`.github/workflows/release-homebrew.yml` manually with `sync_only=true`. Missing tap authorization
+must fail before the tag is created.
 
 ### 5. Manual fallback
 
@@ -271,8 +281,8 @@ For a normal admin release:
 2. Bump version in `pyproject.toml` and `src/ubundiforge/__init__.py`.
 3. Refresh `uv.lock` if dependencies changed.
 4. Run tests and a dry-run scaffold.
-5. Push the release commit to `main`.
-6. Confirm the release workflow tagged, released, and updated both formulas.
+5. Merge the reviewed feature/release PR through the hosted workflow.
+6. Confirm the credential preflight and release workflow tagged, released, and updated both formulas.
 
 ## Future improvement ideas
 

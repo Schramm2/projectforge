@@ -121,6 +121,32 @@ jobs:
           echo "publish_release=true" >> "$GITHUB_OUTPUT"
           echo "sync_formula=true" >> "$GITHUB_OUTPUT"
 
+      - name: Ensure tap publication is authorized
+        if: steps.mode.outputs.sync_formula == 'true'
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "${TAP_REPO}" ]; then
+            echo "::error::HOMEBREW_TAP_REPO is not configured."
+            exit 1
+          fi
+          if [ -z "${TAP_TOKEN}" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN is not configured. Add a token with write access to ${TAP_REPO}."
+            exit 1
+          fi
+
+      - name: Run public-safety scan
+        if: steps.mode.outputs.run_checks == 'true'
+        run: python scripts/scan_safety.py
+
+      - name: Check documentation links
+        if: steps.mode.outputs.run_checks == 'true'
+        run: python scripts/check_docs.py
+
+      - name: Validate Forge operator skill
+        if: steps.mode.outputs.run_checks == 'true'
+        run: python scripts/validate_forge_skill.py
+
       - name: Lint
         if: steps.mode.outputs.run_checks == 'true'
         run: uv run ruff check .
@@ -132,6 +158,10 @@ jobs:
       - name: Build package
         if: steps.mode.outputs.run_checks == 'true'
         run: uv build
+
+      - name: Inspect package artifacts
+        if: steps.mode.outputs.run_checks == 'true'
+        run: python scripts/inspect_artifacts.py
 
       - name: Smoke-test forge dry run
         if: steps.mode.outputs.run_checks == 'true'
@@ -195,21 +225,6 @@ jobs:
           fi
           git commit -m "release: update Homebrew formula for ${{ steps.meta.outputs.tag }}"
           git push origin HEAD:main
-
-      # Tap access is checked only after the release and canonical formula are published. A stale
-      # cross-repository token should make tap synchronization fail visibly without suppressing
-      # the GitHub release itself.
-      - name: Ensure tap token is configured
-        if: steps.mode.outputs.sync_formula == 'true'
-        run: |
-          if [ -z "${TAP_REPO}" ]; then
-            echo "::error::HOMEBREW_TAP_REPO is not configured."
-            exit 1
-          fi
-          if [ -z "${{ secrets.HOMEBREW_TAP_TOKEN }}" ]; then
-            echo "::error::HOMEBREW_TAP_TOKEN is not configured. Add a token with write access to ${TAP_REPO}."
-            exit 1
-          fi
 
       - name: Check out Homebrew tap
         if: steps.mode.outputs.sync_formula == 'true'

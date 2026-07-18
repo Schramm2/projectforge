@@ -63,19 +63,19 @@ Baseline gaps already proven:
 - [x] Use documented Claude and Codex status commands and exit behavior.
 - [x] Report Gemini authentication as unknown/preflight-required unless a safe prompt preflight was
   explicitly run; never infer authentication from installation or `--version`.
-- [ ] Classify missing binary, unauthenticated, unavailable model, quota/rate limit, network,
+- [x] Classify missing binary, unauthenticated, unavailable model, quota/rate limit, network,
   permission denial, timeout, and unknown failures with provider-specific repair steps.
 - [x] Ensure one authenticated provider is sufficient and optional missing providers do not block.
-- [ ] Add unit and journey tests for fresh install, no-provider, logged-out, one-provider, and
+- [x] Add unit and journey tests for fresh install, no-provider, logged-out, one-provider, and
   multiple-provider states.
 
 ## Setup, config, and models
 
-- [ ] Make setup guide install -> authenticate -> recheck without reading or persisting provider
+- [x] Make setup guide install -> authenticate -> recheck without reading or persisting provider
   credentials.
 - [x] Default model selection to provider default/auto; preserve explicit model overrides as an
   advanced option.
-- [ ] Validate explicit aliases where the provider exposes stable validation; otherwise label the
+- [x] Validate explicit aliases where the provider exposes stable validation; otherwise label the
   override as provider-validated at execution time.
 - [x] Make config writes atomic and preserve a recoverable corrupted copy.
 - [x] Validate config shape and migrate v0.4.1 model preferences safely.
@@ -89,11 +89,11 @@ Baseline gaps already proven:
 - [x] Add friendly initialize, import, edit, select, inspect, preview, and validate commands.
 - [x] Safely import Markdown instruction surfaces including `AGENTS.md`, `CLAUDE.md`, and ordinary
   convention files.
-- [ ] Support documented placeholders and reject unknown or secret-bearing values.
+- [x] Support documented placeholders and reject unknown or secret-bearing values.
 - [x] Show exact source paths, order, warnings, and hashes in dry runs and live preflight.
 - [x] Snapshot effective conventions plus source metadata for replay.
-- [ ] Preserve replay compatibility and document v0.4.1 migration behavior.
-- [ ] Add regression coverage for user-wide conventions in an ordinary stack plus project
+- [x] Preserve replay compatibility and document v0.4.1 migration behavior.
+- [x] Add regression coverage for user-wide conventions in an ordinary stack plus project
   precedence, profiles, placeholders, validation, hashes, snapshots, replay, and privacy.
 
 ## Safe provider execution
@@ -108,7 +108,7 @@ Baseline gaps already proven:
 - [x] Share command construction between standard and orchestrated adapters.
 - [x] Add tests for defaults, migration, consent, non-interactive runs, boundaries, redaction, and
   unsupported combinations.
-- [ ] Document provider trust boundaries, data sent, local writes, recovery, and the unsafe escape
+- [x] Document provider trust boundaries, data sent, local writes, recovery, and the unsafe escape
   hatch in user language.
 
 ## Reliability, verification, and recovery
@@ -147,14 +147,14 @@ Baseline gaps already proven:
 
 ## Documentation, packaging, and CI
 
-- [ ] Update README and user docs for install, provider auth, conventions, preview, approval,
+- [x] Update README and user docs for install, provider auth, conventions, preview, approval,
   scaffold, verification, troubleshooting, v0.4.1 migration, and uninstall.
-- [ ] Add concise provider/support and security/privacy documentation with official links.
-- [ ] Remove stale or contradictory commands and make volatile provider facts link-only.
-- [ ] Verify every documented command against current `--help`.
-- [ ] Verify internal links and practical official external links.
-- [ ] Expand CI to the supported Python and OS matrix or narrow the documented support claim.
-- [ ] Inspect wheel/sdist contents, metadata, bundled conventions, and skill packaging.
+- [x] Add concise provider/support and security/privacy documentation with official links.
+- [x] Remove stale or contradictory commands and make volatile provider facts link-only.
+- [x] Verify every documented command against current `--help`.
+- [x] Verify internal links and practical official external links.
+- [x] Expand CI to the supported Python and OS matrix or narrow the documented support claim.
+- [x] Inspect wheel/sdist contents, metadata, bundled conventions, and skill packaging.
 - [ ] Test isolated source and wheel installs.
 
 ## Release gates
