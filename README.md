@@ -187,7 +187,8 @@ Forge writes these project-local records:
 | --- | --- |
 | `.forge/progress.json` | Prompt hashes, attempts, durations, failure category, and resume state |
 | `.forge/scaffold.json` | Requested facts, routing, models, approval mode, and convention hashes |
-| `.forge/conventions-snapshot.md` | Exact replay input; potentially private |
+| `.forge/conventions-snapshot.md` | Exact convention replay input; potentially private |
+| `.forge/context-snapshot.md` | User-approved project brief and selected nearby context; potentially private |
 | `.forge/verification.json` | Redacted commands, working directories, timeouts, exits, endpoints, and remediation |
 
 The dashboard reports `Project Ready` only when required verification passes. If verification was
@@ -226,10 +227,21 @@ Forge checks the original name, stack, routing, prompt hashes, and approval mode
 completed phases and retries incomplete ones. Contract drift is rejected rather than silently
 mixing two scaffolds.
 
-## Manage conventions
+## Teach Forge how you work
 
-Effective precedence is bundled defaults, selected user profile, `~/.forge/conventions.md`, then
-project-local `.forge/conventions.md`. Later layers have higher precedence.
+First-run setup asks how Forge should handle conventions. You can start with the bundled defaults,
+import nearby `AGENTS.md`, `CLAUDE.md`, or Copilot instructions, or answer a short interview that
+creates and selects a reusable profile. Rerunning setup preserves the selected profile unless you
+choose another option.
+
+Each interactive scaffold gathers project context separately. The short project brief covers the
+intended users, first useful outcome, and constraints. Forge can also show a bounded list of nearby
+Markdown files; no file content is included unless you select it. Selected files are secret-scanned
+before being added to the provider prompt.
+
+Effective convention precedence is bundled defaults, selected user profile,
+`~/.forge/conventions.md`, then project-local `.forge/conventions.md`. Later layers have higher
+precedence.
 
 ```bash
 forge conventions init team

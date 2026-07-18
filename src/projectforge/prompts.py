@@ -1,5 +1,6 @@
 """Interactive question flow for gathering project details."""
 
+import pathlib
 import re
 
 import questionary
@@ -9,6 +10,7 @@ from projectforge.design_templates import (
     design_template_choices_for_stack,
 )
 from projectforge.media_assets import list_collections
+from projectforge.project_context import discover_context_files, load_context_sources
 from projectforge.questionary_theme import (
     prompt_checkbox,
     prompt_confirm,
@@ -293,6 +295,113 @@ def _ask_project_basics(answers: dict, *, docker_available: bool) -> None:
     answers["docker"] = docker
 
 
+def _ask_project_context(answers: dict) -> None:
+    """Collect a short project brief and optionally load user-selected nearby Markdown."""
+    console = create_console()
+    console.print(
+        make_panel(
+            grouped_lines(
+                [
+                    "Give Forge enough context to make project-specific choices.",
+                    subtle("The short brief takes three questions. Deeper details are optional."),
+                    muted("Nearby files are included only when you select them below."),
+                ]
+            ),
+            title="Project Context",
+            accent="aqua",
+        )
+    )
+
+    current = answers.get("project_brief") or {}
+    add_brief = prompt_confirm(
+        "Add a short project brief? (recommended)",
+        default=True,
+    ).ask()
+    if add_brief is None:
+        raise SystemExit(0)
+
+    brief = {
+        "audience": "",
+        "first_success": "",
+        "constraints": "",
+        "existing_systems": "",
+        "non_goals": "",
+    }
+    if add_brief:
+        questions = (
+            ("audience", "Who will use this project?"),
+            ("first_success", "What should the first useful version help them do?"),
+            ("constraints", "What constraints should Forge respect?"),
+        )
+        for key, message in questions:
+            value = prompt_text(message, default=current.get(key, "")).ask()
+            if value is None:
+                raise SystemExit(0)
+            brief[key] = value.strip()
+
+        add_details = prompt_confirm(
+            "Add existing systems or explicit non-goals?",
+            default=bool(current.get("existing_systems") or current.get("non_goals")),
+        ).ask()
+        if add_details is None:
+            raise SystemExit(0)
+        if add_details:
+            details = (
+                ("existing_systems", "Existing systems, APIs, or repositories"),
+                ("non_goals", "What should this scaffold explicitly not include?"),
+            )
+            for key, message in details:
+                value = prompt_text(message, default=current.get(key, "")).ask()
+                if value is None:
+                    raise SystemExit(0)
+                brief[key] = value.strip()
+    answers["project_brief"] = brief
+
+    discovered = discover_context_files()
+    if not discovered:
+        answers["context_sources"] = []
+        return
+
+    console.print(
+        make_panel(
+            grouped_lines(
+                [
+                    f"Forge found {len(discovered)} nearby Markdown file(s).",
+                    subtle("Select only files that should inform this scaffold."),
+                    muted(
+                        "Selected content is secret-scanned, added to the provider prompt, "
+                        "and recorded in the project context snapshot."
+                    ),
+                ]
+            ),
+            title="Nearby Context",
+            accent="amber",
+        )
+    )
+    current_paths = {
+        source.path if hasattr(source, "path") else source.get("path", "")
+        for source in answers.get("context_sources", [])
+    }
+    selected = prompt_checkbox(
+        "Choose nearby context files to include",
+        choices=[
+            questionary.Choice(
+                path.relative_to(pathlib.Path.cwd()).as_posix(),
+                value=path,
+                checked=path.relative_to(pathlib.Path.cwd()).as_posix() in current_paths,
+            )
+            for path in discovered
+        ],
+    ).ask()
+    if selected is None:
+        raise SystemExit(0)
+
+    result = load_context_sources(selected)
+    answers["context_sources"] = list(result.sources)
+    for warning in result.warnings:
+        console.print(status_line(warning, accent="amber"))
+
+
 def _ask_design_and_media(answers: dict) -> None:
     """Collect or edit design template and media choices."""
     stack = answers["stack"]
@@ -430,6 +539,15 @@ def _review_answers(answers: dict) -> str:
                     subtle(f"Name: {answers.get('name')}"),
                     subtle(f"Stack: {_stack_label(answers.get('stack', ''))}"),
                     subtle(f"Description: {answers.get('description')}"),
+                    subtle(
+                        "Project brief: "
+                        + (
+                            "Added"
+                            if any((answers.get("project_brief") or {}).values())
+                            else "Not added"
+                        )
+                    ),
+                    subtle(f"Nearby context: {len(answers.get('context_sources', []))} selected"),
                     subtle(f"Docker: {'Yes' if answers.get('docker') else 'No'}"),
                     subtle(f"Design template: {design_label}"),
                     subtle(f"Media collection: {answers.get('media_collection') or 'None'}"),
@@ -451,6 +569,7 @@ def _review_answers(answers: dict) -> str:
         choices=[
             questionary.Choice("Scaffold project", value="scaffold"),
             questionary.Choice("Edit basics", value="basics"),
+            questionary.Choice("Edit project context", value="context"),
             questionary.Choice("Edit design and media", value="appearance"),
             questionary.Choice("Edit auth, services, CI, and extras", value="integrations"),
             questionary.Choice("Edit demo mode", value="demo"),
@@ -473,6 +592,8 @@ def collect_answers(docker_available: bool = True) -> dict:
         "name": "",
         "stack": "nextjs",
         "description": "",
+        "project_brief": {},
+        "context_sources": [],
         "docker": None,
         "design_template": None,
         "media_collection": None,
@@ -485,6 +606,7 @@ def collect_answers(docker_available: bool = True) -> dict:
     }
 
     _ask_project_basics(answers, docker_available=docker_available)
+    _ask_project_context(answers)
 
     # Smart defaults — offer to skip remaining questions if patterns detected
     from projectforge.preferences import get_defaults
@@ -543,6 +665,9 @@ def collect_answers(docker_available: bool = True) -> dict:
             return answers
         if action == "basics":
             _ask_project_basics(answers, docker_available=docker_available)
+            continue
+        if action == "context":
+            _ask_project_context(answers)
             continue
         if action == "appearance":
             _ask_design_and_media(answers)

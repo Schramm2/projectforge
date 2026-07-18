@@ -4,9 +4,13 @@ ProjectForge launches an AI provider CLI on your machine. Review the boundary be
 
 ## What leaves your machine
 
-For live generation, Forge sends the assembled project brief, effective conventions, selected
-design or media context, and phase instructions to the chosen provider through that provider's
-installed CLI. The provider's terms, retention policy, account configuration, and billing apply.
+For live generation, Forge sends the assembled project brief, effective conventions, explicitly
+selected nearby Markdown, design or media context, and phase instructions to the chosen provider
+through that provider's installed CLI. Nearby context discovery checks only a bounded set of known
+filenames in the current folder. Forge includes none of their content until you select files in the
+questionnaire. Selected files are limited to 32 KB each and 64 KB together and are secret-scanned
+before prompt assembly. The provider's terms, retention policy, account configuration, and billing
+apply.
 
 `--dry-run` starts no provider process and makes no model call. `--export` also avoids provider
 calls, but the exported prompt can contain private conventions and should be handled accordingly.
@@ -53,14 +57,16 @@ Generated projects may contain:
 - `.forge/progress.json` — prompt hashes and resumable phase state, never prompt content;
 - `.forge/scaffold.json` — requested facts, routing, approval mode, and convention provenance;
 - `.forge/conventions-snapshot.md` — exact effective conventions; treat it as potentially private;
+- `.forge/context-snapshot.md` — approved project brief and selected nearby content, when supplied;
+  treat it as potentially private;
 - `.forge/verification.json` — redacted commands, exits, timeouts, endpoints, and remediation; and
 - `.forge/card.svg` — the generated project card.
 
 `~/.forge/scaffold.log`, quality signals, and preferences stay local. The scaffold log records only
 the target directory name, not its absolute path. Forge redacts credential-shaped values from
 progress and durable verification evidence, but secret scanning is defense in depth: never put
-credentials in descriptions, extra instructions, conventions, exported prompts, or generated
-fixtures.
+credentials in project briefs, nearby context files, descriptions, extra instructions, conventions,
+exported prompts, or generated fixtures.
 
 Post-scaffold hooks are user-authored shell code and run with your account's permissions. Review
 `~/.forge/hooks/post-scaffold.sh` before enabling it.

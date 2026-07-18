@@ -8,6 +8,7 @@ Each phase has two prompt variants:
   - best: used when the ideal/specialist backend handles the phase
 """
 
+from projectforge.project_context import build_project_context_block
 from projectforge.router import PHASE_IDEAL_BACKEND
 from projectforge.scaffold_options import AUTH_PROVIDER_OPTIONS, CI_ACTION_OPTIONS
 from projectforge.stacks import CROSS_RECIPE_DEFAULTS, STACK_META
@@ -78,6 +79,17 @@ def _demo_mode_section(answers: dict) -> str:
     if answers.get("demo_mode"):
         return DEMO_MODE_BLOCK
     return ""
+
+
+def _with_project_context(prompt: str, answers: dict) -> str:
+    """Insert approved project context once, immediately before extra instructions."""
+    block = build_project_context_block(answers)
+    if not block or "<project_context>" in prompt:
+        return prompt
+    marker = "<extra_instructions>"
+    if marker not in prompt:
+        return f"{prompt.rstrip()}\n\n{block}"
+    return prompt.replace(marker, f"{block}\n{marker}", 1)
 
 
 def _format_env_hint(hint: str, project_name: str) -> str:
@@ -316,7 +328,7 @@ comment where the logic is non-obvious.
 {extra}
 </extra_instructions>"""
 
-    return prompt
+    return _with_project_context(prompt, answers)
 
 
 # ---------------------------------------------------------------------------
@@ -1835,58 +1847,61 @@ def build_phase_prompt(
     # All phases merged → standard full prompt (identical to pre-multi-backend behavior)
     if phase_set == all_set:
         if backend == "codex":
-            return build_prompt_codex(answers, conventions, claude_md_template)
-        return build_prompt(answers, conventions, claude_md_template)
-
-    # Architecture phase (possibly merged with others)
-    if "architecture" in phase_set:
+            prompt = build_prompt_codex(answers, conventions, claude_md_template)
+        else:
+            prompt = build_prompt(answers, conventions, claude_md_template)
+    elif "architecture" in phase_set:
+        # Architecture phase (possibly merged with others)
         exclude_frontend = "frontend" in all_set and "frontend" not in phase_set
         exclude_tests = "tests" in all_set and "tests" not in phase_set
         if backend == "codex":
-            return build_architecture_prompt_codex(
+            prompt = build_architecture_prompt_codex(
                 answers,
                 conventions,
                 claude_md_template,
                 exclude_frontend,
                 exclude_tests,
             )
-        if _is_ideal_backend("architecture", backend):
-            return build_architecture_prompt_best(
+        elif _is_ideal_backend("architecture", backend):
+            prompt = build_architecture_prompt_best(
                 answers,
                 conventions,
                 claude_md_template,
                 exclude_frontend,
                 exclude_tests,
             )
-        return build_architecture_prompt(
-            answers,
-            conventions,
-            claude_md_template,
-            exclude_frontend,
-            exclude_tests,
-        )
-
-    # Standalone frontend phase
-    if "frontend" in phase_set:
+        else:
+            prompt = build_architecture_prompt(
+                answers,
+                conventions,
+                claude_md_template,
+                exclude_frontend,
+                exclude_tests,
+            )
+    elif "frontend" in phase_set:
+        # Standalone frontend phase
         if backend == "codex":
-            return build_frontend_prompt_codex(answers)
-        if _is_ideal_backend("frontend", backend):
-            return build_frontend_prompt_best(answers)
-        return build_frontend_prompt(answers)
-
-    # Standalone tests phase
-    if "tests" in phase_set:
+            prompt = build_frontend_prompt_codex(answers)
+        elif _is_ideal_backend("frontend", backend):
+            prompt = build_frontend_prompt_best(answers)
+        else:
+            prompt = build_frontend_prompt(answers)
+    elif "tests" in phase_set:
+        # Standalone tests phase
         if _is_ideal_backend("tests", backend):
-            return build_tests_prompt_best(answers)
-        return build_tests_prompt(answers)
-
-    # Standalone verify phase
-    if "verify" in phase_set:
+            prompt = build_tests_prompt_best(answers)
+        else:
+            prompt = build_tests_prompt(answers)
+    elif "verify" in phase_set:
+        # Standalone verify phase
         if backend == "codex":
-            return build_verify_prompt_codex(answers)
-        if _is_ideal_backend("verify", backend):
-            return build_verify_prompt_best(answers)
-        return build_verify_prompt(answers)
+            prompt = build_verify_prompt_codex(answers)
+        elif _is_ideal_backend("verify", backend):
+            prompt = build_verify_prompt_best(answers)
+        else:
+            prompt = build_verify_prompt(answers)
+    else:
+        # Shouldn't happen, but fallback to full prompt
+        prompt = build_prompt(answers, conventions, claude_md_template)
 
-    # Shouldn't happen, but fallback to full prompt
-    return build_prompt(answers, conventions, claude_md_template)
+    return _with_project_context(prompt, answers)
