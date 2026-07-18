@@ -121,10 +121,26 @@ jobs:
           echo "publish_release=true" >> "$GITHUB_OUTPUT"
           echo "sync_formula=true" >> "$GITHUB_OUTPUT"
 
-      - name: Ensure tap publication is authorized
+      - name: Probe current tap release
         if: steps.mode.outputs.sync_formula == 'true'
+        id: tap_probe
+        run: |
+          tap_formula_url="https://raw.githubusercontent.com/${TAP_REPO}/${TAP_BRANCH}/Formula/projectforge.rb"
+          if curl -fsSL "${tap_formula_url}" -o /tmp/projectforge-tap-formula.rb \
+            && grep -Fq "refs/tags/${{ steps.meta.outputs.tag }}.tar.gz" /tmp/projectforge-tap-formula.rb; then
+            echo "claims_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "claims_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify tap publication access
+        if: >-
+          steps.mode.outputs.sync_formula == 'true' &&
+          (steps.mode.outputs.publish_release == 'true' ||
+          steps.tap_probe.outputs.claims_release != 'true')
         env:
           TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           if [ -z "${TAP_REPO}" ]; then
             echo "::error::HOMEBREW_TAP_REPO is not configured."
@@ -132,6 +148,10 @@ jobs:
           fi
           if [ -z "${TAP_TOKEN}" ]; then
             echo "::error::HOMEBREW_TAP_TOKEN is not configured. Add a token with write access to ${TAP_REPO}."
+            exit 1
+          fi
+          if [ "$(gh api "repos/${TAP_REPO}" --jq '.permissions.push // false')" != "true" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN cannot push to ${TAP_REPO}."
             exit 1
           fi
 
@@ -213,6 +233,37 @@ jobs:
             --source-url "${{ steps.checksum.outputs.source_url }}" \
             --source-sha256 "${{ steps.checksum.outputs.source_sha256 }}"
 
+      - name: Compare generated formula with Homebrew tap
+        if: steps.mode.outputs.sync_formula == 'true'
+        id: tap_sync
+        run: |
+          tap_formula_url="https://raw.githubusercontent.com/${TAP_REPO}/${TAP_BRANCH}/Formula/projectforge.rb"
+          if curl -fsSL "${tap_formula_url}" -o /tmp/projectforge-tap-formula.rb \
+            && cmp -s Formula/projectforge.rb /tmp/projectforge-tap-formula.rb; then
+            echo "already_synced=true" >> "$GITHUB_OUTPUT"
+            echo "Homebrew tap already matches the generated formula."
+          else
+            echo "already_synced=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify deferred tap publication access
+        if: >-
+          steps.mode.outputs.sync_formula == 'true' &&
+          steps.tap_sync.outputs.already_synced != 'true' &&
+          steps.tap_probe.outputs.claims_release == 'true'
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "${TAP_TOKEN}" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN is not configured. Add a token with write access to ${TAP_REPO}."
+            exit 1
+          fi
+          if [ "$(gh api "repos/${TAP_REPO}" --jq '.permissions.push // false')" != "true" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN cannot push to ${TAP_REPO}."
+            exit 1
+          fi
+
       - name: Commit updated formula to main repo
         if: steps.mode.outputs.sync_formula == 'true'
         run: |
@@ -227,7 +278,9 @@ jobs:
           git push origin HEAD:main
 
       - name: Check out Homebrew tap
-        if: steps.mode.outputs.sync_formula == 'true'
+        if: >-
+          steps.mode.outputs.sync_formula == 'true' &&
+          steps.tap_sync.outputs.already_synced != 'true'
         uses: actions/checkout@v4
         with:
           repository: ${{ env.TAP_REPO }}
@@ -236,13 +289,17 @@ jobs:
           path: tap-checkout
 
       - name: Sync formula into Homebrew tap
-        if: steps.mode.outputs.sync_formula == 'true'
+        if: >-
+          steps.mode.outputs.sync_formula == 'true' &&
+          steps.tap_sync.outputs.already_synced != 'true'
         run: |
           mkdir -p tap-checkout/Formula
           cp Formula/projectforge.rb tap-checkout/Formula/projectforge.rb
 
       - name: Commit and push Homebrew tap update
-        if: steps.mode.outputs.sync_formula == 'true'
+        if: >-
+          steps.mode.outputs.sync_formula == 'true' &&
+          steps.tap_sync.outputs.already_synced != 'true'
         run: |
           cd tap-checkout
           git config user.name "github-actions[bot]"
