@@ -13,6 +13,10 @@ the next release is prepared.
   boundary, input flow, routing, prompt assembly, runtime pipeline, project lifecycle, and trust
   boundaries.
 - A maintained inventory of user-visible failure paths and their recovery-safe wording.
+- Guided convention onboarding with nearby instruction import, reusable profile interviews, and a
+  separate project brief with opt-in, bounded, secret-scanned Markdown context.
+- Project context source hashes and a potentially private `.forge/context-snapshot.md` for local
+  replay when a scaffold used approved project context.
 
 ### Changed
 
@@ -25,6 +29,8 @@ the next release is prepared.
   paths, or hook failure streams.
 - Failure paths preserve completed project work and distinguish required scaffold records from
   optional local evidence so non-critical record failures do not erase a successful scaffold.
+- Rerunning setup now preserves the selected convention profile, execution preference, and sound
+  preference unless the user changes them.
 
 ## [0.6.0] - 2026-07-18
 

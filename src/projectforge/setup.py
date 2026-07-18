@@ -11,6 +11,7 @@ from pathlib import Path
 
 import questionary
 from rich.console import Console
+from rich.text import Text
 
 from projectforge.config import (
     SUPPORTED_BACKENDS,
@@ -18,8 +19,20 @@ from projectforge.config import (
     get_backend_statuses,
     normalize_legacy_backend,
 )
-from projectforge.conventions import BUNDLED_CONVENTIONS_DIR, CONVENTIONS_PATH, FORGE_DIR
-from projectforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
+from projectforge.convention_models import ConventionValidationError
+from projectforge.convention_profiles import (
+    build_guided_profile_content,
+    build_import_profile_content,
+    discover_instruction_files,
+    save_profile_content,
+)
+from projectforge.conventions import CONVENTIONS_PATH, FORGE_DIR
+from projectforge.questionary_theme import (
+    prompt_checkbox,
+    prompt_confirm,
+    prompt_select,
+    prompt_text,
+)
 from projectforge.safety import check_for_secrets
 from projectforge.ui import (
     badge,
@@ -291,8 +304,138 @@ def _print_legacy_conventions_warning(console: Console) -> None:
     )
 
 
+def _configure_conventions_onboarding(console: Console, current_profile: str) -> str:
+    """Guide the user through keeping, importing, or creating durable conventions."""
+    nearby_instructions = discover_instruction_files()
+    choices = []
+    if current_profile != "default":
+        choices.append(
+            questionary.Choice(
+                f"Keep the selected profile: {current_profile}",
+                value="keep",
+            )
+        )
+    choices.append(
+        questionary.Choice(
+            "Use Forge's bundled defaults — recommended for getting started",
+            value="defaults",
+        )
+    )
+    if nearby_instructions:
+        choices.append(
+            questionary.Choice(
+                f"Import nearby team instructions ({len(nearby_instructions)} found)",
+                value="import",
+            )
+        )
+    choices.extend(
+        [
+            questionary.Choice(
+                "Create a convention profile through a short interview",
+                value="guided",
+            ),
+            questionary.Choice("Decide later", value="later"),
+        ]
+    )
+
+    action = prompt_select(
+        "How should Forge learn how you work?",
+        choices=choices,
+        default="keep" if current_profile != "default" else "defaults",
+    ).ask()
+    if action is None:
+        raise SystemExit(0)
+    if action in {"keep", "later"}:
+        return current_profile
+    if action == "defaults":
+        console.print(status_line("Using Forge's bundled conventions.", accent="aqua"))
+        return "default"
+
+    try:
+        if action == "import":
+            console.print(
+                make_panel(
+                    grouped_lines(
+                        [
+                            "Selected instructions become a reusable convention profile.",
+                            subtle("Forge includes that profile in future provider prompts."),
+                            muted("Review the preview and remove private content before saving."),
+                        ]
+                    ),
+                    title="Import Instructions",
+                    accent="amber",
+                )
+            )
+            selected = prompt_checkbox(
+                "Choose instruction files to import",
+                choices=[
+                    questionary.Choice(
+                        path.relative_to(Path.cwd()).as_posix(),
+                        value=path,
+                    )
+                    for path in nearby_instructions
+                ],
+            ).ask()
+            if selected is None:
+                raise SystemExit(0)
+            if not selected:
+                console.print(
+                    status_line(
+                        "No instruction files selected. Keeping the current convention profile.",
+                        accent="amber",
+                    )
+                )
+                return current_profile
+            name = prompt_text("Name this convention profile", default="imported-team").ask()
+            if name is None:
+                raise SystemExit(0)
+            profile_content = build_import_profile_content(selected)
+        else:
+            name = prompt_text("Name this convention profile", default="personal").ask()
+            if name is None:
+                raise SystemExit(0)
+            questions = (
+                ("toolchain", "Preferred languages, runtimes, or package managers"),
+                ("testing", "Testing and verification expectations"),
+                ("architecture", "Architecture or code organization preferences"),
+                ("code_style", "Code style and typing expectations"),
+                ("git_docs", "Git and documentation practices"),
+                ("guardrails", "Rules Forge should respect on every project"),
+            )
+            answers: dict[str, str] = {}
+            for key, message in questions:
+                value = prompt_text(message, default="").ask()
+                if value is None:
+                    raise SystemExit(0)
+                answers[key] = value.strip()
+            profile_content = build_guided_profile_content(answers)
+
+        preview = profile_content
+        if len(preview) > 4_000:
+            preview = preview[:4_000].rstrip() + "\n\n[Preview shortened in the terminal]"
+        console.print(make_panel(Text(preview), title="Convention Profile Preview", accent="aqua"))
+        save_profile = prompt_confirm("Save and use this convention profile", default=True).ask()
+        if save_profile is None:
+            raise SystemExit(0)
+        if not save_profile:
+            console.print(status_line("Convention profile was not saved.", accent="amber"))
+            return current_profile
+
+        path = save_profile_content(name.strip(), profile_content)
+    except ConventionValidationError as exc:
+        console.print(status_line(str(exc), accent="amber"))
+        console.print(
+            status_line("Keeping the current convention profile for now.", accent="amber")
+        )
+        return current_profile
+
+    console.print(status_line(f"Selected convention profile: {path.stem}", accent="aqua"))
+    return path.stem
+
+
 def run_setup(console: Console) -> dict:
     """Run the interactive setup wizard. Returns the saved config dict."""
+    existing_config = load_forge_config()
     console.print()
     console.print(
         make_panel(
@@ -411,7 +554,7 @@ def run_setup(console: Console) -> dict:
     # --- Step 3: Model selection per backend ---
     console.print(make_step_panel(3, 8, "Model preferences", accent="plum"))
 
-    existing_models = load_forge_config().get("backend_models", {})
+    existing_models = existing_config.get("backend_models", {})
     backend_models: dict[str, str] = {}
 
     if len(available) > 0:
@@ -632,7 +775,7 @@ def run_setup(console: Console) -> dict:
     # --- Step 7: Default project directory ---
     console.print(make_step_panel(7, 8, "Default project directory", accent="plum"))
 
-    existing_dir = load_forge_config().get("projects_dir", "")
+    existing_dir = existing_config.get("projects_dir", "")
     default_dir = existing_dir or ""
 
     console.print(
@@ -688,12 +831,12 @@ def run_setup(console: Console) -> dict:
         make_panel(
             grouped_lines(
                 [
-                    "Forge now compiles bundled conventions for each scaffolded stack.",
-                    subtle(f"Bundled source tree: {BUNDLED_CONVENTIONS_DIR}"),
-                    muted(
-                        "Repo admins can inspect or customize bundled sources with "
-                        "forge admin conventions."
+                    "Conventions tell Forge how you want projects built.",
+                    subtle(
+                        "Start with Forge's defaults, import team instructions, or create a "
+                        "profile."
                     ),
+                    muted("You can change the selected profile later with forge conventions."),
                 ]
             ),
             title="Conventions",
@@ -701,6 +844,10 @@ def run_setup(console: Console) -> dict:
         )
     )
     _print_legacy_conventions_warning(console)
+    conventions_profile = _configure_conventions_onboarding(
+        console,
+        existing_config.get("conventions_profile", "default"),
+    )
 
     # Check media collections in the repo's media/ folder
     from projectforge.media_assets import MEDIA_DIR, list_collections
@@ -735,6 +882,9 @@ def run_setup(console: Console) -> dict:
         "backend_models": backend_models,
         "docker_available": docker_installed,
         "projects_dir": projects_dir,
+        "agents": existing_config.get("agents", False),
+        "sound": existing_config.get("sound", True),
+        "conventions_profile": conventions_profile,
     }
     save_forge_config(config)
 

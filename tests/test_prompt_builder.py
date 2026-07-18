@@ -40,6 +40,44 @@ def test_build_prompt_includes_requested_auth_ci_and_agent_docs():
     assert "This is a scaffold, not a fully built product." in prompt
 
 
+def test_project_brief_and_selected_context_reach_every_provider_phase():
+    answers = {
+        **_BASE_ANSWERS,
+        "project_brief": {
+            "audience": "Support coordinators",
+            "first_success": "Assign one shift",
+            "constraints": "Use the existing identity provider",
+            "existing_systems": "Workday API",
+            "non_goals": "Payroll",
+        },
+        "context_sources": [
+            {
+                "path": "PRODUCT.md",
+                "content": "# Product context\n\nScheduling is the first milestone.",
+                "sha256": "sha256:abc",
+            }
+        ],
+    }
+
+    for phases, backend in (
+        (["architecture"], "claude"),
+        (["frontend"], "antigravity"),
+        (["tests"], "codex"),
+        (["verify"], "claude"),
+    ):
+        prompt = build_phase_prompt(
+            phases,
+            ["architecture", "frontend", "tests", "verify"],
+            answers,
+            "conventions",
+            backend=backend,
+        )
+        assert "<project_context>" in prompt
+        assert "Intended users: Support coordinators" in prompt
+        assert "Selected file: PRODUCT.md" in prompt
+        assert "Scheduling is the first milestone." in prompt
+
+
 def test_build_prompt_blank_ci_template_uses_placeholder_language():
     prompt = build_prompt(
         {
