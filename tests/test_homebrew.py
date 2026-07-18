@@ -74,3 +74,15 @@ def test_render_homebrew_formula_contains_expected_install_surface():
     assert 'conflicts_with "forge"' in formula
     assert 'resource "typer" do' in formula
     assert "#{bin}/forge --dry-run --name brew-smoke" in formula
+
+
+def test_release_workflow_verifies_real_tap_access_before_tagging():
+    workflow = (ROOT / ".github/workflows/release-homebrew.yml").read_text()
+
+    preflight = workflow.index("Verify tap publication access")
+    create_tag = workflow.index("Create and push release tag")
+
+    assert preflight < create_tag
+    assert ".permissions.push" in workflow
+    assert "Compare generated formula with Homebrew tap" in workflow
+    assert "steps.tap_sync.outputs.already_synced != 'true'" in workflow
