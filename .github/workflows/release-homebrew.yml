@@ -29,7 +29,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO }}
+      TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO || 'Schramm2/homebrew-tap' }}
       TAP_BRANCH: ${{ vars.HOMEBREW_TAP_BRANCH || 'main' }}
 
     steps:

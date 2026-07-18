@@ -9,10 +9,9 @@ from pathlib import Path
 from ubundiforge import __version__
 
 FORMULA_NAME = "projectforge"
-DEFAULT_HOMEPAGE = "https://github.com/projectforge/projectforge"
-DEFAULT_REPOSITORY = "https://github.com/projectforge/projectforge"
+DEFAULT_HOMEPAGE = "https://github.com/Schramm2/projectforge"
+DEFAULT_REPOSITORY = "https://github.com/Schramm2/projectforge"
 DEFAULT_SOURCE_URL = f"{DEFAULT_REPOSITORY}/archive/refs/tags/v{__version__}.tar.gz"
-DEFAULT_SOURCE_SHA256 = "REPLACE_WITH_RELEASE_TARBALL_SHA256"
 DEFAULT_PYTHON_FORMULA = "python@3.13"
 PROJECT_DESCRIPTION = "Scaffold projects with AI coding tools and shared conventions"
 
@@ -140,9 +139,9 @@ def write_homebrew_formula(
     output_path: Path,
     *,
     lock_path: Path,
+    source_sha256: str,
     version: str = __version__,
     source_url: str = DEFAULT_SOURCE_URL,
-    source_sha256: str = DEFAULT_SOURCE_SHA256,
     homepage: str = DEFAULT_HOMEPAGE,
     python_formula: str = DEFAULT_PYTHON_FORMULA,
 ) -> Path:

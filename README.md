@@ -6,7 +6,7 @@
 
 ---
 
-ProjectForge is a CLI that collects project details, picks the best AI backend, assembles a structured prompt with your team's conventions, and routes generation through installed AI coding CLIs. You get a production-ready project directory in minutes instead of hours.
+ProjectForge is a CLI that collects project details, selects an available AI backend, assembles a structured prompt with your team's conventions, and routes generation through installed AI coding CLIs. The result is a ready-to-build starter project with a recorded manifest and optional verification checks.
 
 ProjectForge helps you:
 - Collect project requirements interactively,
@@ -58,32 +58,52 @@ See [docs/guides/stacks.md](docs/guides/stacks.md) for detailed structure, libra
 
 ## Installation
 
-### Homebrew (macOS)
+The supported public route installs the `projectforge` distribution from an immutable release in
+the canonical GitHub repository.
 
 ```bash
-brew tap <tap-owner>/<tap>
-brew install projectforge
+uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1
 ```
 
-### From source
-
-```bash
-git clone <repository-url>
-cd projectforge
-uv sync --dev
-```
-
-Maintainer note: keep `<tap-owner>/<tap>` and `<repository-url>` placeholders until the
-final public GitHub repository and Homebrew tap owner/name are chosen. Finalize those
-release URLs after the repository transfer or rename.
-
-Verify the installation:
+Verify the installed command:
 
 ```bash
 forge --version
+forge --help
 ```
 
+ProjectForge is not currently published to PyPI. See
+[Getting Started](docs/guides/getting-started.md) for prerequisites and a source-development
+setup.
+
 ## Quick Start
+
+Preview a complete prompt without backend credentials or filesystem changes:
+
+```bash
+forge --dry-run \
+  --name hello-forge \
+  --stack python-cli \
+  --description "A tiny greeting CLI" \
+  --no-docker \
+  --no-open \
+  --no-verify
+```
+
+To generate and verify the project, first install and authenticate one supported AI CLI, then
+run:
+
+```bash
+forge --name hello-forge \
+  --stack python-cli \
+  --description "A tiny greeting CLI" \
+  --no-docker \
+  --no-open \
+  --verify
+```
+
+`--demo` means the generated application should avoid real service credentials. The selected
+AI coding CLI still needs its own local authentication for live generation.
 
 ### Interactive mode
 
@@ -317,12 +337,17 @@ Replay uses `.forge/scaffold.json` and `.forge/conventions-snapshot.md` (saved a
 | [Admin Playbook](docs/maintainers/admin-playbook.md) | Maintaining conventions, adding stacks, shipping releases |
 | [Troubleshooting](docs/guides/troubleshooting.md) | Common issues and fixes |
 | [Homebrew Release](docs/maintainers/homebrew-release.md) | Formula generation and release flow |
+| [Showcase Evidence](docs/showcase/README.md) | Reproducible install, prompt, scaffold, and verification proof |
 
 ## Development
 
 The distribution package is named `projectforge` and the installed command is `forge`. The
 Python import namespace remains `ubundiforge` for compatibility with existing releases; keep
 that namespace in code, tests, and build configuration until a deliberate migration is planned.
+
+Repository: [Schramm2/projectforge](https://github.com/Schramm2/projectforge) ·
+[Releases](https://github.com/Schramm2/projectforge/releases) ·
+[Issues](https://github.com/Schramm2/projectforge/issues)
 
 ```bash
 uv sync --dev                            # Install in dev mode

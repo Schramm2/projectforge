@@ -2,6 +2,13 @@
 
 All notable changes to the Forge Scaffolding Assistant skill will be documented in this file.
 
+## Unreleased
+
+### Changed
+- Replaced the unavailable Homebrew path with the verified GitHub-backed `uv tool install` route.
+- Clarified that demo mode removes application-service credentials, not AI CLI authentication.
+- Added the canonical public repository URL.
+
 ## [2.0.0] - 2026-03-22
 
 ### Added
@@ -16,7 +23,7 @@ All notable changes to the Forge Scaffolding Assistant skill will be documented 
 - Forge card documentation: auto-generated SVG badge and project card
 - User data reference table: all `~/.forge/` files and their purposes
 - Augmentation mode to operating modes section
-- Homebrew install as the primary installation method
+- Homebrew install as the primary installation method at the time of this historical release
 - Updated CLI commands summary table
 
 ### Changed
@@ -24,11 +31,11 @@ All notable changes to the Forge Scaffolding Assistant skill will be documented 
 - Expanded Core Capabilities with quality routing and smart defaults
 - Expanded Post-Scaffold Repair Mode to include `forge check` as a follow-up step
 - Updated verification section to reference the post-scaffold dashboard
-- Replaced `pipx install .` with `brew install projectforge` as the recommended install
+- Replaced `pipx install .` with `brew install projectforge` as the recommendation at that time
 - Updated README testing checklist to cover all five commands
 
 ### Removed
-- References to `pipx install .` (Homebrew is the supported distribution channel)
+- References to `pipx install .` (superseded again by the current GitHub-backed uv route)
 
 ## [1.0.0] - 2026-03-20
 
