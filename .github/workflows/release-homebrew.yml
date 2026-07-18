@@ -186,18 +186,11 @@ jobs:
         if: steps.mode.outputs.run_checks == 'true'
         run: uv run python scripts/inspect_artifacts.py
 
-      - name: Smoke-test forge dry run
+      - name: Verify installed package as a clean user
         if: steps.mode.outputs.run_checks == 'true'
-        run: |
-          uv run python -m projectforge \
-            --dry-run \
-            --name release-smoke \
-            --stack fastapi \
-            --description "Release smoke test" \
-            --no-docker \
-            --no-open \
-            --no-verify > /tmp/forge-release-smoke.txt
-          grep -q "Release smoke test" /tmp/forge-release-smoke.txt
+        run: >-
+          uv run python scripts/clean_user_harness.py verify
+          --wheel dist/matt_projectforge-*.whl
 
       - name: Create and push release tag
         if: steps.mode.outputs.publish_release == 'true'
