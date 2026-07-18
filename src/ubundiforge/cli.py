@@ -21,6 +21,7 @@ from ubundiforge.config import (
     BackendStatus,
     check_backend_installed,
     get_backend_statuses,
+    normalize_legacy_backend,
 )
 from ubundiforge.convention_admin import (
     list_scopes,
@@ -68,7 +69,6 @@ from ubundiforge.media_assets import (
 from ubundiforge.preferences import record_preferences
 from ubundiforge.prompt_builder import build_phase_prompt
 from ubundiforge.prompts import collect_answers
-from ubundiforge.provider_preflight import run_gemini_preflight
 from ubundiforge.quality import append_quality_signal, compute_backend_scores, read_quality_signals
 from ubundiforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
 from ubundiforge.router import (
@@ -135,6 +135,7 @@ _TOP_LEVEL_CONVENTION_HISTORY_TARGETS = {
 }
 _BACKEND_LOGIN_COMMANDS = {
     "claude": "claude auth login",
+    "antigravity": "agy and complete Google Sign-In",
     "codex": "codex login",
 }
 _FORGE_RUNTIME_BOUNDARY = """
@@ -145,57 +146,36 @@ evidence file. Preserve existing project output from earlier phases.
 </forge_runtime_boundary>"""
 
 
+def _validate_backend_override(backend: str | None) -> None:
+    """Reject retired or unknown explicit backend names with migration guidance."""
+    if backend is None:
+        return
+    if backend == "gemini":
+        console.print(
+            "[red]The Gemini CLI backend was removed. Install Google Antigravity CLI and "
+            "use --use antigravity.[/red]"
+        )
+        raise typer.Exit(1)
+    if backend not in SUPPORTED_BACKENDS:
+        backends = ", ".join(SUPPORTED_BACKENDS)
+        console.print(f"[red]Unknown backend '{backend}'. Choose from: {backends}[/red]")
+        raise typer.Exit(1)
+
+
 @app.command()
 def doctor(
     json_output: Annotated[
         bool,
         typer.Option("--json", help="Emit deterministic machine-readable diagnostics."),
     ] = False,
-    preflight: Annotated[
-        str | None,
-        typer.Option(
-            "--preflight",
-            help="Make one opt-in readiness model call for a provider without a status API.",
-        ),
-    ] = None,
 ) -> None:
-    """Check configuration and provider readiness; normal checks make no model calls."""
+    """Check configuration, provider installation, and authentication without model calls."""
     import json
 
-    preflight_result = None
-    if preflight is not None:
-        if preflight != "gemini":
-            raise typer.BadParameter(
-                "only gemini needs an explicit model preflight",
-                param_hint="--preflight",
-            )
-        if not json_output:
-            console.print(
-                status_line(
-                    "Gemini preflight: making one isolated, read-only model call; quota may apply",
-                    accent="amber",
-                )
-            )
-        preflight_result = run_gemini_preflight()
-
     report = build_doctor_report()
-    if preflight_result is not None and json_output:
-        report["preflight"] = {
-            "provider": "gemini",
-            "success": preflight_result.success,
-            "category": preflight_result.category,
-            "detail": preflight_result.detail,
-        }
     if json_output:
         console.print_json(json.dumps(report))
     else:
-        if preflight_result is not None:
-            console.print(
-                status_line(
-                    preflight_result.detail,
-                    accent="aqua" if preflight_result.success else "amber",
-                )
-            )
         console.print(header_panel(__version__))
         config_status = report["config"]["status"]
         console.print(status_line(f"Configuration: {config_status}", accent="violet"))
@@ -242,8 +222,6 @@ def doctor(
             if provider.get("repair") != "No action required.":
                 console.print(muted(f"  repair: {provider['repair']}"))
     exit_code = doctor_exit_code(report)
-    if preflight_result is not None and not preflight_result.success:
-        exit_code = 1
     if exit_code:
         raise typer.Exit(exit_code)
 
@@ -356,8 +334,8 @@ def _backend_help_line(backend: str, status: BackendStatus) -> Text:
     if not status.installed:
         return subtle(f"{backend} is not installed or not on PATH.")
     return subtle(
-        f"{backend} is installed but requires a provider-specific readiness preflight. "
-        "Run forge doctor for details."
+        f"{backend} is installed but Forge could not confirm authentication. "
+        "Run forge doctor for the recommended next step."
     )
 
 
@@ -916,7 +894,7 @@ def evolve(
     ] = None,
     use: Annotated[
         str | None,
-        typer.Option("--use", help="Override AI routing."),
+        typer.Option("--use", help="Override AI routing (claude, antigravity, or codex)."),
     ] = None,
     model: Annotated[
         str | None,
@@ -950,6 +928,7 @@ def evolve(
     except ValueError as exc:
         console.print(status_line(str(exc), accent="amber"))
         raise typer.Exit(1) from exc
+    _validate_backend_override(use)
 
     project_dir = Path.cwd()
     manifest_path = project_dir / ".forge" / "scaffold.json"
@@ -1148,7 +1127,7 @@ def replay(
     ] = False,
     use: Annotated[
         str | None,
-        typer.Option("--use", help="Override AI routing."),
+        typer.Option("--use", help="Override AI routing (claude, antigravity, or codex)."),
     ] = None,
     model: Annotated[
         str | None,
@@ -1183,6 +1162,7 @@ def replay(
     except ValueError as exc:
         console.print(status_line(str(exc), accent="amber"))
         raise typer.Exit(1) from exc
+    _validate_backend_override(use)
 
     project_dir = Path.cwd()
     manifest_path = project_dir / ".forge" / "scaffold.json"
@@ -1261,7 +1241,7 @@ def replay(
 
     # Reconstruct phase backends from routing
     routing = dna.get("routing", [])
-    phase_backends = [(r["phase"], r["backend"]) for r in routing]
+    phase_backends = [(r["phase"], normalize_legacy_backend(r["backend"])) for r in routing]
 
     if not phase_backends:
         phase_backends = pick_phase_backends(stack, override=use)
@@ -1386,7 +1366,7 @@ def main(
     ctx: typer.Context,
     use: Annotated[
         str | None,
-        typer.Option("--use", help="Override AI routing (claude, gemini, or codex)."),
+        typer.Option("--use", help="Override AI routing (claude, antigravity, or codex)."),
     ] = None,
     dry_run: Annotated[
         bool,
@@ -1595,10 +1575,7 @@ def main(
         agents = forge_config.get("agents", False)
     backend_statuses = get_backend_statuses() if not prompt_only else {}
 
-    if use and use not in SUPPORTED_BACKENDS:
-        backends = ", ".join(SUPPORTED_BACKENDS)
-        console.print(f"[red]Unknown backend '{use}'. Choose from: {backends}[/red]")
-        raise typer.Exit(1)
+    _validate_backend_override(use)
 
     # Non-interactive mode: all required flags provided
     if name and stack and description:
@@ -1777,7 +1754,7 @@ def main(
             if not status.installed:
                 console.print(
                     f"\n[red bold]{backend}[/red bold] [red]is not installed or not on PATH.[/red]"
-                    "\n[dim]Install at least one AI CLI (claude, gemini, or codex).[/dim]"
+                    "\n[dim]Install at least one AI CLI (claude, antigravity, or codex).[/dim]"
                 )
                 raise typer.Exit(1)
             if status.ready is not True:

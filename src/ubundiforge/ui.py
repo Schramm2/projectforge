@@ -27,7 +27,7 @@ ACCENTS = {
 
 BACKEND_ACCENTS: dict[str, str] = {
     "claude": "violet",
-    "gemini": "amber",
+    "antigravity": "amber",
     "codex": "aqua",
 }
 

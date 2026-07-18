@@ -102,7 +102,7 @@ def test_write_scaffold_manifest_creates_forge_dir(tmp_path):
 
     write_scaffold_manifest(
         {"name": "new-project", "stack": "nextjs"},
-        [("architecture", "gemini")],
+        [("architecture", "antigravity")],
         project_dir,
         "conventions",
     )

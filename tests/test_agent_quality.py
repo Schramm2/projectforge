@@ -36,7 +36,7 @@ def test_appends_multiple_signals(tmp_path: Path) -> None:
         append_agent_quality_signal(
             log_path=log,
             phase="scaffold",
-            backend="gemini",
+            backend="antigravity",
             task_id=f"task-{i}",
             task_description=f"Task {i}",
             success=True,

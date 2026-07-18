@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- Replaced the retired Gemini CLI backend with Google Antigravity CLI (`agy`) across routing,
+  adapters, setup, execution, diagnostics, tests, and documentation.
+- `forge doctor` now verifies Antigravity Google Sign-In through `agy models` without sending an
+  inference prompt or storing provider output.
+- Legacy saved `gemini` backend selections migrate to `antigravity`; incompatible Gemini model
+  overrides are dropped in favor of Antigravity's current provider default.
+
+### Security
+
+- Antigravity safe and plan modes enable its terminal sandbox. The dangerous permission bypass is
+  available only through `--approval-mode unsafe --allow-unsafe`.
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 

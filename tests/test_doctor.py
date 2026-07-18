@@ -13,7 +13,7 @@ def test_doctor_report_is_deterministic_and_excludes_provider_detail(monkeypatch
     monkeypatch.setattr(
         "ubundiforge.doctor.get_backend_statuses",
         lambda: {
-            "gemini": BackendStatus(installed=True, ready=None, detail="secret@example.com"),
+            "antigravity": BackendStatus(installed=True, ready=None, detail="secret@example.com"),
             "codex": BackendStatus(
                 installed=True,
                 ready=True,
@@ -26,7 +26,7 @@ def test_doctor_report_is_deterministic_and_excludes_provider_detail(monkeypatch
     )
     monkeypatch.setattr(
         "ubundiforge.doctor.get_backend_version",
-        lambda backend: {"codex": "codex-cli 1.2.3", "gemini": "0.9.0"}.get(backend),
+        lambda backend: {"codex": "codex-cli 1.2.3", "antigravity": "0.9.0"}.get(backend),
     )
     monkeypatch.setattr(
         "ubundiforge.doctor.build_environment_report",
@@ -41,8 +41,8 @@ def test_doctor_report_is_deterministic_and_excludes_provider_detail(monkeypatch
     report = build_doctor_report()
     serialized = json.dumps(report)
 
-    assert list(report["providers"]) == ["claude", "gemini", "codex"]
-    assert report["providers"]["gemini"]["readiness"] == "preflight_required"
+    assert list(report["providers"]) == ["claude", "antigravity", "codex"]
+    assert report["providers"]["antigravity"]["readiness"] == "check_inconclusive"
     assert report["providers"]["codex"]["auth_mode"] == "chatgpt"
     assert report["providers"]["codex"]["model_behavior"] == {
         "mode": "provider_default",
@@ -58,12 +58,12 @@ def test_doctor_report_is_deterministic_and_excludes_provider_detail(monkeypatch
         },
         "unsafe_requires_consent": True,
     }
-    assert report["providers"]["gemini"]["capabilities"]["deterministic_status"] is False
-    assert report["providers"]["gemini"]["install_url"] == (
-        "https://geminicli.com/docs/get-started/installation/"
+    assert report["providers"]["antigravity"]["capabilities"]["deterministic_status"] is True
+    assert report["providers"]["antigravity"]["install_url"] == (
+        "https://antigravity.google/docs/cli-install"
     )
     assert "codex login" not in report["providers"]["codex"]["repair"]
-    assert "authentication" in report["providers"]["gemini"]["repair"].lower()
+    assert "google sign-in" in report["providers"]["antigravity"]["repair"].lower()
     assert report["config"] == {"status": "valid"}
     assert report["environment"]["python"]["supported"] is True
     assert "secret@example.com" not in serialized
@@ -78,7 +78,7 @@ def test_doctor_reports_advanced_model_override_without_other_config(monkeypatch
         "ubundiforge.doctor.get_backend_statuses",
         lambda: {
             "claude": BackendStatus(installed=True, ready=True, auth_mode="authenticated"),
-            "gemini": BackendStatus(installed=False, ready=False),
+            "antigravity": BackendStatus(installed=False, ready=False),
             "codex": BackendStatus(installed=False, ready=False),
         },
     )
@@ -95,6 +95,33 @@ def test_doctor_reports_advanced_model_override_without_other_config(monkeypatch
         "mode": "provider_default",
         "value": None,
     }
+
+
+def test_doctor_gives_antigravity_browser_and_ssh_login_guidance(monkeypatch, tmp_path):
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({"preferred_editor": "code"}))
+    monkeypatch.setattr("ubundiforge.doctor.CONFIG_PATH", config_path)
+    monkeypatch.setattr(
+        "ubundiforge.doctor.get_backend_statuses",
+        lambda: {
+            "claude": BackendStatus(installed=False, ready=False),
+            "antigravity": BackendStatus(
+                installed=True,
+                ready=False,
+                login_command="agy",
+            ),
+            "codex": BackendStatus(installed=False, ready=False),
+        },
+    )
+    monkeypatch.setattr("ubundiforge.doctor.get_backend_version", lambda backend: None)
+    monkeypatch.setattr("ubundiforge.doctor.build_environment_report", lambda: {})
+
+    repair = build_doctor_report()["providers"]["antigravity"]["repair"]
+
+    assert "Google Sign-In" in repair
+    assert "browser" in repair
+    assert "SSH URL" in repair
+    assert "/exit" in repair
 
 
 def test_doctor_exit_code_requires_valid_config_and_ready_provider():

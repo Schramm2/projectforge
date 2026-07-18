@@ -1,6 +1,6 @@
 # ProjectForge — Project Scaffolder
 
-A Python CLI that wraps AI coding tools (Codex, Gemini CLI, Codex) to scaffold new projects with organization conventions baked in.
+A Python CLI that wraps AI coding tools (Claude Code, Google Antigravity CLI, Codex CLI) to scaffold new projects with organization conventions baked in.
 
 ## Stack
 

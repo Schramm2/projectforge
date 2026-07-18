@@ -72,45 +72,13 @@ def test_doctor_human_output_includes_model_behavior_and_repair(monkeypatch):
     assert "claude auth login" in result.stdout
 
 
-def test_doctor_preflight_is_explicit_and_rebuilds_report(monkeypatch):
-    calls: list[str] = []
-    report = {
-        "schema_version": 1,
-        "projectforge_version": __version__,
-        "status": "ready",
-        "config": {"status": "valid"},
-        "environment": {
-            "python": {"version": "3.12.1", "supported": True},
-            "git": {"installed": True, "version": "git version 2.50.0"},
-            "docker": {"installed": False, "version": None},
-            "editors": {},
-        },
-        "providers": {},
-    }
-    monkeypatch.setattr(
-        "ubundiforge.cli.run_gemini_preflight",
-        lambda: SimpleNamespace(success=True, detail="Gemini readiness verified."),
-    )
-
-    def fake_report():
-        calls.append("report")
-        return report
-
-    monkeypatch.setattr("ubundiforge.cli.build_doctor_report", fake_report)
-
-    result = runner.invoke(app, ["doctor", "--preflight", "gemini"])
+def test_doctor_help_promises_auth_check_without_model_calls():
+    result = runner.invoke(app, ["doctor", "--help"], env={"TERM": "dumb"})
+    output = " ".join(result.stdout.lower().split())
 
     assert result.exit_code == 0
-    assert "model call" in result.stdout.lower()
-    assert "readiness verified" in result.stdout.lower()
-    assert calls == ["report"]
-
-
-def test_doctor_rejects_preflight_for_provider_with_status_api():
-    result = runner.invoke(app, ["doctor", "--preflight", "claude"])
-
-    assert result.exit_code == 2
-    assert "gemini" in result.output.lower()
+    assert "authentication without model calls" in output
+    assert "--preflight" not in result.stdout
 
 
 def test_live_unsafe_mode_requires_explicit_cli_consent():
@@ -154,7 +122,7 @@ def _patch_prompt_only_dependencies(monkeypatch, *, setup_called: list[bool]) ->
         "ubundiforge.cli.get_backend_statuses",
         lambda: {
             backend: BackendStatus(installed=False, ready=False)
-            for backend in ("claude", "gemini", "codex")
+            for backend in ("claude", "antigravity", "codex")
         },
     )
     monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: False)
@@ -242,7 +210,7 @@ def test_unknown_provider_readiness_is_not_executable(monkeypatch, tmp_path):
         "ubundiforge.cli.get_backend_statuses",
         lambda: {
             "claude": BackendStatus(installed=False, ready=False),
-            "gemini": BackendStatus(installed=True, ready=None),
+            "antigravity": BackendStatus(installed=True, ready=None),
             "codex": BackendStatus(installed=False, ready=False),
         },
     )
@@ -251,9 +219,9 @@ def test_unknown_provider_readiness_is_not_executable(monkeypatch, tmp_path):
         app,
         [
             "--use",
-            "gemini",
+            "antigravity",
             "--name",
-            "preflight-needed",
+            "auth-check-inconclusive",
             "--stack",
             "fastapi",
             "--description",
@@ -264,7 +232,28 @@ def test_unknown_provider_readiness_is_not_executable(monkeypatch, tmp_path):
     )
 
     assert result.exit_code == 1
-    assert "preflight" in result.stdout.lower()
+    assert "could not confirm authentication" in result.stdout.lower()
+
+
+def test_removed_gemini_override_points_to_antigravity():
+    result = runner.invoke(
+        app,
+        [
+            "--dry-run",
+            "--use",
+            "gemini",
+            "--name",
+            "migration-check",
+            "--stack",
+            "fastapi",
+            "--description",
+            "Must not route to a retired CLI",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "gemini cli backend was removed" in result.stdout.lower()
+    assert "--use antigravity" in " ".join(result.stdout.lower().split())
 
 
 def test_export_skips_setup_and_writes_prompt(monkeypatch, tmp_path):
@@ -324,7 +313,7 @@ def test_export_keeps_specialist_phase_routing_without_installed_backends(monkey
     assert setup_called[0] is False
     assert export_path.exists()
     assert "=== Architecture & Core (claude) ===" in exported
-    assert "=== Frontend & UI (gemini) ===" in exported
+    assert "=== Frontend & UI (antigravity) ===" in exported
     assert "=== Tests & Automation (codex) ===" in exported
     assert "=== Verify & Fix (claude) ===" in exported
 
@@ -445,7 +434,7 @@ def test_mock_backends_cover_full_cli_flow_without_installed_ai_clis(monkeypatch
         "ubundiforge.cli.get_backend_statuses",
         lambda: {
             backend: BackendStatus(installed=True, ready=True)
-            for backend in ("claude", "gemini", "codex")
+            for backend in ("claude", "antigravity", "codex")
         },
     )
     monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
@@ -543,7 +532,7 @@ def test_resume_preserves_completed_phases_and_finishes_failed_scaffold(monkeypa
         "ubundiforge.cli.get_backend_statuses",
         lambda: {
             "claude": BackendStatus(installed=True, ready=True),
-            "gemini": BackendStatus(installed=False, ready=False),
+            "antigravity": BackendStatus(installed=False, ready=False),
             "codex": BackendStatus(installed=False, ready=False),
         },
     )
@@ -698,7 +687,7 @@ def test_first_run_with_explicit_scaffold_flags_skips_post_setup_prompt(monkeypa
         "ubundiforge.cli.get_backend_statuses",
         lambda: {
             backend: BackendStatus(installed=True, ready=True)
-            for backend in ("claude", "gemini", "codex")
+            for backend in ("claude", "antigravity", "codex")
         },
     )
     monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
@@ -933,7 +922,7 @@ def test_run_setup_does_not_create_legacy_conventions_file(monkeypatch, tmp_path
         "ubundiforge.setup.get_backend_statuses",
         lambda: {
             "claude": BackendStatus(installed=True, ready=True),
-            "gemini": BackendStatus(installed=False, ready=False),
+            "antigravity": BackendStatus(installed=False, ready=False),
             "codex": BackendStatus(installed=False, ready=False),
         },
     )
@@ -971,7 +960,7 @@ def test_setup_missing_providers_shows_official_install_auth_recheck_flow(monkey
         "ubundiforge.setup.get_backend_statuses",
         lambda: {
             backend: BackendStatus(installed=False, ready=False)
-            for backend in ("claude", "gemini", "codex")
+            for backend in ("claude", "antigravity", "codex")
         },
     )
 
@@ -980,7 +969,7 @@ def test_setup_missing_providers_shows_official_install_auth_recheck_flow(monkey
 
     output = console.export_text()
     assert "https://code.claude.com/docs/en/setup" in output
-    assert "https://geminicli.com/docs/get-started/installation/" in output
+    assert "https://antigravity.google/docs/cli-install" in output
     assert "https://github.com/openai/codex" in output
     assert "forge doctor" in output
 

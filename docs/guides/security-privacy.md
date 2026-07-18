@@ -15,10 +15,9 @@ Forge does not collect provider credentials or account identity. Provider login 
 provider-owned CLI. `forge doctor` reports only readiness and a non-identifying authentication mode
 when the provider exposes one.
 
-Normal doctor checks make no model call. The deliberately separate
-`forge doctor --preflight gemini` command makes one read-only sandboxed model call because Gemini
-has no deterministic status API. Its 24-hour proof contains only provider name, CLI version, and
-timestamp in `~/.forge/provider-preflight.json` with owner-only file permissions.
+Normal doctor checks make no model call. For Antigravity, Forge runs `agy models`; this is an
+authenticated model-catalog request, not an inference prompt. Forge uses only its exit status and
+whether a non-empty catalog was returned, and does not retain catalog output or account identity.
 
 ## Execution modes
 
@@ -30,6 +29,11 @@ timestamp in `~/.forge/provider-preflight.json` with owner-only file permissions
 Safe mode still authorizes the provider to create and edit files inside the target workspace, run
 commands there, install dependencies, use network access allowed by the provider, and consume
 provider quota. Inspect the preflight panel and use `--no-open` when editor launch is unwanted.
+
+Antigravity safe mode passes `--mode accept-edits --sandbox` to `agy --print`. Its sandbox applies
+terminal restrictions; its permission engine and default disabled non-workspace access govern file
+scope. Unapproved commands may be denied in non-interactive print mode. Only Forge's explicit
+unsafe mode adds `--dangerously-skip-permissions` and removes the sandbox flag.
 
 Generated code is untrusted until its recorded and independent checks pass. A successful provider
 exit alone is not verification.
@@ -47,9 +51,8 @@ Generated projects may contain:
 - `.forge/verification.json` — redacted commands, exits, timeouts, endpoints, and remediation; and
 - `.forge/card.svg` — the generated project card.
 
-`~/.forge/scaffold.log`, quality signals, preferences, and provider preflight timestamps stay
-local. The scaffold log records only the target directory name, not its absolute path. Forge
-redacts credential-shaped values from
+`~/.forge/scaffold.log`, quality signals, and preferences stay local. The scaffold log records only
+the target directory name, not its absolute path. Forge redacts credential-shaped values from
 progress and durable verification evidence, but secret scanning is defense in depth: never put
 credentials in descriptions, extra instructions, conventions, exported prompts, or generated
 fixtures.

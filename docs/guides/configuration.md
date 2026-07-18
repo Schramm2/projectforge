@@ -31,13 +31,18 @@ forge doctor
 An invalid config is moved to `config.json.corrupt-<timestamp>` when possible. Forge then uses safe
 defaults and asks you to run setup. Review the recovery copy locally before removing it.
 
-`~/.forge/provider-preflight.json` is separate from user preferences. When an explicit Gemini
-preflight succeeds, it records only schema version, provider name, CLI version, and verification
-timestamp with owner-only permissions. Proofs expire after 24 hours and must match the running CLI
-version. Provider output, identity, and credentials are never stored.
+Antigravity authentication remains in the operating system keyring managed by `agy`; Forge does
+not copy it into `~/.forge`. `forge doctor` uses `agy models` as a non-inference session check and
+stores none of its output.
 
-The unversioned 0.4.1 config is normalized in memory. Existing model overrides are preserved; a
-fresh setup omits them so providers choose their current defaults. See
+Upgrades from a release that supported Gemini CLI may leave
+`~/.forge/provider-preflight.json`. Current Forge does not read that obsolete, credential-free
+timestamp file; you may remove it after confirming the upgrade.
+
+The unversioned 0.4.1 config is normalized in memory. Existing supported-provider model overrides
+are preserved; a fresh setup omits them so providers choose their current defaults. A retired
+`gemini` backend entry becomes `antigravity`, while a Gemini CLI model override is discarded
+because Antigravity model display names are not compatibility-guaranteed. See
 [Migrating from 0.4.1](migrating-from-0.4.1.md).
 
 ## Convention profiles and precedence

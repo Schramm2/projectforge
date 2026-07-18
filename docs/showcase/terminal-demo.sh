@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ -z "${FORGE_BACKEND:-}" ]]; then
-  echo "Set FORGE_BACKEND to an authenticated backend: claude, gemini, or codex." >&2
+  echo "Set FORGE_BACKEND to an authenticated backend: claude, antigravity, or codex." >&2
   exit 2
 fi
 

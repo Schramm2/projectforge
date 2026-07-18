@@ -14,7 +14,7 @@ from ubundiforge.execution_policy import (
     [
         ("claude", ["--permission-mode", "plan"]),
         ("codex", ["--sandbox", "read-only"]),
-        ("gemini", ["--approval-mode", "plan"]),
+        ("antigravity", ["--mode", "plan"]),
     ],
 )
 def test_plan_mode_is_read_only(backend, expected):
@@ -38,7 +38,7 @@ def test_unknown_approval_mode_is_rejected_before_execution():
     [
         ("claude", "bypassPermissions"),
         ("codex", "--dangerously-bypass-approvals-and-sandbox"),
-        ("gemini", "yolo"),
+        ("antigravity", "--dangerously-skip-permissions"),
     ],
 )
 def test_unsafe_mode_is_deliberately_named_and_provider_specific(backend, dangerous_value):
@@ -49,3 +49,28 @@ def test_unsafe_mode_is_deliberately_named_and_provider_specific(backend, danger
         allow_unsafe=True,
     )
     assert dangerous_value in cmd
+
+
+def test_antigravity_safe_mode_uses_headless_sandboxed_accept_edits():
+    cmd = build_provider_command("antigravity", "build it", approval_mode="safe")
+
+    assert cmd == [
+        "agy",
+        "--mode",
+        "accept-edits",
+        "--sandbox",
+        "--print",
+        "build it",
+    ]
+
+
+def test_antigravity_print_flag_remains_immediately_before_prompt_with_model():
+    cmd = build_provider_command(
+        "antigravity",
+        "build it",
+        model="Gemini 3.5 Flash (High)",
+        approval_mode="safe",
+    )
+
+    assert cmd[-2:] == ["--print", "build it"]
+    assert cmd[cmd.index("--model") + 1] == "Gemini 3.5 Flash (High)"

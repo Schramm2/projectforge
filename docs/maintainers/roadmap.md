@@ -20,7 +20,7 @@ truth.
 
 - [DONE] **Quality-based routing**: Tracks which backend produces better results per stack over time. Stores success/failure signals after each scaffold in `~/.forge/quality.jsonl` and shifts routing weights using exponential moving average scoring. The router overrides the ideal backend when a clearly better alternative exists (>0.1 margin, minimum 8 data points).
 - [DONE] **Model selection per backend**: `--model opus` passes the model flag through to the AI CLI subprocess.
-- [DONE] **Fallback chain**: If the primary backend isn't installed, automatically try the next available (claude -> gemini -> codex).
+- [DONE] **Fallback chain**: If the primary backend isn't installed, automatically try the next available (claude -> antigravity -> codex).
 - [DONE] **Multi-backend phase routing**: Different scaffold phases (architecture, frontend, tests, verify) route to the ideal AI backend based on strengths. Adjacent phases using the same backend are merged to reduce handoffs.
 - [DONE] **Specialist prompt variants**: Each phase has a "best" prompt variant optimized for its ideal backend, plus a general fallback variant for other backends.
 - **Cost-aware routing**: For backends with usage-based pricing, optionally prefer cheaper options for simple scaffolds.

@@ -136,7 +136,7 @@ def run_ai(
     AI CLI inside it. Output streams to the terminal in real-time.
 
     Args:
-        backend: Which CLI to use (claude, gemini, codex).
+        backend: Which CLI to use (claude, antigravity, codex).
         prompt: The assembled prompt string.
         project_dir: Path to the project directory to scaffold into.
         model: Optional model to pass to the AI CLI.

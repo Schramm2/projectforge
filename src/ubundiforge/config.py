@@ -7,14 +7,24 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 
-from ubundiforge.provider_preflight import load_valid_preflight
+SUPPORTED_BACKENDS = ("claude", "antigravity", "codex")
+BACKEND_COMMANDS = {
+    "claude": "claude",
+    "antigravity": "agy",
+    "codex": "codex",
+}
+LEGACY_BACKEND_ALIASES = {"gemini": "antigravity"}
 
-SUPPORTED_BACKENDS = ("claude", "gemini", "codex")
+
+def normalize_legacy_backend(backend: str) -> str:
+    """Map retired backend names found in saved Forge data to their replacement."""
+    return LEGACY_BACKEND_ALIASES.get(backend, backend)
 
 
 def check_backend_installed(backend: str) -> bool:
     """Check if the given AI CLI tool is installed and available on PATH."""
-    return shutil.which(backend) is not None
+    command = BACKEND_COMMANDS.get(backend)
+    return command is not None and shutil.which(command) is not None
 
 
 def get_available_backends() -> list[str]:
@@ -46,7 +56,7 @@ class BackendStatus:
             return "Ready"
         if self.ready is False:
             return "Needs login"
-        return "Not auto-checked"
+        return "Check inconclusive"
 
 
 def _run_status_command(
@@ -155,51 +165,56 @@ def _check_codex_status() -> BackendStatus:
     )
 
 
-def _check_gemini_status() -> BackendStatus:
-    """Inspect Gemini availability.
-
-    Gemini's CLI help does not expose a login-status command like Claude
-    or Codex. Instead, verify that the CLI itself responds to a cheap local
-    command without sending a model prompt.
-    """
-    if not check_backend_installed("gemini"):
+def _check_antigravity_status() -> BackendStatus:
+    """Inspect Antigravity installation and Google Sign-In state without a model call."""
+    if not check_backend_installed("antigravity"):
         return BackendStatus(installed=False, ready=False)
 
-    version_result = _run_status_command(["gemini", "--version"])
-    if version_result and version_result.returncode == 0:
-        version = (version_result.stdout or version_result.stderr).strip()
-        version_line = version.splitlines()[0][:160] if version else "unknown"
-        if load_valid_preflight("gemini", version=version_line):
-            return BackendStatus(
-                installed=True,
-                ready=True,
-                detail="Gemini readiness was explicitly verified within the last 24 hours.",
-                auth_mode="verified_preflight",
-            )
-        detail = "Gemini CLI responded to --version."
-        if version:
-            detail = f"Gemini CLI responded successfully ({version_line})."
+    version_result = _run_status_command(["agy", "--version"])
+    if version_result is None or version_result.returncode != 0:
         return BackendStatus(
             installed=True,
             ready=None,
-            detail=f"{detail} Authentication was not auto-checked.",
+            detail="Antigravity is installed, but Forge could not run its version check.",
+            login_command="agy",
         )
 
-    help_result = _run_status_command(["gemini", "--help"])
-    if help_result and help_result.returncode == 0:
+    # `agy models` performs a lightweight authenticated API check. It does not
+    # submit a prompt, consume model quota, or expose account identity.
+    models_result = _run_status_command(["agy", "models"], timeout=15)
+    if models_result is None:
         return BackendStatus(
             installed=True,
             ready=None,
-            detail="Gemini CLI help loaded successfully. Authentication was not auto-checked.",
+            detail="Antigravity is installed; its sign-in check timed out.",
+            login_command="agy",
+        )
+
+    output = "\n".join(
+        part for part in (models_result.stdout, models_result.stderr) if part
+    ).strip()
+    lowered = output.lower()
+    if models_result.returncode == 0 and output:
+        return BackendStatus(
+            installed=True,
+            ready=True,
+            detail="Google Sign-In verified through Antigravity CLI.",
+            login_command="agy",
+            auth_mode="google_sign_in",
+        )
+    if "please sign in" in lowered or "not signed in" in lowered or "login required" in lowered:
+        return BackendStatus(
+            installed=True,
+            ready=False,
+            detail="Antigravity is installed but needs Google Sign-In.",
+            login_command="agy",
         )
 
     return BackendStatus(
         installed=True,
         ready=None,
-        detail=(
-            "Gemini is installed, but setup could not confirm that the CLI was "
-            "runnable automatically."
-        ),
+        detail="Antigravity is installed; its sign-in state could not be confirmed.",
+        login_command="agy",
     )
 
 
@@ -209,8 +224,8 @@ def get_backend_status(backend: str) -> BackendStatus:
         return _check_claude_status()
     if backend == "codex":
         return _check_codex_status()
-    if backend == "gemini":
-        return _check_gemini_status()
+    if backend == "antigravity":
+        return _check_antigravity_status()
     return BackendStatus(installed=False, ready=False, detail="Unsupported backend.")
 
 

@@ -34,8 +34,9 @@ Choose at least one provider. Follow its current official installation and authe
 
 - [Claude Code setup](https://code.claude.com/docs/en/setup), then `claude auth login`.
 - [Codex CLI](https://github.com/openai/codex), then `codex login`.
-- [Gemini CLI installation](https://geminicli.com/docs/get-started/installation/) and
-  [authentication](https://geminicli.com/docs/get-started/authentication/).
+- [Google Antigravity CLI](https://antigravity.google/docs/cli-install), then run `agy` and
+  complete Google Sign-In. On SSH, open the displayed authorization URL locally and paste the
+  returned code into the terminal.
 
 Forge does not collect credentials or account identity. Confirm readiness without a model call:
 
@@ -44,10 +45,9 @@ forge doctor
 forge doctor --json
 ```
 
-One `ready` provider is enough. An installed Gemini CLI remains `preflight_required` because the
-provider exposes no deterministic credential-status command. After authenticating in Gemini's own
-CLI, run `forge doctor --preflight gemini`. This makes one read-only model call in a temporary
-sandbox, may consume quota, and stores only a version-bound readiness timestamp for 24 hours.
+One `ready` provider is enough. Forge checks Antigravity with `agy models`, which confirms the
+provider-owned session without sending a prompt, consuming model quota, or printing identity. If
+Forge reports `needs_login`, run `agy`, finish sign-in, exit with `/exit`, and rerun `forge doctor`.
 
 ## 3. Preview with zero provider calls
 
@@ -80,8 +80,9 @@ forge \
 The preflight panel states the target workspace, provider and model behavior, remaining provider
 calls, a qualified time range, execution strategy, demo/verification limits, and possible provider
 quota or billing. Live generation sends the assembled brief, effective conventions, and selected
-context to the chosen provider CLI. Safe mode keeps writes inside the provider's selected workspace
-boundary; it still allows project edits and commands required to scaffold.
+context to the chosen provider CLI. Safe mode uses each provider's bounded execution controls.
+Antigravity auto-accepts workspace edits and enables its terminal sandbox; print mode may deny
+commands that are not already permitted by Antigravity's scoped policy.
 
 Demo mode is on by default so the generated project should start without real service credentials.
 The provider CLI itself still requires authentication.

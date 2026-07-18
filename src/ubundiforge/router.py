@@ -2,7 +2,7 @@
 
 Strengths:
   - Claude Code: complex reasoning, multi-file architecture, backend work, self-correction
-  - Gemini CLI: frontend and UI work, richer aesthetics, sophisticated UI components
+  - Antigravity CLI: frontend and UI work, richer aesthetics, sophisticated UI components
   - Codex CLI: tests, automation, mechanical refactors, backward compatibility checks
 
 When all three are installed each phase routes to the strongest backend.
@@ -39,7 +39,7 @@ STACK_PHASES: dict[str, list[str]] = {
 # Ideal backend for each phase
 PHASE_IDEAL_BACKEND: dict[str, str] = {
     PHASE_ARCHITECTURE: "claude",
-    PHASE_FRONTEND: "gemini",
+    PHASE_FRONTEND: "antigravity",
     PHASE_TESTS: "codex",
     PHASE_VERIFY: "claude",
 }
@@ -63,7 +63,7 @@ _CODEX_PHRASES = [
     "lint tool",
 ]
 
-FALLBACK_ORDER = ("claude", "gemini", "codex")
+FALLBACK_ORDER = ("claude", "antigravity", "codex")
 
 
 def _detect_codex_project(description: str) -> bool:

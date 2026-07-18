@@ -149,10 +149,10 @@ class TestParseDecompositionPlan:
         assert plan.rationale == "Start with the skeleton"
 
     def test_stamps_phase_and_backend(self):
-        plan = parse_decomposition_plan(VALID_PLAN_JSON, phase="scaffold", backend="gemini")
+        plan = parse_decomposition_plan(VALID_PLAN_JSON, phase="scaffold", backend="antigravity")
         assert plan is not None
         assert plan.tasks[0].phase == "scaffold"
-        assert plan.tasks[0].backend == "gemini"
+        assert plan.tasks[0].backend == "antigravity"
 
     def test_returns_none_for_unparseable(self):
         result = parse_decomposition_plan("no json here", phase="architecture", backend="claude")

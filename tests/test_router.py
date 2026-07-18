@@ -14,7 +14,7 @@ from ubundiforge.router import (
 
 def test_override_takes_precedence():
     assert pick_backend("nextjs", override="codex") == "codex"
-    assert pick_backend("fastapi", override="gemini") == "gemini"
+    assert pick_backend("fastapi", override="antigravity") == "antigravity"
 
 
 def test_default_is_claude():
@@ -34,9 +34,9 @@ def test_fallback_not_needed_when_primary_installed(mock_check):
 
 
 @patch("ubundiforge.router.check_backend_installed", side_effect=lambda b: b != "claude")
-def test_fallback_to_gemini_when_claude_missing(mock_check):
+def test_fallback_to_antigravity_when_claude_missing(mock_check):
     backend, was_fallback = pick_backend_with_fallback("fastapi")
-    assert backend == "gemini"
+    assert backend == "antigravity"
     assert was_fallback is True
 
 
@@ -62,7 +62,7 @@ def test_all_three_installed_nextjs_gets_four_phases(mock_check):
     result = pick_phase_backends("nextjs")
     assert result == [
         ("architecture", "claude"),
-        ("frontend", "gemini"),
+        ("frontend", "antigravity"),
         ("tests", "codex"),
         ("verify", "claude"),
     ]
@@ -91,13 +91,13 @@ def test_only_claude_handles_everything(mock_check):
 
 @patch(
     "ubundiforge.router.check_backend_installed",
-    side_effect=lambda b: b in ("claude", "gemini"),
+    side_effect=lambda b: b in ("claude", "antigravity"),
 )
-def test_claude_gemini_routes_frontend_to_gemini(mock_check):
+def test_claude_antigravity_routes_frontend_to_antigravity(mock_check):
     result = pick_phase_backends("nextjs")
     assert result == [
         ("architecture", "claude"),
-        ("frontend", "gemini"),
+        ("frontend", "antigravity"),
         ("tests", "claude"),
         ("verify", "claude"),
     ]
@@ -115,12 +115,12 @@ def test_claude_codex_routes_tests_to_codex(mock_check):
 
 @patch("ubundiforge.router.check_backend_installed", return_value=True)
 def test_override_forces_single_backend(mock_check):
-    result = pick_phase_backends("nextjs", override="gemini")
+    result = pick_phase_backends("nextjs", override="antigravity")
     assert result == [
-        ("architecture", "gemini"),
-        ("frontend", "gemini"),
-        ("tests", "gemini"),
-        ("verify", "gemini"),
+        ("architecture", "antigravity"),
+        ("frontend", "antigravity"),
+        ("tests", "antigravity"),
+        ("verify", "antigravity"),
     ]
 
 
@@ -160,7 +160,7 @@ def test_prompt_only_routing_uses_ideal_backends_even_when_none_installed(mock_c
     result = pick_phase_backends("nextjs", prefer_installed_backends=False)
     assert result == [
         ("architecture", "claude"),
-        ("frontend", "gemini"),
+        ("frontend", "antigravity"),
         ("tests", "codex"),
         ("verify", "claude"),
     ]
@@ -184,13 +184,13 @@ def test_merge_same_backend_collapses():
 def test_merge_different_backends_stays_separate():
     phase_backends = [
         ("architecture", "claude"),
-        ("frontend", "gemini"),
+        ("frontend", "antigravity"),
         ("tests", "codex"),
     ]
     merged = merge_adjacent_phases(phase_backends)
     assert merged == [
         (["architecture"], "claude"),
-        (["frontend"], "gemini"),
+        (["frontend"], "antigravity"),
         (["tests"], "codex"),
     ]
 
@@ -198,13 +198,13 @@ def test_merge_different_backends_stays_separate():
 def test_merge_adjacent_same_backend():
     phase_backends = [
         ("architecture", "claude"),
-        ("frontend", "gemini"),
+        ("frontend", "antigravity"),
         ("tests", "claude"),
     ]
     merged = merge_adjacent_phases(phase_backends)
     assert merged == [
         (["architecture"], "claude"),
-        (["frontend"], "gemini"),
+        (["frontend"], "antigravity"),
         (["tests"], "claude"),
     ]
 
@@ -241,22 +241,22 @@ def test_merge_empty_input():
 
 def test_quality_scores_override_ideal_backend():
     """Quality scores override ideal backend when margin > 0.1."""
-    scores = {"architecture": {"gemini": 0.95, "claude": 0.7}}
+    scores = {"architecture": {"antigravity": 0.95, "claude": 0.7}}
     result = pick_phase_backends(
         "fastapi",
-        available_backends={"claude", "gemini"},
+        available_backends={"claude", "antigravity"},
         quality_scores=scores,
     )
     arch_backend = next(b for p, b in result if p == "architecture")
-    assert arch_backend == "gemini"
+    assert arch_backend == "antigravity"
 
 
 def test_quality_scores_no_override_small_margin():
     """Quality scores do NOT override when margin <= 0.1."""
-    scores = {"architecture": {"gemini": 0.85, "claude": 0.80}}
+    scores = {"architecture": {"antigravity": 0.85, "claude": 0.80}}
     result = pick_phase_backends(
         "fastapi",
-        available_backends={"claude", "gemini"},
+        available_backends={"claude", "antigravity"},
         quality_scores=scores,
     )
     arch_backend = next(b for p, b in result if p == "architecture")

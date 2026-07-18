@@ -25,13 +25,13 @@ only for the tested version. Account identity and credential values are delibera
 | --- | --- | --- | --- | --- | --- |
 | Claude Code | 2.1.214 | `claude auth status`; JSON `loggedIn=true`, auth method recorded without identity | Omit `--model`; Claude settings/default apply. Stable aliases include `sonnet`, `opus`, and `haiku` | `claude -p --permission-mode acceptEdits --no-session-persistence <prompt>` with workspace permissions/settings constrained by the provider | `--permission-mode bypassPermissions` / `--dangerously-skip-permissions` |
 | Codex CLI | 0.144.0 installed; 0.144.5 probed through the official latest npm package | `codex login status`; exit 0 and auth mode only | Omit `--model`; Codex uses the configured/recommended model | `codex --ask-for-approval never --sandbox workspace-write exec --cd <workspace> <prompt>`; `--json` and `--output-last-message` are available for inspection | `--dangerously-bypass-approvals-and-sandbox` / `--yolo`, only in an externally hardened environment |
-| Gemini CLI | No global binary; 0.51.0 version/help probed through the official no-install route | No documented deterministic status command; installation remains unknown/preflight-required until an explicit model preflight succeeds | CLI default is `auto`; omit `--model` | `gemini --prompt <prompt> --approval-mode auto_edit --sandbox` only after an explicit readiness preflight | `--approval-mode yolo`; deprecated `--yolo` / `-y` |
+| Google Antigravity CLI | 1.1.4 installed | `agy models`; exit 0 with a non-empty catalog confirms the provider-owned Google session without an inference prompt | Omit `--model`; Antigravity uses the current session default | `agy --mode accept-edits --sandbox --print <prompt>`; unapproved commands may be denied in print mode | `--dangerously-skip-permissions` without `--sandbox`, only with explicit unsafe consent |
 
 ProjectForge now maps its provider-neutral modes as follows: `safe` uses Claude `acceptEdits`,
-Codex `workspace-write` with non-interactive denial, and Gemini `auto_edit` plus sandboxing; `plan`
-uses each provider's read-only mode; `unsafe` uses the provider bypass/yolo behavior and is rejected
-unless the caller also supplies explicit unsafe consent. The installed Claude and Codex parsers
-accepted their generated safe/read-only command shapes without a model call on 2026-07-18.
+Codex `workspace-write` with non-interactive denial, and Antigravity `accept-edits` plus terminal
+sandboxing; `plan` uses each provider's read-only mode; `unsafe` uses the provider bypass behavior
+and is rejected unless the caller also supplies explicit unsafe consent. The installed provider
+parsers accepted their generated safe/read-only command shapes without a model call on 2026-07-18.
 
 ## Claude Code
 
@@ -120,52 +120,50 @@ Known limitation: authentication evidence applies to the installed 0.144.0 runti
 latest npm package reported 0.144.5 and accepted the relevant version/help surface in an isolated
 probe, but it was not given access to host authentication and made no model call.
 
-## Gemini CLI
+## Google Antigravity CLI
 
 ### Official sources
 
 Retrieved 2026-07-18:
 
-- <https://geminicli.com/docs/>
-- <https://geminicli.com/docs/get-started/installation/>
-- <https://geminicli.com/docs/get-started/authentication/>
-- <https://geminicli.com/docs/cli/cli-reference/>
-- <https://geminicli.com/docs/cli/model/>
-- <https://geminicli.com/docs/reference/policy-engine/>
+- <https://antigravity.google/docs/cli-overview>
+- <https://antigravity.google/docs/cli-install>
+- <https://antigravity.google/docs/cli-using>
+- <https://antigravity.google/docs/cli/modes>
+- <https://antigravity.google/docs/cli/permissions>
+- <https://github.com/google-antigravity/antigravity-cli>
 
 ### Installation and authentication
 
-Official stable install routes include npm, Homebrew, MacPorts, and an npm install inside an
-Anaconda environment; `npx @google/gemini-cli` is the documented no-install route. Authentication
-supports Google sign-in, Gemini API key, and Vertex AI variants. Headless mode uses an existing
-cached credential or provider environment variables.
+The official installer places `agy` under the user's local binary directory. On first launch,
+Antigravity uses an existing system-keyring session or opens Google Sign-In. SSH sessions print an
+authorization URL and accept the returned code in the terminal. `/logout` clears the provider-owned
+session.
 
-The official authentication and CLI references expose no safe deterministic login-status command.
-Therefore Forge must report an installed Gemini CLI as `unknown/preflight-required`, not ready.
-The explicit verification path is `forge doctor --preflight gemini`, after completing the
-provider-owned authentication flow. It makes one sentinel-only call in a temporary workspace using
-plan mode, sandboxing, and JSON output. A success stores only the CLI version and verification
-timestamp with a 24-hour lifetime and owner-only permissions; provider output is not persisted.
+`agy models` is a bounded readiness check: an authenticated session returns the available model
+display names, while an unauthenticated clean profile exits non-zero and asks the user to launch
+`agy` to sign in. Forge uses only the exit and non-empty-result condition, and never retains model
+catalog output, account identity, authorization codes, or credentials.
 
 ### Invocation, models, policies, and exits
 
-- `--prompt` / `-p` forces non-interactive mode; output can be text, JSON, or stream JSON.
-- The CLI default model value is `auto`; Forge should omit `--model` and describe this as provider
-  auto-selection.
-- Approval modes are `default`, `auto_edit`, `yolo`, and `plan`; the policy-engine docs spell the
-  internal names as `default`, `autoEdit`, `yolo`, and `plan`.
-- `plan` is read-only. `default` prompts for most writes. `auto_edit` permits some automated edits.
-  `yolo` auto-approves every tool and requires explicit unsafe consent.
-- `--sandbox` requests a sandboxed environment. Forge must verify availability and failure behavior
-  on the invoked version rather than assuming Docker/Podman support.
-- `--yolo` / `-y` is deprecated in favor of `--approval-mode=yolo` and must be removed from normal
-  Forge commands.
+- `--print` / `-p` runs one prompt non-interactively. Keep it as the final flag immediately before
+  the prompt because the Go parser treats it as value-taking.
+- `--model` overrides the session model. Forge omits it by default and lets Antigravity select its
+  current default.
+- `--mode accept-edits` automatically approves file edits and creations. `--mode plan` uses
+  read-only investigation tools and produces a plan.
+- `--sandbox` enables terminal restrictions. It is not the file-permission engine; workspace and
+  non-workspace file access remain governed by Antigravity permissions and settings.
+- Print mode cannot answer interactive permission prompts. Current versions deny unapproved tools
+  with guidance rather than granting them. Users can allow narrowly scoped commands in
+  `/permissions`; Forge does not edit the user's global settings.
+- `--dangerously-skip-permissions` auto-approves tool requests and is used only by Forge's explicit
+  unsafe mode. Forge omits `--sandbox` in that mode so its risk is not disguised.
 
-Known limitations: no global binary or authentication evidence exists; there is no official status
-API; and a safe headless write preflight may consume quota. The official no-install route reported
-0.51.0 and exposed the documented prompt, model, sandbox, approval-mode, and output-format options,
-but no model call was made. Release evidence must label Gemini live validation unavailable until an
-explicit preflight succeeds.
+Known limitation: a safe headless scaffold can write workspace files but may be unable to run a
+command that the user's Antigravity policy has not already allowed. Forge preserves the provider
+failure and independently verifies generated output rather than silently escalating permissions.
 
 ## Runtime evidence, 2026-07-18
 
@@ -175,9 +173,10 @@ explicit preflight succeeds.
   provider-owned status command reported authenticated through ChatGPT; Forge retained no identity.
 - The official latest Codex npm package reported 0.144.5 and exposed the required `exec`, sandbox,
   approval, model, JSON, and final-message options in a clean no-install probe.
-- The official latest Gemini npm package reported 0.51.0 and exposed prompt, model, sandbox,
-  approval modes (`default`, `auto_edit`, `yolo`, and `plan`), and structured output in a clean
-  no-install probe. Authentication and live write behavior remain unavailable evidence.
+- Antigravity CLI 1.1.4 reported its version, exposed `--print`, `--model`, `--mode`, `--sandbox`,
+  and `--dangerously-skip-permissions`, and returned its model catalog through the saved Google
+  session. The same `agy models` command in a clean isolated home exited non-zero with provider-owned
+  sign-in guidance and did not open a browser.
 - All probes above were version/help/status-only. They made no model calls and recorded no account
   identifier, credential, token, or provider response body.
 
@@ -190,7 +189,7 @@ retaining a redacted diagnostic summary:
 | --- | --- | --- |
 | Missing binary | Executable lookup fails | Show official install link/command, then rerun doctor |
 | Unauthenticated | Documented status is false/non-zero or provider explicitly requests login | Launch or show provider-owned auth flow, then rerun doctor |
-| Preflight required | Installed provider lacks deterministic status | Explain unknown state and offer an isolated minimal verification |
+| Check inconclusive | A bounded status command times out or returns an unclassified error | Check connectivity/keyring access and rerun the provider-owned status command |
 | Unavailable model | Provider rejects explicit model/alias | Remove the override or choose a provider-supported alias |
 | Quota/rate limit | Provider emits a rate/quota class response | Preserve output; wait, change provider, or review plan/billing |
 | Network | DNS, connection, TLS, or provider-unreachable failure | Check connectivity/proxy and retry without changing project output |
@@ -201,8 +200,8 @@ retaining a redacted diagnostic summary:
 ## Remaining live evidence
 
 - Run an isolated bounded-write probe with a current-stable authenticated provider.
-- Run Gemini's explicit opt-in readiness preflight when authentication is available; do not infer
-  readiness from the successful 0.51.0 version/help probe.
+- Run a bounded Antigravity workspace-write scaffold and record which commands require explicit
+  scoped permission rules in print mode.
 - Run bounded Claude and Codex failure probes for permission/model/network classification where
   they can be done without secrets or external side effects.
 - Complete at least one authenticated end-to-end Forge scaffold and independently verify every

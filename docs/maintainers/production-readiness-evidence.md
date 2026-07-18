@@ -1,5 +1,8 @@
 # Production Readiness Evidence
 
+> Historical v0.5.0 release record. Gemini CLI references below describe the provider support that
+> existed during that release; current Forge uses Google Antigravity CLI instead.
+
 Evidence date: 2026-07-18
 Release candidate: 0.5.0
 

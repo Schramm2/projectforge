@@ -76,6 +76,34 @@ def test_resume_preserves_completed_phases_and_retries_incomplete_phases(tmp_pat
     assert resumed["phases"][1]["last_failure_category"] == "quota"
 
 
+def test_resume_migrates_retired_gemini_backend_without_weakening_contract(tmp_path):
+    contract = [("frontend", "antigravity", "private frontend prompt")]
+    initialize_progress(
+        tmp_path,
+        name="atlas",
+        stack="nextjs",
+        approval_mode="safe",
+        phase_prompts=contract,
+        resume=False,
+    )
+    progress_path = tmp_path / ".forge" / "progress.json"
+    legacy = json.loads(progress_path.read_text())
+    legacy["phases"][0]["backend"] = "gemini"
+    progress_path.write_text(json.dumps(legacy))
+
+    resumed = initialize_progress(
+        tmp_path,
+        name="atlas",
+        stack="nextjs",
+        approval_mode="safe",
+        phase_prompts=contract,
+        resume=True,
+    )
+
+    assert resumed["phases"][0]["backend"] == "antigravity"
+    assert resumed["resume_count"] == 1
+
+
 @pytest.mark.parametrize(
     ("name", "stack", "approval_mode", "phases"),
     [

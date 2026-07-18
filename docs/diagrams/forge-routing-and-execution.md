@@ -24,7 +24,7 @@ flowchart TD
     CodexHint -- No --> IdealChoice["Use ideal backend per phase"]
 
     ArchChoice --> IdealMap
-    IdealChoice --> IdealMap["Ideal mapping:<br/>architecture -> claude<br/>frontend -> gemini<br/>tests -> codex<br/>verify -> claude"]
+    IdealChoice --> IdealMap["Ideal mapping:<br/>architecture -> claude<br/>frontend -> antigravity<br/>tests -> codex<br/>verify -> claude"]
 
     IdealMap --> Fallback{"Ideal backend available?"}
     Fallback -- Yes --> Routed["Use ideal backend"]
