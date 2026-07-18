@@ -190,19 +190,20 @@ Items marked with [DONE] are implemented in this repository as of `0.4.1`. Plann
 
 ## Deployment & Distribution
 
-Packaging groundwork is in place. The supported public route currently installs from the
-canonical GitHub repository with uv; PyPI and Homebrew remain release work.
+The v0.4.1 package is available from its immutable GitHub release through uv and from the public
+Homebrew tap. PyPI remains an optional future channel.
 
 The current workflow:
-1. User runs `uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1`
+1. User runs `uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz`
+   or `brew install --build-from-source schramm2/tap/projectforge`
 2. Runs `forge` from any directory
 3. Setup wizard runs on first use (detects tools, configures preferences)
 4. Projects scaffold into their configured directory with organization conventions baked in
 
 Steps to ship:
 - [DONE] **Homebrew formula source**: The repo includes `Formula/projectforge.rb`, a formula generator, and documented release steps.
-- **Publish and verify Homebrew**: Sync `Formula/projectforge.rb` into `Schramm2/homebrew-tap`, retire any superseded formula after compatibility review, and test the tap from a clean environment.
-- [DONE] **Homebrew release automation code**: `.github/workflows/release-homebrew.yml` can tag, release, regenerate, and sync after its credentials and target repository are configured. This is not evidence that the public tap is ready.
+- [DONE] **Publish and verify Homebrew**: `Formula/projectforge.rb` is synchronized into `Schramm2/homebrew-tap`; the superseded formula was retired; clean `brew install`, `brew test`, version, help, and dry-run checks passed for v0.4.1.
+- [DONE] **Homebrew release automation**: `.github/workflows/release-homebrew.yml` tagged, released, regenerated, and synchronized v0.4.1 successfully.
 - [DONE] **Buildable package metadata**: `pyproject.toml` is set up for versioned source/wheel builds.
 - **Publish releases to PyPI**: optional later, if Forge needs a Python package distribution channel.
 - Transfer repo to a shared organization when ready
