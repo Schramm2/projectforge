@@ -20,7 +20,7 @@ def _markdown_files() -> list[Path]:
         text=True,
         check=True,
     )
-    return [ROOT / line for line in result.stdout.splitlines() if line]
+    return [ROOT / line for line in result.stdout.splitlines() if line and (ROOT / line).is_file()]
 
 
 def broken_links() -> list[str]:

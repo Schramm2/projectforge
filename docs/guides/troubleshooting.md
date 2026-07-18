@@ -27,24 +27,38 @@ Use the provider's current official installation guide:
 
 - [Claude Code](https://code.claude.com/docs/en/setup), then `claude auth login`.
 - [Codex CLI](https://github.com/openai/codex), then `codex login`.
-- [Gemini CLI](https://geminicli.com/docs/get-started/installation/) and its
-  [authentication guide](https://geminicli.com/docs/get-started/authentication/).
+- [Google Antigravity CLI](https://antigravity.google/docs/cli-install), then run `agy` and complete
+  Google Sign-In.
 
 Then rerun `forge doctor`. Forge never asks you to paste a credential.
 
-## Gemini says `preflight_required`
+## Antigravity needs Google Sign-In
 
-Gemini CLI does not expose a deterministic credential-status command. Forge therefore does not
-mark it ready from installation or `--version`. Authenticate through Gemini's own flow, then run:
+Forge uses `agy models` to verify an existing Antigravity session without sending a model prompt.
+If `forge doctor` reports `needs_login`:
 
 ```bash
-forge doctor --preflight gemini
+agy
+# Complete Google Sign-In, then leave the TUI with /exit.
+forge doctor
 ```
 
-This explicit command makes one read-only model call in a temporary sandbox and may consume quota.
-On success, Forge stores only the CLI version and verification timestamp for 24 hours in
-`~/.forge/provider-preflight.json`; it never stores provider output, identity, or credentials. Use
-another ready provider if you do not want a model call.
+On SSH, `agy` prints an authorization URL. Open it on a local device, sign in, and paste the
+returned code into the remote terminal. Credentials remain in Antigravity's system-keyring
+integration. Forge never asks for or stores the code, token, catalog output, or account identity.
+
+If `forge doctor` reports `check_inconclusive`, confirm connectivity and keyring access, then run
+`agy models` directly. A successful command prints available model display names; a missing session
+prints a sign-in instruction. See Google's
+[Antigravity troubleshooting guide](https://antigravity.google/docs/cli-troubleshooting) for PATH,
+keyring, and SSH-specific recovery.
+
+## Migrating from Gemini CLI
+
+Gemini CLI is no longer a supported Forge backend. Install Antigravity, authenticate as above, and
+use `--use antigravity`. Forge migrates saved `gemini` backend entries to `antigravity` in memory,
+but drops old Gemini model overrides so Antigravity can select a current supported default. Running
+`--setup` writes a fresh provider selection.
 
 ## Config is corrupted
 

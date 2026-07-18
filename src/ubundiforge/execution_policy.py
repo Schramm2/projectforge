@@ -55,15 +55,18 @@ def build_provider_command(
                 sandbox,
                 "exec",
             ]
-    elif backend == "gemini":
-        provider_mode = {
-            "safe": "auto_edit",
-            "plan": "plan",
-            "unsafe": "yolo",
-        }[approval_mode]
-        cmd = ["gemini", "-p", prompt, "--approval-mode", provider_mode, "--sandbox"]
+    elif backend == "antigravity":
+        provider_mode = "plan" if approval_mode == "plan" else "accept-edits"
+        cmd = ["agy", "--mode", provider_mode]
+        if approval_mode in {"safe", "plan"}:
+            cmd.append("--sandbox")
+        else:
+            cmd.append("--dangerously-skip-permissions")
         if model:
             cmd.extend(["--model", model])
+        # Antigravity's Go flag parser treats --print as value-taking, so it
+        # must remain the final flag immediately before the prompt.
+        cmd.extend(["--print", prompt])
         return cmd
     else:
         return []

@@ -47,7 +47,7 @@ def test_append_quality_signal_without_verify(tmp_path: Path, monkeypatch):
 
     append_quality_signal(
         stack="nextjs",
-        phase_backends=[("architecture", "gemini")],
+        phase_backends=[("architecture", "antigravity")],
         verify_report=None,
     )
 
@@ -70,7 +70,7 @@ def test_read_quality_signals_skips_malformed(tmp_path: Path, monkeypatch):
     quality_path.write_text(
         '{"stack":"fastapi","backend":"claude","phase":"arch"}\n'
         "BAD LINE\n"
-        '{"stack":"nextjs","backend":"gemini","phase":"frontend"}\n'
+        '{"stack":"nextjs","backend":"antigravity","phase":"frontend"}\n'
     )
     monkeypatch.setattr("ubundiforge.quality.QUALITY_LOG_PATH", quality_path)
 

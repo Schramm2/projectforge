@@ -8,6 +8,8 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
+from ubundiforge.config import normalize_legacy_backend
+
 
 class ProgressContractError(ValueError):
     """Raised when resume evidence is missing, invalid, or belongs to another run."""
@@ -99,7 +101,15 @@ def initialize_progress(
         )
     payload = _read_progress(path)
     recorded_contract = [
-        {key: item.get(key) for key in ("phase", "backend", "prompt_sha256")}
+        {
+            "phase": item.get("phase"),
+            "backend": (
+                normalize_legacy_backend(item["backend"])
+                if isinstance(item.get("backend"), str)
+                else item.get("backend")
+            ),
+            "prompt_sha256": item.get("prompt_sha256"),
+        }
         for item in payload.get("phases", [])
         if isinstance(item, dict)
     ]
@@ -115,6 +125,8 @@ def initialize_progress(
         )
 
     for phase in payload["phases"]:
+        if isinstance(phase.get("backend"), str):
+            phase["backend"] = normalize_legacy_backend(phase["backend"])
         if phase.get("status") != "completed":
             phase["status"] = "pending"
             phase["exit_code"] = None

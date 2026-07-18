@@ -1,5 +1,8 @@
 # Production Readiness Plan
 
+> Historical v0.5.0 plan. Gemini CLI references below record the constraints proven at that time;
+> current Forge uses Google Antigravity CLI instead.
+
 Status date: 2026-07-18
 Target branch: `feat/production-readiness`
 Starting point: `main` at `1691b2d` (`v0.4.1`)

@@ -1,12 +1,12 @@
 """Backend adapter implementations for the multi-agent orchestration framework."""
 
+from ubundiforge.adapters.antigravity_adapter import AntigravityAdapter
 from ubundiforge.adapters.claude_adapter import ClaudeAdapter
 from ubundiforge.adapters.codex_adapter import CodexAdapter
-from ubundiforge.adapters.gemini_adapter import GeminiAdapter
 
 ADAPTER_REGISTRY: dict[str, type] = {
     "claude": ClaudeAdapter,
-    "gemini": GeminiAdapter,
+    "antigravity": AntigravityAdapter,
     "codex": CodexAdapter,
 }
 

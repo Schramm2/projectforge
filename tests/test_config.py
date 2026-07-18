@@ -2,7 +2,41 @@
 
 from subprocess import CompletedProcess
 
-from ubundiforge.config import BackendStatus, get_backend_status, get_usable_backends
+from ubundiforge.config import (
+    BackendStatus,
+    check_backend_installed,
+    get_backend_status,
+    get_usable_backends,
+)
+from ubundiforge.setup import _normalize_forge_config
+
+
+def test_antigravity_install_check_uses_agy_binary(monkeypatch):
+    observed: list[str] = []
+
+    def fake_which(command):
+        observed.append(command)
+        return "/usr/local/bin/agy"
+
+    monkeypatch.setattr("ubundiforge.config.shutil.which", fake_which)
+
+    assert check_backend_installed("antigravity") is True
+    assert observed == ["agy"]
+
+
+def test_legacy_gemini_config_migrates_to_antigravity_and_drops_model_override():
+    normalized = _normalize_forge_config(
+        {
+            "available_backends": ["claude", "gemini", "antigravity"],
+            "backend_models": {
+                "gemini": "gemini-2.5-pro",
+                "antigravity": "Gemini 3.5 Flash (High)",
+            },
+        }
+    )
+
+    assert normalized["available_backends"] == ["claude", "antigravity"]
+    assert normalized["backend_models"] == {"antigravity": "Gemini 3.5 Flash (High)"}
 
 
 def test_claude_status_reports_needs_login(monkeypatch):
@@ -49,51 +83,70 @@ def test_codex_status_reports_ready(monkeypatch):
     assert status.auth_mode == "chatgpt"
 
 
-def test_gemini_status_reports_unknown_when_cli_responds(monkeypatch):
+def test_antigravity_status_reports_ready_when_models_are_available(monkeypatch):
     monkeypatch.setattr(
         "ubundiforge.config.check_backend_installed",
-        lambda backend: backend == "gemini",
-    )
-    monkeypatch.setattr(
-        "ubundiforge.config._run_status_command",
-        lambda cmd, timeout=5: CompletedProcess(
-            args=cmd,
-            returncode=0,
-            stdout="1.2.3",
-            stderr="",
-        ),
+        lambda backend: backend == "antigravity",
     )
 
-    status = get_backend_status("gemini")
+    def fake_run(cmd, timeout=5):
+        if cmd == ["agy", "--version"]:
+            return CompletedProcess(cmd, 0, "1.1.0\n", "")
+        assert cmd == ["agy", "models"]
+        assert timeout == 15
+        return CompletedProcess(cmd, 0, "Gemini 3.5 Flash (High)\n", "")
+
+    monkeypatch.setattr("ubundiforge.config._run_status_command", fake_run)
+
+    status = get_backend_status("antigravity")
+
+    assert status.installed is True
+    assert status.ready is True
+    assert status.auth_mode == "google_sign_in"
+    assert status.login_command == "agy"
+
+
+def test_antigravity_status_reports_needs_login_without_google_session(monkeypatch):
+    monkeypatch.setattr(
+        "ubundiforge.config.check_backend_installed",
+        lambda backend: backend == "antigravity",
+    )
+
+    def fake_run(cmd, timeout=5):
+        if cmd == ["agy", "--version"]:
+            return CompletedProcess(cmd, 0, "1.1.0\n", "")
+        return CompletedProcess(
+            cmd,
+            1,
+            "",
+            "Error: Please sign in to view available models. Launch the CLI without arguments.",
+        )
+
+    monkeypatch.setattr("ubundiforge.config._run_status_command", fake_run)
+
+    status = get_backend_status("antigravity")
+
+    assert status.ready is False
+    assert status.login_command == "agy"
+
+
+def test_antigravity_status_is_unknown_on_non_auth_failure(monkeypatch):
+    monkeypatch.setattr(
+        "ubundiforge.config.check_backend_installed",
+        lambda backend: backend == "antigravity",
+    )
+
+    def fake_run(cmd, timeout=5):
+        if cmd == ["agy", "--version"]:
+            return CompletedProcess(cmd, 0, "1.1.0\n", "")
+        return CompletedProcess(cmd, 1, "", "Network unavailable")
+
+    monkeypatch.setattr("ubundiforge.config._run_status_command", fake_run)
+
+    status = get_backend_status("antigravity")
 
     assert status.installed is True
     assert status.ready is None
-    assert "authentication" in status.detail.lower()
-
-
-def test_gemini_status_reports_ready_from_matching_fresh_preflight(monkeypatch):
-    monkeypatch.setattr(
-        "ubundiforge.config.check_backend_installed",
-        lambda backend: backend == "gemini",
-    )
-    monkeypatch.setattr(
-        "ubundiforge.config._run_status_command",
-        lambda cmd, timeout=5: CompletedProcess(
-            args=cmd,
-            returncode=0,
-            stdout="0.51.0\n",
-            stderr="",
-        ),
-    )
-    monkeypatch.setattr(
-        "ubundiforge.config.load_valid_preflight",
-        lambda backend, *, version: backend == "gemini" and version == "0.51.0",
-    )
-
-    status = get_backend_status("gemini")
-
-    assert status.ready is True
-    assert status.auth_mode == "verified_preflight"
 
 
 def test_get_usable_backends_requires_verified_readiness(monkeypatch):
@@ -101,7 +154,7 @@ def test_get_usable_backends_requires_verified_readiness(monkeypatch):
         "ubundiforge.config.get_backend_statuses",
         lambda: {
             "claude": BackendStatus(installed=True, ready=False),
-            "gemini": BackendStatus(installed=True, ready=None),
+            "antigravity": BackendStatus(installed=True, ready=None),
             "codex": BackendStatus(installed=True, ready=True),
         },
     )

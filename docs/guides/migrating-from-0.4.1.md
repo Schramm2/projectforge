@@ -6,8 +6,15 @@ The next pre-1.0 release keeps the `projectforge` distribution, `forge` command,
 ## Configuration
 
 Forge reads the unversioned 0.4.1 `~/.forge/config.json` format and normalizes it to schema version
-1. Existing per-provider model overrides are preserved. New setups omit model overrides by default
-so each provider can select its current default or auto model.
+1. Existing model overrides for supported providers are preserved. New setups omit model overrides
+by default so each provider can select its current default or auto model.
+
+Gemini CLI is retired. Forge maps a saved `gemini` backend selection to `antigravity` in memory and
+drops its old model override because Antigravity's model display names are not guaranteed to accept
+Gemini CLI identifiers. Install and authenticate `agy`, run `forge doctor`, then use
+`forge --setup` to save the current provider selection. Legacy replay manifests and resumable
+progress contracts translate only the retired backend name; prompt hashes and all other resume
+invariants remain enforced.
 
 Config saves are now atomic and use user-only permissions. If the file is invalid or contains an
 unsupported key, Forge preserves it as `config.json.corrupt-<timestamp>` and asks you to run
@@ -43,10 +50,9 @@ provider bypass/yolo behavior is removed. A blanket bypass requires both
 `--approval-mode unsafe` and `--allow-unsafe` on that specific command.
 
 Run `forge doctor` after upgrading. A provider must be both installed and verifiably ready before
-Forge routes a live phase to it. Gemini may remain `preflight_required` because its CLI does not
-offer a deterministic credential-status command. After provider-owned authentication, opt in to
-one read-only readiness call with `forge doctor --preflight gemini`; the resulting version-bound
-proof expires after 24 hours.
+Forge routes a live phase to it. Antigravity readiness uses `agy models`, which verifies the saved
+Google session without an inference call. If login is required, run `agy`, complete Google Sign-In,
+exit with `/exit`, and rerun `forge doctor`.
 
 ## Evidence and recovery
 

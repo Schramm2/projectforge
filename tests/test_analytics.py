@@ -31,7 +31,7 @@ def test_aggregate_stats_with_data():
         {
             "name": "p3",
             "stack": "nextjs",
-            "backends": ["gemini"],
+            "backends": ["antigravity"],
             "timestamp": "2026-03-20T12:00:00",
         },
     ]

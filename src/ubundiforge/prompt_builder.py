@@ -800,10 +800,10 @@ comment where the logic is non-obvious.
 
 
 def build_frontend_prompt_best(answers: dict) -> str:
-    """Build specialist frontend prompt for Gemini (ideal backend).
+    """Build specialist frontend prompt for Antigravity (ideal backend).
 
-    Applies Gemini 3 prompting best practices: role in <role> tags, context
-    before instructions, plan-execute-validate workflow, self-critique,
+    Applies structured agent prompting practices: role in <role> tags, context
+    before instructions, a plan-execute-validate workflow, self-critique,
     negative constraints at the end, and XML-structured sections.
     """
     stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])

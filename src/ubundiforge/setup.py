@@ -16,6 +16,7 @@ from ubundiforge.config import (
     SUPPORTED_BACKENDS,
     BackendStatus,
     get_backend_statuses,
+    normalize_legacy_backend,
 )
 from ubundiforge.conventions import BUNDLED_CONVENTIONS_DIR, CONVENTIONS_PATH, FORGE_DIR
 from ubundiforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
@@ -56,11 +57,12 @@ SUPPORTED_EDITORS = [
 
 _BACKEND_LOGIN_HINTS = {
     "claude": "claude auth login",
+    "antigravity": "agy, then complete Google Sign-In",
     "codex": "codex login",
 }
 _BACKEND_INSTALL_URLS = {
     "claude": "https://code.claude.com/docs/en/setup",
-    "gemini": "https://geminicli.com/docs/get-started/installation/",
+    "antigravity": "https://antigravity.google/docs/cli-install",
     "codex": "https://github.com/openai/codex",
 }
 
@@ -114,7 +116,7 @@ def _backend_readiness_cell(status: BackendStatus):
         return badge("Ready", "success")
     if status.ready is False:
         return badge("Needs login", "warning")
-    return badge("Not auto-checked", "warning")
+    return badge("Check inconclusive", "warning")
 
 
 def needs_setup() -> bool:
@@ -123,7 +125,7 @@ def needs_setup() -> bool:
 
 
 def _normalize_forge_config(payload: object) -> dict:
-    """Validate config shape and migrate the unversioned v0.4.1 format in memory."""
+    """Validate config shape and migrate supported legacy values in memory."""
     if not isinstance(payload, dict):
         raise ValueError("config root must be an object")
     unknown_keys = sorted(set(payload) - set(_CONFIG_TYPES))
@@ -139,11 +141,26 @@ def _normalize_forge_config(payload: object) -> dict:
             raise ValueError(f"invalid value type for config key: {key}")
 
     backends = normalized.get("available_backends", [])
+    if "available_backends" in normalized and isinstance(backends, list):
+        migrated_backends: list[object] = []
+        for backend in backends:
+            migrated = normalize_legacy_backend(backend) if isinstance(backend, str) else backend
+            if migrated not in migrated_backends:
+                migrated_backends.append(migrated)
+        normalized["available_backends"] = migrated_backends
+        backends = migrated_backends
     if any(
         not isinstance(backend, str) or backend not in SUPPORTED_BACKENDS for backend in backends
     ):
         raise ValueError("available_backends contains an unsupported backend")
     backend_models = normalized.get("backend_models", {})
+    if isinstance(backend_models, dict) and "gemini" in backend_models:
+        # Gemini CLI model identifiers are not guaranteed to be valid Antigravity
+        # display names. Prefer Antigravity's current default after migration.
+        backend_models = {
+            backend: model for backend, model in backend_models.items() if backend != "gemini"
+        }
+        normalized["backend_models"] = backend_models
     if any(
         backend not in SUPPORTED_BACKENDS or not isinstance(model, str) or not model.strip()
         for backend, model in backend_models.items()
@@ -219,26 +236,26 @@ def _routing_summary(available: list[str], console: Console) -> None:
         return
 
     has_claude = "claude" in available
-    has_gemini = "gemini" in available
+    has_antigravity = "antigravity" in available
     has_codex = "codex" in available
 
-    if has_claude and has_gemini and has_codex:
+    if has_claude and has_antigravity and has_codex:
         body = grouped_lines(
             [
                 subtle("All three backends detected. Specialist routing is available."),
                 subtle("Architecture & backend code -> claude"),
-                subtle("Frontend & UI -> gemini"),
+                subtle("Frontend & UI -> antigravity"),
                 subtle("Tests & automation -> codex"),
                 muted("Use --use to override routing for any run."),
             ]
         )
         console.print(make_panel(body, title="Routing", accent="aqua"))
-    elif has_claude and has_gemini:
+    elif has_claude and has_antigravity:
         body = grouped_lines(
             [
-                subtle("claude + gemini detected."),
+                subtle("claude + antigravity detected."),
                 subtle("Architecture, backend & tests -> claude"),
-                subtle("Frontend & UI -> gemini"),
+                subtle("Frontend & UI -> antigravity"),
                 muted("Use --use to override routing for any run."),
             ]
         )
@@ -257,7 +274,7 @@ def _routing_summary(available: list[str], console: Console) -> None:
         body = grouped_lines(
             [
                 subtle("Only claude detected. It will handle all scaffolding."),
-                muted("Install gemini and/or codex to enable specialist routing."),
+                muted("Install antigravity and/or codex to enable specialist routing."),
                 muted("Use --use to override routing for any run."),
             ]
         )
@@ -301,7 +318,7 @@ def run_setup(console: Console) -> dict:
 
     strengths = {
         "claude": "Architecture & backend",
-        "gemini": "Frontend & UI",
+        "antigravity": "Frontend & UI",
         "codex": "Tests & automation",
     }
 
@@ -331,7 +348,7 @@ def run_setup(console: Console) -> dict:
                 grouped_lines(
                     [
                         "No AI CLI tools found.",
-                        subtle("Forge needs at least one of: claude, gemini, or codex."),
+                        subtle("Forge needs at least one of: claude, antigravity, or codex."),
                         *[
                             muted(f"{backend}: {_BACKEND_INSTALL_URLS[backend]}")
                             for backend in SUPPORTED_BACKENDS
@@ -381,9 +398,8 @@ def run_setup(console: Console) -> dict:
         ]
         lines.append(
             muted(
-                "Forge will not route to these backends until readiness is confirmed by a "
-                "provider-specific preflight. Complete official authentication, then run "
-                "forge doctor for the current classification."
+                "Forge will not route to these backends until readiness is confirmed. "
+                "Complete official authentication, then run forge doctor again."
             )
         )
         console.print(make_panel(grouped_lines(lines), title="Backend Checks", accent="amber"))

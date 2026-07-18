@@ -39,29 +39,29 @@ def test_claude_cmd_with_model():
     ]
 
 
-def test_gemini_cmd_basic():
-    cmd = _build_cmd("gemini", "do stuff")
+def test_antigravity_cmd_basic():
+    cmd = _build_cmd("antigravity", "do stuff")
     assert cmd == [
-        "gemini",
-        "-p",
-        "do stuff",
-        "--approval-mode",
-        "auto_edit",
+        "agy",
+        "--mode",
+        "accept-edits",
         "--sandbox",
+        "--print",
+        "do stuff",
     ]
 
 
-def test_gemini_cmd_with_model():
-    cmd = _build_cmd("gemini", "do stuff", model="flash")
+def test_antigravity_cmd_with_model():
+    cmd = _build_cmd("antigravity", "do stuff", model="flash")
     assert cmd == [
-        "gemini",
-        "-p",
-        "do stuff",
-        "--approval-mode",
-        "auto_edit",
+        "agy",
+        "--mode",
+        "accept-edits",
         "--sandbox",
         "--model",
         "flash",
+        "--print",
+        "do stuff",
     ]
 
 
@@ -104,7 +104,7 @@ def test_initial_phase_summary_matches_known_phase_labels():
         == "Designing the project foundation"
     )
     assert (
-        _initial_phase_summary("Frontend & UI", "gemini")
+        _initial_phase_summary("Frontend & UI", "antigravity")
         == "Shaping the interface and app structure"
     )
     assert (

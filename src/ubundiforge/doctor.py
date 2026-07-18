@@ -19,7 +19,7 @@ from ubundiforge.setup import CONFIG_PATH, _normalize_forge_config
 
 _VERSION_COMMANDS = {
     "claude": ["claude", "--version"],
-    "gemini": ["gemini", "--version"],
+    "antigravity": ["agy", "--version"],
     "codex": ["codex", "--version"],
 }
 _EDITOR_COMMANDS = ("cursor", "code", "antigravity", "windsurf", "zed")
@@ -85,7 +85,7 @@ def _readiness_label(status: BackendStatus) -> str:
         return "ready"
     if status.ready is False:
         return "needs_login"
-    return "preflight_required"
+    return "check_inconclusive"
 
 
 def _provider_repair(backend: str, status: BackendStatus) -> str:
@@ -98,12 +98,17 @@ def _provider_repair(backend: str, status: BackendStatus) -> str:
             "then rerun forge doctor."
         )
     if status.ready is False:
+        if backend == "antigravity":
+            return (
+                "Run agy, complete Google Sign-In in the browser (or the displayed SSH URL), "
+                "exit with /exit, then rerun forge doctor."
+            )
         command = status.login_command or f"{backend} login"
         return f"Run {command}, then rerun forge doctor."
-    if backend == "gemini":
+    if backend == "antigravity":
         return (
-            "Complete Gemini authentication through its official CLI; readiness remains "
-            "preflight-required until explicitly verified."
+            "Run agy, complete Google Sign-In in the browser (or the displayed SSH URL), "
+            "exit with /exit, then rerun forge doctor."
         )
     return f"Recheck the provider-owned login flow, then rerun forge doctor for {backend}."
 

@@ -39,13 +39,13 @@ PROVIDER_CAPABILITIES = {
         plan_mode="plan (read-only)",
         unsafe_mode="bypassPermissions",
     ),
-    "gemini": ProviderCapability(
-        install_url="https://geminicli.com/docs/get-started/installation/",
-        deterministic_status=False,
+    "antigravity": ProviderCapability(
+        install_url="https://antigravity.google/docs/cli-install",
+        deterministic_status=True,
         default_model="provider_default",
-        safe_mode="auto_edit with sandbox",
+        safe_mode="accept-edits with terminal sandbox",
         plan_mode="plan with sandbox",
-        unsafe_mode="yolo",
+        unsafe_mode="skip permissions without sandbox",
     ),
     "codex": ProviderCapability(
         install_url="https://github.com/openai/codex",

@@ -1,4 +1,4 @@
-"""Gemini CLI backend adapter."""
+"""Google Antigravity CLI backend adapter."""
 
 from __future__ import annotations
 
@@ -32,10 +32,10 @@ Return a JSON object with this exact structure:
 }}"""
 
 
-class GeminiAdapter(CLIAdapterBase):
-    """Backend adapter for Gemini CLI (`gemini` CLI)."""
+class AntigravityAdapter(CLIAdapterBase):
+    """Backend adapter for Google Antigravity CLI (`agy`)."""
 
-    backend = "gemini"
+    backend = "antigravity"
 
     def build_prompt(self, task: AgentTask) -> str:
         territory = "\n".join(f"- {f}" for f in task.file_territory)

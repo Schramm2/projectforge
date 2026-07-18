@@ -1,7 +1,7 @@
 # ProjectForge
 
 ProjectForge is a local CLI that turns a project brief and your conventions into a verified starter
-repository through Claude Code, Codex CLI, or Gemini CLI.
+repository through Claude Code, Google Antigravity CLI, or Codex CLI.
 
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB)
 
@@ -13,8 +13,8 @@ from “generated project verified.”
 
 - Interactive and flag-driven scaffolding for seven Python and TypeScript stacks.
 - Zero-provider-call prompt previews with `--dry-run`.
-- `forge doctor` readiness diagnostics without a model call or credential output; Gemini has a
-  separate, opt-in readiness preflight.
+- `forge doctor` installation and authentication diagnostics without a model call or credential
+  output.
 - Provider-default models unless you deliberately request an override.
 - Deterministic bundled, profile, user-wide, and project-local conventions with source hashes.
 - Safe provider execution by default; blanket bypass requires two explicit unsafe flags.
@@ -72,21 +72,20 @@ collect a token, or print account identity.
 | --- | --- | --- | --- |
 | Claude Code | [Install](https://code.claude.com/docs/en/setup) | `claude auth login` | Deterministic status check |
 | Codex CLI | [Install](https://github.com/openai/codex) | `codex login` | Deterministic status check |
-| Gemini CLI | [Install](https://geminicli.com/docs/get-started/installation/) | Follow its [authentication guide](https://geminicli.com/docs/get-started/authentication/) | May require an explicit provider preflight |
+| Google Antigravity CLI | [Install](https://antigravity.google/docs/cli-install) ([source](https://github.com/google-antigravity/antigravity-cli)) | Run `agy`; follow the official [usage and sign-in flow](https://antigravity.google/docs/cli/using) in the browser or over SSH | `agy models` check; no model prompt or quota usage |
 
 After provider login, run:
 
 ```bash
 forge doctor
 forge doctor --json
-# Gemini only, after provider-owned authentication (one read-only model call):
-forge doctor --preflight gemini
 ```
 
 A live scaffold requires one provider reported as `ready`. Missing optional providers do not block
-the run. An installed Gemini CLI remains `preflight_required` because it exposes no deterministic
-credential-status command. Its explicit preflight runs in a temporary workspace with plan mode and
-sandboxing, may consume quota, and stores only a version-bound readiness timestamp for 24 hours.
+the run. For Antigravity, Forge checks `agy --version` and `agy models`. The latter verifies the
+saved Google session without sending a prompt or printing account identity. If sign-in is needed,
+run `agy`, complete the provider-owned browser flow, exit with `/exit`, and rerun `forge doctor`.
+Remote SSH sessions display an authorization URL and code flow instead of opening a browser.
 
 ## Preview first
 
@@ -129,6 +128,11 @@ install dependencies, run commands, use allowed network access, and consume quot
 `--approval-mode plan` uses a read-only provider mode but still makes provider calls.
 `--approval-mode unsafe --allow-unsafe` disables provider approval or sandbox boundaries and should
 only be used inside an external isolation boundary you control.
+
+For Antigravity specifically, safe mode uses headless `--print`, `accept-edits`, and its terminal
+sandbox. Workspace file edits can proceed, while commands that are not allowed by Antigravity's
+permission policy may be denied in non-interactive print mode. Forge uses
+`--dangerously-skip-permissions` only for the explicitly consented unsafe mode.
 
 Demo mode is enabled by default so generated startup should not require real service credentials.
 It does not remove the provider CLI's own authentication requirement.
@@ -204,7 +208,6 @@ maintainers use the separate `forge admin conventions` command for bundled conve
 ```bash
 forge                         # Interactive scaffold
 forge doctor                  # Readiness diagnostics, no model call
-forge doctor --preflight gemini  # Explicit Gemini readiness call; quota may apply
 forge stats                   # Local scaffold analytics
 forge check                   # Read-only convention audit
 forge check --fix             # Add supported missing convention files
