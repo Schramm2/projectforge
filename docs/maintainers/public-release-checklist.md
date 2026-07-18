@@ -25,10 +25,20 @@ PyPI remains deliberately unpublished. Do not document it as an install route un
 release publishes and verifies it. The GitHub homepage remains blank by choice; the repository
 does not depend on a custom portfolio domain.
 
+## v0.5.0 release status
+
+- [x] Choose a compatibility-preserving pre-1.0 minor version and write migration-aware notes.
+- [x] Complete provider, safety, conventions, resume, verification, docs, CI, package, and skill
+  production-readiness work on a reviewed feature branch.
+- [x] Pass pre-publication gates and an authenticated end-to-end scaffold on the release candidate.
+- [ ] Merge the ready PR after hosted CI passes.
+- [ ] Publish and verify the GitHub release and synchronized Homebrew formula.
+- [ ] Repeat immutable uv and clean Homebrew installation checks against v0.5.0.
+
 ## Supported install routes
 
 ```bash
-uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz
+uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.0.tar.gz
 brew install --build-from-source schramm2/tap/projectforge
 ```
 

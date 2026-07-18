@@ -23,6 +23,7 @@ Current product truth lives in `guides/`, `maintainers/`, and the code under `sr
 - [maintainers/roadmap.md](maintainers/roadmap.md) — product roadmap and future work
 - [maintainers/provider-compatibility.md](maintainers/provider-compatibility.md) — dated official sources and runtime provider evidence
 - [maintainers/production-readiness-plan.md](maintainers/production-readiness-plan.md) — release gates and evidence status
+- [maintainers/production-readiness-evidence.md](maintainers/production-readiness-evidence.md) — dated authenticated scaffold and provider evidence
 - [maintainers/skill-behavioral-evidence.md](maintainers/skill-behavioral-evidence.md) — shipped skill RED/GREEN forward tests
 
 ## Reference
