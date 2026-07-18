@@ -1,0 +1,62 @@
+vars: {
+  midnight: "#091135"
+  electric-blue: "#0f77ff"
+  cobalt: "#127ee3"
+  slate: "#36394a"
+  frost: "#e1e9f0"
+  mist: "#b1bbcd"
+  paper: "#ffffff"
+  lavender: "#f5f3ff"
+}
+
+classes: {
+  card: {
+    style.fill: ${paper}
+    style.stroke: ${frost}
+    style.stroke-width: 1
+    style.font-color: ${midnight}
+    style.border-radius: 12
+  }
+  lavender-zone: {
+    style.fill: ${lavender}
+    style.stroke: ${frost}
+    style.stroke-width: 1
+    style.font-color: ${midnight}
+    style.border-radius: 12
+  }
+  accent: {
+    style.fill: ${cobalt}
+    style.stroke: ${electric-blue}
+    style.font-color: ${paper}
+    style.border-radius: 8
+  }
+  data: {
+    style.fill: ${paper}
+    style.stroke: ${electric-blue}
+    style.stroke-width: 1
+    style.font-color: ${midnight}
+    style.border-radius: 8
+  }
+  muted: {
+    style.fill: ${paper}
+    style.stroke: ${mist}
+    style.stroke-width: 1
+    style.font-color: ${slate}
+    style.border-radius: 8
+  }
+  tag: {
+    style.fill: ${lavender}
+    style.stroke: ${frost}
+    style.font-color: ${midnight}
+    style.border-radius: 999
+  }
+  text: {
+    style.fill: transparent
+    style.stroke: transparent
+    style.font-color: ${midnight}
+  }
+}
+
+*.style.font-color: ${midnight}
+(* -> *).style.stroke: ${midnight}
+(* -> *).style.stroke-width: 2

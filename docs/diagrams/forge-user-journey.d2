@@ -1,0 +1,85 @@
+...@styles
+
+direction: down
+
+title: "New user journey: install to full use" {
+  near: top-center
+  shape: text
+  class: text
+}
+
+ready: "Become ready" {
+  class: lavender-zone
+  grid-rows: 1
+
+  install: "1  Install Forge" {
+    class: card
+    route: "uv · pipx · Homebrew · source" {class: tag}
+    verify: "Confirm projectforge --version" {class: muted}
+    route -> verify
+  }
+
+  connect: "2  Connect one provider" {
+    class: card
+    provider: "Install Claude, Antigravity, or Codex" {class: muted}
+    login: "Authenticate in the provider CLI" {class: muted}
+    doctor: "forge doctor" {class: data}
+    provider -> login -> doctor
+  }
+
+  configure: "3  Configure once" {
+    class: card
+    setup: "First-use setup wizard" {class: muted}
+    defaults: "Models, editor, Git, Docker,\nproject folder, conventions" {class: muted}
+    setup -> defaults
+  }
+
+  install -> connect -> configure
+}
+
+first: "Create the first project" {
+  class: lavender-zone
+  grid-rows: 1
+
+  preview: "4  Preview safely" {
+    class: card
+    brief: "Choose a stack and describe the project" {class: muted}
+    dry: "forge --dry-run" {class: data}
+    review: "Review target, routing, prompt,\ncost range, and boundaries" {class: muted}
+    brief -> dry -> review
+  }
+
+  create: "5  Create" {
+    class: card
+    run: "Run safe mode with --verify" {class: muted}
+    phases: "Forge routes and executes phases" {class: muted}
+    run -> phases
+  }
+
+  trust: "6  Verify" {
+    class: card
+    checks: "Install, lint, type, build,\ntest, and health checks" {class: muted}
+    evidence: ".forge evidence and dashboard" {class: data}
+    ready: "Project Ready" {class: accent}
+    checks -> evidence -> ready
+  }
+
+  preview -> create -> trust
+}
+
+operate: "7  Use Forge fully" {
+  class: lavender-zone
+  grid-rows: 2
+  work: "Develop in the generated project" {class: card}
+  evolve: "evolve · add capabilities" {class: card}
+  check: "check · audit conventions" {class: card}
+  replay: "replay · reproduce or compare" {class: card}
+  stats: "stats · review local outcomes" {class: card}
+  resume: "resume · continue interrupted phases" {class: muted}
+}
+
+ready -> first: first live scaffold
+first -> operate: verified handoff {
+  style.stroke: "#0f77ff"
+  style.stroke-width: 3
+}

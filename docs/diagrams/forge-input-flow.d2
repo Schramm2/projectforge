@@ -1,0 +1,66 @@
+...@styles
+
+direction: down
+
+title: "Setup and input collection" {
+  near: top-center
+  shape: text
+  class: text
+}
+
+start: "Run forge" {class: tag}
+setup_check: "First live use?" {shape: diamond; class: card}
+
+setup: "One-time setup" {
+  class: lavender-zone
+  direction: down
+  tools: "Detect provider CLIs\nand readiness" {class: card}
+  routing: "Choose routing and\nmodel preferences" {class: card}
+  environment: "Choose editor;\ncheck Git and Docker" {class: card}
+  defaults: "Set project folder,\nconventions, and media" {class: card}
+  next: "Create now,\nreview setup, or exit" {class: muted}
+  tools -> routing -> environment -> defaults -> next
+}
+
+mode: "Name, stack, and description flags present?" {shape: diamond; class: card}
+
+paths: "Choose the input path" {
+  class: lavender-zone
+  direction: right
+
+  interactive: "Interactive" {
+    class: card
+    direction: down
+    basics: "Name, stack, brief, Docker" {class: muted}
+    usual: "Offer learned defaults" {class: muted}
+    extras: "Design, media, auth, services, CI" {class: muted}
+    demo: "Choose demo mode" {class: muted}
+    review: "Review and edit" {class: data}
+    basics -> usual -> extras -> demo -> review
+    review -> basics: edit basics
+    review -> extras: edit options
+  }
+
+  flags: "Non-interactive" {
+    class: card
+    direction: down
+    normalize: "Normalize stack alias" {class: muted}
+    validate: "Validate structured options" {class: muted}
+    resolve: "Resolve Docker and media defaults" {class: muted}
+    normalize -> validate -> resolve
+  }
+}
+
+answers: "Final answers payload" {class: accent}
+exit: Exit {class: muted}
+
+start -> setup_check
+setup_check -> setup.tools: yes
+setup_check -> mode: no
+setup.next -> mode: create
+setup.next -> exit: exit
+mode -> paths.interactive.basics: no
+mode -> paths.flags.normalize: yes
+paths.interactive.review -> answers: scaffold
+paths.interactive.review -> exit: cancel
+paths.flags.resolve -> answers

@@ -1,0 +1,62 @@
+...@styles
+
+direction: down
+
+title: "Security, privacy, and evidence boundaries" {
+  near: top-center
+  shape: text
+  class: text
+}
+
+user: Developer {class: tag}
+
+modes: "Choose an execution boundary" {
+  class: lavender-zone
+  grid-rows: 1
+  preview: "dry-run / export\nno provider process" {class: data}
+  plan: "plan\nread-only provider mode" {class: card}
+  safe: "safe\nbounded workspace mode" {class: card}
+  unsafe: "unsafe + allow-unsafe\nexternal isolation required" {class: muted}
+}
+
+boundaries: "Live execution" {
+  class: lavender-zone
+  grid-rows: 1
+
+  machine: "Developer machine" {
+    class: card
+    direction: down
+    forge: "ProjectForge process" {class: card}
+    config: "~/.forge config, profiles,\npreferences, quality, history" {class: data}
+    target: "Target workspace" {class: card}
+    evidence: ".forge progress, manifest,\nsnapshot, verification, card" {class: data}
+    hook: "Optional user-authored hook" {class: muted}
+
+    config -> forge
+    forge -> target
+    target -> evidence
+    forge -> hook
+  }
+
+  provider: "Provider-owned boundary" {
+    class: card
+    direction: down
+    account: "Credentials, identity, quota,\nmodels, retention, and billing" {class: muted}
+    cli: "Installed provider CLI" {class: card}
+    service: "Provider service" {class: card}
+    account -> cli -> service
+  }
+
+  machine.forge -> provider.cli: brief, conventions,\nand selected context
+  provider.cli -> machine.target: edits and commands
+  provider.account -> machine.forge: readiness classification only
+}
+
+verified: "Project Ready only after required local checks pass" {class: accent}
+
+user -> modes
+modes -> boundaries: live modes
+boundaries -> verified: local evidence supports status {
+  style.stroke: "#0f77ff"
+  style.stroke-width: 3
+}

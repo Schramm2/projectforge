@@ -1,0 +1,48 @@
+...@styles
+
+direction: right
+
+title: "Phase prompt assembly" {
+  near: top-center
+  shape: text
+  class: text
+}
+
+inputs: "Scaffold context" {
+  class: lavender-zone
+  answers: "Answers: stack, brief, options, demo" {class: card}
+  stack: "Stack structure, libraries, commands" {class: card}
+  conventions: "Compiled convention bundle" {class: data}
+  design: "Design template and media manifest" {class: data}
+  starter: "CLAUDE.md starter guidance" {class: muted}
+  phase: "Assigned phases and provider" {class: tag}
+}
+
+safety: "Secret scan user-controlled text" {class: card}
+
+builder: "prompt_builder.py" {
+  class: lavender-zone
+  ownership: "One provider owns every phase?" {shape: diamond; class: card}
+  full: "Build full scaffold prompt" {class: card}
+  targeted: "Choose architecture, frontend,\ntests, or verify variant" {class: card}
+  specialize: "Apply provider-specific wording" {class: card}
+  ownership -> full: yes
+  ownership -> targeted: no
+  targeted -> specialize
+}
+
+phase_prompt: "Final phase prompt" {class: accent}
+preview_prompt: "Merged preview or export prompt" {class: data}
+cli_args: "Model and approval flags\npassed separately to provider CLI" {class: muted}
+
+inputs.answers -> safety
+inputs.stack -> builder.ownership
+inputs.conventions -> safety
+inputs.design -> safety
+inputs.starter -> builder.ownership
+inputs.phase -> builder.ownership
+safety -> builder.ownership
+builder.full -> phase_prompt
+builder.specialize -> phase_prompt
+phase_prompt -> preview_prompt: merge for prompt-only use
+cli_args -> phase_prompt

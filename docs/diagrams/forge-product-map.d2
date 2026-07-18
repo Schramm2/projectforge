@@ -1,0 +1,73 @@
+...@styles
+
+direction: down
+
+title: "ProjectForge product map" {
+  near: top-center
+  shape: text
+  class: text
+}
+
+developer: Developer {class: tag}
+
+prepare_band: "Define and prepare" {
+  class: lavender-zone
+  grid-rows: 1
+
+  context: "Developer-controlled context" {
+    class: card
+    brief: "Project brief and stack" {class: card}
+    options: "Auth, CI, Docker, design, media" {class: card}
+    conventions: "Bundled + user + project conventions" {class: data}
+    mode: "Preview, plan, safe, or explicit unsafe" {class: muted}
+  }
+
+  forge: "ProjectForge control plane" {
+    class: card
+    prepare: "Setup, doctor, and input review" {class: card}
+    compose: "Context and prompt assembly" {class: card}
+    route: "Phase routing and recovery" {class: card}
+    prepare -> compose -> route
+  }
+
+  context -> forge: compiles inputs
+}
+
+execute_band: "Execute and prove" {
+  class: lavender-zone
+  grid-rows: 1
+
+  providers: "Provider-owned execution" {
+    class: card
+    ownership: "Credentials, models, quota,\nand provider sandbox" {class: muted}
+    gateway: "Claude Code · Antigravity · Codex" {class: card}
+    ownership -> gateway
+  }
+
+  result: "Generated project" {
+    class: card
+    workspace: "Working source, tests, and tooling" {class: card}
+    verify: "Metadata-aware local verification" {class: card}
+    evidence: ".forge progress, manifest,\nsnapshot, verification, card" {class: data}
+    status: "Project Ready" {class: accent}
+    workspace -> verify -> evidence -> status
+  }
+
+  providers -> result: edits target workspace
+}
+
+memory: "Local product memory" {
+  class: lavender-zone
+  grid-rows: 1
+  config: "~/.forge config and profiles" {class: data}
+  signals: "Preferences, quality, and history" {class: data}
+  next: "Improves defaults and future routing" {class: muted}
+  config -> signals -> next
+}
+
+developer -> prepare_band: supplies intent
+prepare_band -> execute_band: selected phases
+execute_band -> memory: records local outcomes {
+  style.stroke: "#0f77ff"
+  style.stroke-width: 3
+}

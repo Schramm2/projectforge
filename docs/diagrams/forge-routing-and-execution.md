@@ -1,75 +1,21 @@
-# Forge Routing And Execution
+# Forge routing and execution
 
-This document covers how Forge picks backends for each phase and how those phases are run.
+Forge chooses a provider per scaffold phase, merges adjacent phases owned by the same provider, and then runs the resulting execution windows.
 
-## Current Behavior
+## Provider selection
 
-- Routing is phase-based, not single-backend by default.
-- The router considers explicit `--use`, installed and ready backends, project-description keywords, and quality-memory scores.
-- Standard execution runs architecture first and verify last, with multiple middle phases in
-  parallel. `--agents` keeps the same phase order but runs phase windows sequentially while each
-  phase's dependency graph may execute independent agent tasks in parallel.
+![ProjectForge provider routing logic](forge-routing-logic.svg)
 
-## Routing Logic
+[Edit the routing D2 source](forge-routing-logic.d2).
 
-```mermaid
-flowchart TD
-    Start["answers.stack + answers.description"] --> Override{"--use provided?"}
+An explicit `--use` value assigns one provider to every phase. Automatic routing starts from the stack's phase list, removes providers that are not ready, applies the specialist mapping, falls back in deterministic order, and may use local quality evidence when an alternative wins by more than `0.1`.
 
-    Override -- Yes --> Forced["Route every phase to forced backend"]
-    Override -- No --> Available["Determine usable backends<br/>from readiness checks"]
+## Phase merging and execution
 
-    Available --> Phases["Load stack phase list<br/>from STACK_PHASES"]
-    Phases --> CodexHint{"Architecture description<br/>matches Codex phrases?"}
+![ProjectForge phase merging and execution strategy](forge-execution-strategy.svg)
 
-    CodexHint -- Yes --> ArchChoice["Prefer Codex for architecture<br/>if Codex is available"]
-    CodexHint -- No --> IdealChoice["Use ideal backend per phase"]
+[Edit the execution D2 source](forge-execution-strategy.d2).
 
-    ArchChoice --> IdealMap
-    IdealChoice --> IdealMap["Ideal mapping:<br/>architecture -> claude<br/>frontend -> antigravity<br/>tests -> codex<br/>verify -> claude"]
+Standard mode runs architecture first, may run frontend and tests in parallel, and runs verify last. `--agents` keeps phase windows sequential while allowing independent tasks inside the active phase to run in parallel before reconciliation.
 
-    IdealMap --> Fallback{"Ideal backend available?"}
-    Fallback -- Yes --> Routed["Use ideal backend"]
-    Fallback -- No --> FallbackPick["Fallback preference:<br/>claude -> antigravity -> codex"]
-
-    Routed --> Quality{"Enough quality-memory data<br/>for this stack + phase?"}
-    FallbackPick --> Quality
-    Quality -- No --> PhasePlan["Phase backend plan"]
-    Quality -- Yes --> QualityMargin{"Alternative backend score<br/>beats current by > 0.1?"}
-    QualityMargin -- Yes --> OverrideByQuality["Swap to best-scoring backend"]
-    QualityMargin -- No --> KeepCurrent["Keep current backend"]
-    OverrideByQuality --> PhasePlan
-    KeepCurrent --> PhasePlan
-```
-
-## Merge And Execution Strategy
-
-```mermaid
-flowchart TD
-    PhasePlan["Per-phase routing list"] --> Merge["Merge adjacent phases<br/>that share a backend"]
-    Merge --> PromptBuild["Build prompts per phase<br/>and merged prompts for preview/export"]
-
-    PromptBuild --> RunWindow{"Prompt-only run?"}
-    RunWindow -- Yes --> Preview["Show or export merged prompts"]
-    RunWindow -- No --> SerialFirst["Run architecture phase serially"]
-
-    SerialFirst --> Middle{"Middle phases present?"}
-    Middle -- No --> FinalVerify
-    Middle -- Yes --> ParallelCheck{"More than one<br/>middle phase?"}
-
-    ParallelCheck -- Yes --> ParallelRun["Run frontend/tests window in parallel"]
-    ParallelCheck -- No --> SerialMiddle["Run the single middle phase serially"]
-
-    ParallelRun --> FinalVerify["Run verify phase serially"]
-    SerialMiddle --> FinalVerify
-    FinalVerify --> Done["Scaffold phases complete"]
-```
-
-## Notes
-
-- `merge_adjacent_phases()` reduces redundant prompt handoffs when the same backend owns neighboring phases.
-- In standard mode, phase-level parallel work applies only to the middle window. Architecture and
-  verify stay serialized to preserve dependency order.
-- In `--agents` mode, phase windows run sequentially; the orchestrator may run independent tasks
-  within the active phase in parallel before reconciliation.
-- If no usable backends are ready, Forge stops before any prompt is assembled or executed.
+Prompt-only runs print or export merged prompts and make no provider call.

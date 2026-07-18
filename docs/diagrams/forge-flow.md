@@ -1,56 +1,32 @@
-# Forge Flow Diagrams
+# ProjectForge diagrams
 
-These diagrams are now split into focused documents so each flow stays readable and easier to maintain.
+Start with the product map for the system boundary, then use the user journey for the install-to-handoff path. The remaining diagrams explain one part of the product in more detail.
 
-Current state in this section is based on the scaffold path implemented in:
+## Product map
 
-- `src/projectforge/cli.py`
-- `src/projectforge/setup.py`
-- `src/projectforge/prompts.py`
-- `src/projectforge/router.py`
-- `src/projectforge/prompt_builder.py`
-- `src/projectforge/runner.py`
-- `src/projectforge/verify.py`
-- `src/projectforge/quality.py`
-- `src/projectforge/media_assets.py`
-- `src/projectforge/scaffold_log.py`
+![ProjectForge product map](forge-product-map.svg)
 
-## Diagram Map
+[Read the product overview](forge-product-overview.md) or edit the [D2 source](forge-product-map.d2).
 
-- [forge-input-flow.md](forge-input-flow.md) - first-run setup, interactive questionnaire, smart defaults, and review loop
-- [forge-routing-and-execution.md](forge-routing-and-execution.md) - backend selection, quality-aware routing, phase merging, and execution order
-- [forge-prompt-assembly.md](forge-prompt-assembly.md) - how Forge builds per-phase prompts from answers and context files
-- [forge-runtime-pipeline.md](forge-runtime-pipeline.md) - end-to-end module flow from CLI entry to verification, logs, and editor launch
+## Choose a diagram
 
-## High-Level Overview
+| Question | Diagram |
+| --- | --- |
+| How does a new user get from installation to a verified project? | [New user journey](forge-user-journey.md) |
+| What does Forge own, and what stays with the provider or generated project? | [Product overview](forge-product-overview.md) |
+| What can I do after the first scaffold? | [Project lifecycle](forge-project-lifecycle.md) |
+| How does first-run setup and input collection work? | [Input flow](forge-input-flow.md) |
+| How are providers chosen and phases scheduled? | [Routing and execution](forge-routing-and-execution.md) |
+| What goes into each provider prompt? | [Prompt assembly](forge-prompt-assembly.md) |
+| What happens during a live scaffold? | [Runtime pipeline](forge-runtime-pipeline.md) |
+| What crosses the provider boundary, and what evidence stays local? | [Trust boundaries](forge-trust-boundaries.md) |
 
-```mermaid
-flowchart TD
-    Start["Developer runs forge"] --> SetupCheck{"First scaffold run<br/>and not dry-run/export?"}
+## Editing and rendering
 
-    SetupCheck -- Yes --> Setup["Run 8-step setup wizard"]
-    SetupCheck -- No --> InputMode
-    Setup --> InputMode{"Interactive Q&A<br/>or CLI flags?"}
+The `.d2` files are the editable source of truth. Render one diagram from the repository root:
 
-    InputMode -- Interactive --> Interactive["Collect basics, defaults,<br/>design/media, integrations,<br/>demo mode, review loop"]
-    InputMode -- Flags --> Flags["Validate non-interactive inputs<br/>and build answers dict"]
-
-    Interactive --> Route
-    Flags --> Route["Compute phase plan"]
-
-    Route --> Context["Load conventions, templates,<br/>media manifest, backend models"]
-    Context --> Safety["Secret scan user-entered text"]
-    Safety --> Prompting["Build per-phase prompts"]
-    Prompting --> Preview{"Dry run or export?"}
-
-    Preview -- Yes --> OutputPrompt["Print or write merged prompts"]
-    Preview -- No --> Execute["Copy media, run phases,<br/>architecture first,<br/>standard-mode middle phases parallel,<br/>verify last"]
-
-    Execute --> Post["Write manifest, init git,<br/>verify scaffold, log quality,<br/>run hook, record preferences"]
-    Post --> Ready["Render dashboard,<br/>write project card,<br/>badge README, play sound,<br/>open editor"]
+```bash
+docs/diagrams/render.sh docs/diagrams/forge-user-journey.d2
 ```
 
-## Notes
-
-- `forge check`, `forge replay`, `forge evolve`, and `forge stats` exist too, but this diagram set focuses on the main scaffold workflow.
-- The old single-file diagrams had drifted behind the code. The split docs aim to track the actual runtime path more closely.
+Run `docs/diagrams/render.sh` with no arguments to rebuild every SVG in this folder.
