@@ -143,7 +143,10 @@ def load_conventions_bundle(
 ) -> CompiledBundle:
     """Compose effective conventions in deterministic low-to-high precedence order."""
     if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]*", profile):
-        raise ConventionValidationError(f"Invalid conventions profile: {profile}")
+        raise ConventionValidationError(
+            "That convention profile name is not valid. Start with a letter or number and use "
+            "only letters, numbers, dots, hyphens, or underscores."
+        )
 
     bundled = compile_bundle(build_registry(), stack=stack)
     content_parts = [bundled.prompt_block] if bundled.prompt_block.strip() else []
@@ -163,8 +166,8 @@ def load_conventions_bundle(
         secret_types = check_for_secrets(content)
         if secret_types:
             raise ConventionValidationError(
-                f"Convention source contains credential-like content: {source_id} "
-                f"({', '.join(secret_types)})."
+                "Forge found content that looks like a credential. Remove secrets and use "
+                "placeholders, then retry."
             )
         if source_id == "user-wide" and content.strip() == LEGACY_DEFAULT_CONVENTIONS.strip():
             warnings.append(
@@ -172,7 +175,10 @@ def load_conventions_bundle(
             )
             continue
         if _looks_placeholder_local_conventions(content):
-            warnings.append(f"Ignoring placeholder conventions from {_display_path(path)}.")
+            warnings.append(
+                "Forge ignored a placeholder convention file. Replace the placeholder text "
+                "with project rules, then run `forge conventions validate`."
+            )
             continue
         if content.strip():
             content_parts.append(content.strip())
@@ -195,9 +201,15 @@ def _load_conventions_file(path: Path) -> tuple[str, list[str]]:
     content = path.read_text()
 
     if not content.strip():
-        warnings.append("Conventions file is empty — scaffolds will lack guidance.")
+        warnings.append(
+            "This convention file is empty, so it will not guide the scaffold. Add project "
+            "rules or remove the empty layer."
+        )
     elif len(content.strip()) < MIN_CONVENTIONS_LENGTH:
-        warnings.append("Conventions file is very short — consider adding more detail.")
+        warnings.append(
+            "This convention file is very short. Add the essential rules, or remove the layer "
+            "if it is not needed."
+        )
 
     return content, warnings
 

@@ -185,5 +185,5 @@ def render_dashboard(
         if run_cmd:
             console.print(command_text(f"  {run_cmd}"))
     if verify_report is not None and not verify_report.all_passed:
-        console.print(subtle("  inspect .forge/verification.json, fix failures, then rerun checks"))
+        console.print(subtle("  review the guidance above, fix the failed checks, then rerun them"))
     console.print()

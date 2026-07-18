@@ -223,18 +223,14 @@ def _run_check(
                 duration_seconds=time.monotonic() - started,
                 **metadata,
             )
-        stderr = result.stderr.strip()
-        detail = (
-            _privacy_safe_text(stderr, cwd)[:200]
-            if stderr
-            else f"exit code {result.returncode}"
-        )
         return CheckResult(
             name=name,
             passed=False,
-            detail=detail,
+            detail="This check did not pass.",
             exit_code=result.returncode,
-            remediation=f"Run `{cmd}` in `{cwd}` and inspect the complete output.",
+            remediation=(
+                f"Run `{cmd}` from the recorded project folder to see the full local output."
+            ),
             duration_seconds=time.monotonic() - started,
             **metadata,
         )
@@ -242,8 +238,8 @@ def _run_check(
         return CheckResult(
             name=name,
             passed=False,
-            detail=f"timed out after {timeout}s",
-            remediation=f"Run `{cmd}` manually or increase the verification timeout.",
+            detail="This check took too long and was stopped.",
+            remediation=f"Run `{cmd}` from the project folder to inspect it locally.",
             duration_seconds=time.monotonic() - started,
             **metadata,
         )
@@ -253,7 +249,14 @@ def _install_deps(stack: str, project_dir: Path) -> CheckResult:
     """Install project dependencies based on the stack's package manager."""
     meta = STACK_META.get(stack)
     if not meta:
-        return CheckResult(name="install", passed=False, detail=f"unknown stack: {stack}")
+        return CheckResult(
+            name="install",
+            passed=False,
+            detail="Forge cannot verify this project type.",
+            remediation=(
+                "Check the recorded stack, or scaffold a new target with a supported stack."
+            ),
+        )
 
     pkg_mgr = meta.package_manager
 
@@ -261,19 +264,36 @@ def _install_deps(stack: str, project_dir: Path) -> CheckResult:
     if pkg_mgr == "uv + npm":
         uv_result = _run_check("install (python)", "uv sync", project_dir, timeout=60)
         if not uv_result.passed:
-            return CheckResult(name="install", passed=False, detail=uv_result.detail)
+            return CheckResult(
+                name="install",
+                passed=False,
+                detail=uv_result.detail,
+                remediation=uv_result.remediation,
+            )
         frontend_dir = project_dir / "frontend"
         if frontend_dir.exists():
             npm_result = _run_check("install (node)", "npm install", frontend_dir, timeout=60)
             if not npm_result.passed:
-                return CheckResult(name="install", passed=False, detail=npm_result.detail)
+                return CheckResult(
+                    name="install",
+                    passed=False,
+                    detail=npm_result.detail,
+                    remediation=npm_result.remediation,
+                )
         return CheckResult(name="install", passed=True)
 
     install_cmd = (
         _python_install_command(project_dir) if pkg_mgr == "uv" else _INSTALL_COMMANDS.get(pkg_mgr)
     )
     if not install_cmd:
-        return CheckResult(name="install", passed=False, detail=f"no install cmd for {pkg_mgr}")
+        return CheckResult(
+            name="install",
+            passed=False,
+            detail="Forge does not know how to install this project's dependencies.",
+            remediation=(
+                "Install them with the project's documented command, then rerun its checks."
+            ),
+        )
     return _run_check("install", install_cmd, project_dir, timeout=60)
 
 
@@ -316,18 +336,12 @@ def _check_health(
             time.sleep(1.5)
             # Check if process died
             if process.poll() is not None:
-                stderr = (process.stderr.read() or b"").decode(errors="replace")
-                detail = (
-                    _privacy_safe_text(stderr.strip(), project_dir)[:200]
-                    if stderr.strip()
-                    else "server exited early"
-                )
                 return CheckResult(
                     name="health",
                     passed=False,
-                    detail=detail,
+                    detail="The app stopped before the health check could connect.",
                     exit_code=process.returncode,
-                    remediation="Inspect the server command and startup output.",
+                    remediation="Run the recorded start command locally and review its output.",
                     attempted_endpoints=tuple(attempted_endpoints),
                     duration_seconds=time.monotonic() - started,
                     **metadata,
@@ -350,18 +364,21 @@ def _check_health(
         return CheckResult(
             name="health",
             passed=False,
-            detail=f"no successful response on port {port} after {startup_timeout}s",
-            remediation="Confirm the server command, port, and configured health endpoints.",
+            detail="The app started but did not become healthy.",
+            remediation=("Confirm the recorded start command and health address, then try again."),
             attempted_endpoints=tuple(attempted_endpoints),
             duration_seconds=time.monotonic() - started,
             **metadata,
         )
-    except Exception as exc:
+    except Exception:
         return CheckResult(
             name="health",
             passed=False,
-            detail=_privacy_safe_text(str(exc), project_dir)[:200],
-            remediation="Run the server command manually and inspect startup output.",
+            detail="Forge could not complete the health check.",
+            remediation=(
+                "Run the recorded start command locally and confirm the configured address "
+                "responds."
+            ),
             attempted_endpoints=tuple(attempted_endpoints),
             duration_seconds=time.monotonic() - started,
             **metadata,
@@ -384,7 +401,16 @@ def verify_scaffold(
     meta = STACK_META.get(stack)
     if not meta:
         return VerifyReport(
-            checks=[CheckResult(name="verify", passed=False, detail=f"unknown stack: {stack}")]
+            checks=[
+                CheckResult(
+                    name="verify",
+                    passed=False,
+                    detail="Forge cannot verify this project type.",
+                    remediation=(
+                        "Check the recorded stack, or scaffold a new target with a supported stack."
+                    ),
+                )
+            ]
         )
 
     report = VerifyReport()
@@ -407,7 +433,10 @@ def verify_scaffold(
                     name=check_name,
                     passed=False,
                     skipped=True,
-                    detail="deps not installed",
+                    detail=(
+                        "Not run because dependency installation did not finish. Fix the install "
+                        "step, then rerun the remaining checks."
+                    ),
                 )
             )
         return report

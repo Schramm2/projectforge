@@ -33,15 +33,21 @@ def _phase_contract(phase: str, backend: str, prompt: str) -> dict:
 
 
 def _atomic_write(path: Path, payload: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = path.with_suffix(path.suffix + ".tmp")
-    with temp_path.open("w", encoding="utf-8") as handle:
-        json.dump(payload, handle, indent=2)
-        handle.write("\n")
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.chmod(temp_path, 0o600)
-    temp_path.replace(path)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = path.with_suffix(path.suffix + ".tmp")
+        with temp_path.open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temp_path, 0o600)
+        temp_path.replace(path)
+    except OSError as exc:
+        raise ProgressContractError(
+            "Forge could not save resume information. Keep the partial project, make the "
+            "project folder writable, then retry."
+        ) from exc
 
 
 def _read_progress(path: Path) -> dict:
@@ -49,10 +55,14 @@ def _read_progress(path: Path) -> dict:
         payload = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError) as exc:
         raise ProgressContractError(
-            "Resume requires valid .forge/progress.json progress evidence."
+            "Forge could not read the saved resume information. Keep the partial project and "
+            "start a new target; do not overwrite the existing work."
         ) from exc
     if not isinstance(payload, dict) or payload.get("schema_version") != 1:
-        raise ProgressContractError("Resume progress evidence uses an unsupported schema.")
+        raise ProgressContractError(
+            "This partial project was created by an incompatible Forge version. Use the "
+            "original version to resume, or start a new target."
+        )
     return payload
 
 
@@ -97,7 +107,8 @@ def initialize_progress(
 
     if not path.is_file():
         raise ProgressContractError(
-            "Resume requires existing .forge/progress.json progress evidence."
+            "Forge could not find a resumable run in this project. Return to the original "
+            "partial project, or start a new project without `--resume`."
         )
     payload = _read_progress(path)
     recorded_contract = [
@@ -120,8 +131,8 @@ def initialize_progress(
         or recorded_contract != contract
     ):
         raise ProgressContractError(
-            "Resume contract differs from the recorded name, stack, routing, prompt hashes, "
-            "or approval mode. Start a new target or repeat the original options."
+            "These options do not match the original run. Repeat the original command, or "
+            "choose a new project name for the changed request."
         )
 
     for phase in payload["phases"]:
@@ -156,7 +167,10 @@ def mark_phase(
         None,
     )
     if phase is None:
-        raise ProgressContractError(f"Phase {phase_name!r} is not in the progress contract.")
+        raise ProgressContractError(
+            "Forge could not match this step to the saved run. Keep the partial project and "
+            "start a new target."
+        )
 
     if status == "running" or int(phase.get("attempts", 0)) == 0:
         phase["attempts"] = int(phase.get("attempts", 0)) + 1

@@ -68,9 +68,15 @@ def _all_sources_bundle(registry: ConventionRegistry, bundle_id: str) -> Compile
     ).strip()
     warnings: list[str] = []
     if not prompt_block:
-        warnings.append("Conventions bundle is empty.")
+        warnings.append(
+            "The active conventions are empty, so the scaffold will have no organization "
+            "guidance. Add convention content, then validate again."
+        )
     elif len(prompt_block) < _MIN_BUNDLE_LENGTH:
-        warnings.append("Conventions bundle is very short — consider adding more detail.")
+        warnings.append(
+            "The active conventions are very short. Add the essential project rules before "
+            "scaffolding."
+        )
     return CompiledBundle(
         bundle_id=bundle_id,
         prompt_block=prompt_block,
@@ -122,9 +128,15 @@ def compile_bundle(registry: ConventionRegistry, stack: str | None = None) -> Co
 
     warnings: list[str] = []
     if not prompt_block:
-        warnings.append("Conventions bundle is empty.")
+        warnings.append(
+            "The active conventions are empty, so the scaffold will have no organization "
+            "guidance. Add convention content, then validate again."
+        )
     elif len(prompt_block) < _MIN_BUNDLE_LENGTH:
-        warnings.append("Conventions bundle is very short — consider adding more detail.")
+        warnings.append(
+            "The active conventions are very short. Add the essential project rules before "
+            "scaffolding."
+        )
 
     return CompiledBundle(
         bundle_id=bundle_id,

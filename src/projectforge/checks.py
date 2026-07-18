@@ -48,26 +48,40 @@ def detect_stack(project_dir: Path) -> str:
 def _check_file_exists(project_dir: Path, filename: str, category: str, **kwargs) -> CheckResult:
     """Check that a file exists."""
     exists = (project_dir / filename).exists()
+    fixable = kwargs.get("fixable", False)
+    if exists:
+        detail = ""
+    elif fixable:
+        detail = f"{filename} is missing. Run `forge check --fix` to add it."
+    else:
+        detail = f"{filename} is missing. Add it to meet the project structure convention."
     return CheckResult(
         name=filename,
         category=category,
         passed=exists,
         severity="fail" if not exists else "pass",
-        detail="" if exists else f"Missing {filename}",
-        fixable=kwargs.get("fixable", False),
+        detail=detail,
+        fixable=fixable,
     )
 
 
 def _check_dir_exists(project_dir: Path, dirname: str, category: str, **kwargs) -> CheckResult:
     """Check that a directory exists."""
     exists = (project_dir / dirname).is_dir()
+    fixable = kwargs.get("fixable", False)
+    if exists:
+        detail = ""
+    elif fixable:
+        detail = f"{dirname}/ is missing. Run `forge check --fix` to create it."
+    else:
+        detail = f"{dirname}/ is missing. Create it if this project should use that convention."
     return CheckResult(
         name=dirname + "/",
         category=category,
         passed=exists,
         severity="warn" if not exists else "pass",
-        detail="" if exists else f"Missing {dirname}/ directory",
-        fixable=kwargs.get("fixable", False),
+        detail=detail,
+        fixable=fixable,
     )
 
 
@@ -80,7 +94,12 @@ def _check_ci_present(project_dir: Path) -> CheckResult:
         category="tooling",
         passed=has_ci,
         severity="warn" if not has_ci else "pass",
-        detail="" if has_ci else "No .github/workflows/*.yml found",
+        detail=(
+            ""
+            if has_ci
+            else "No CI workflow was found. Add one under `.github/workflows/` to run project "
+            "checks automatically."
+        ),
     )
 
 
@@ -92,7 +111,11 @@ def _check_pre_commit(project_dir: Path) -> CheckResult:
         category="tooling",
         passed=exists,
         severity="warn" if not exists else "pass",
-        detail="" if exists else "Missing .pre-commit-config.yaml",
+        detail=(
+            ""
+            if exists
+            else ".pre-commit-config.yaml is missing. Add the repository's pre-commit checks."
+        ),
     )
 
 
@@ -110,7 +133,10 @@ def _check_health_endpoint(project_dir: Path) -> CheckResult:
         category="runtime",
         passed=False,
         severity="warn",
-        detail="No health endpoint file found",
+        detail=(
+            "No health endpoint file was found. Add a health route so deployments can verify "
+            "readiness."
+        ),
     )
 
 
@@ -124,14 +150,28 @@ def _check_docker_nonroot(project_dir: Path) -> CheckResult:
             passed=True,
             detail="No Dockerfile (skipped)",
         )
-    content = dockerfile.read_text()
+    try:
+        content = dockerfile.read_text()
+    except OSError:
+        return CheckResult(
+            name="Docker non-root user",
+            category="runtime",
+            passed=False,
+            severity="warn",
+            detail="Forge could not read Dockerfile. Check that it is readable, then retry.",
+        )
     has_user = "adduser" in content.lower() or "user " in content.lower()
     return CheckResult(
         name="Docker non-root user",
         category="runtime",
         passed=has_user,
         severity="warn" if not has_user else "pass",
-        detail="" if has_user else "Dockerfile should create and switch to a non-root user",
+        detail=(
+            ""
+            if has_user
+            else "Dockerfile does not select a non-root user. Create one and add a `USER` "
+            "instruction."
+        ),
     )
 
 
@@ -144,16 +184,32 @@ def _check_ruff_config(project_dir: Path) -> CheckResult:
             category="tooling",
             passed=False,
             severity="warn",
-            detail="No pyproject.toml",
+            detail=(
+                "pyproject.toml is missing. Add the project configuration before enabling this "
+                "check."
+            ),
         )
-    content = toml.read_text()
+    try:
+        content = toml.read_text()
+    except OSError:
+        return CheckResult(
+            name="Ruff config",
+            category="tooling",
+            passed=False,
+            severity="warn",
+            detail="Forge could not read pyproject.toml. Check that it is readable, then retry.",
+        )
     has_ruff = "[tool.ruff" in content
     return CheckResult(
         name="Ruff config",
         category="tooling",
         passed=has_ruff,
         severity="warn" if not has_ruff else "pass",
-        detail="" if has_ruff else "No [tool.ruff] section in pyproject.toml",
+        detail=(
+            ""
+            if has_ruff
+            else "pyproject.toml has no Ruff configuration. Add a `tool.ruff` section."
+        ),
     )
 
 
@@ -166,16 +222,33 @@ def _check_mypy_strict(project_dir: Path) -> CheckResult:
             category="tooling",
             passed=False,
             severity="warn",
-            detail="No pyproject.toml",
+            detail=(
+                "pyproject.toml is missing. Add the project configuration before enabling this "
+                "check."
+            ),
         )
-    content = toml.read_text()
+    try:
+        content = toml.read_text()
+    except OSError:
+        return CheckResult(
+            name="MyPy strict",
+            category="tooling",
+            passed=False,
+            severity="warn",
+            detail="Forge could not read pyproject.toml. Check that it is readable, then retry.",
+        )
     has_mypy = "[tool.mypy]" in content or "--strict" in content
     return CheckResult(
         name="MyPy strict",
         category="tooling",
         passed=has_mypy,
         severity="warn" if not has_mypy else "pass",
-        detail="" if has_mypy else "No MyPy strict mode configured",
+        detail=(
+            ""
+            if has_mypy
+            else "Strict type checking is not configured. Add a `tool.mypy` section with "
+            "`strict = true`."
+        ),
     )
 
 
@@ -189,14 +262,28 @@ def _check_docker_healthcheck(project_dir: Path) -> CheckResult:
             passed=True,
             detail="No Dockerfile (skipped)",
         )
-    content = dockerfile.read_text()
+    try:
+        content = dockerfile.read_text()
+    except OSError:
+        return CheckResult(
+            name="Docker HEALTHCHECK",
+            category="runtime",
+            passed=False,
+            severity="warn",
+            detail="Forge could not read Dockerfile. Check that it is readable, then retry.",
+        )
     has_healthcheck = "HEALTHCHECK" in content
     return CheckResult(
         name="Docker HEALTHCHECK",
         category="runtime",
         passed=has_healthcheck,
         severity="warn" if not has_healthcheck else "pass",
-        detail="" if has_healthcheck else "Dockerfile missing HEALTHCHECK directive",
+        detail=(
+            ""
+            if has_healthcheck
+            else "Dockerfile has no HEALTHCHECK. Add one that verifies the app is ready to serve "
+            "traffic."
+        ),
     )
 
 

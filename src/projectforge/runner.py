@@ -158,7 +158,13 @@ def run_ai(
         allow_unsafe=allow_unsafe,
     )
     if not cmd:
-        console.print(status_line(f"Unknown backend: {backend}", accent="amber"))
+        console.print(
+            status_line(
+                "Forge could not start the selected AI tool. Run `forge doctor`, then choose "
+                "a ready tool and retry.",
+                accent="amber",
+            )
+        )
         return 1
 
     if verbose:
@@ -202,8 +208,8 @@ def run_ai(
                         new_summary = summarize_output_line(clean)
                         if new_summary and new_summary != tracker.current:
                             tracker.update(new_summary)
-                    if verbose:
-                        live.console.print(clean)
+                    if verbose and new_summary:
+                        live.console.print(new_summary)
         except ValueError:
             pass  # pipe closed
 
@@ -233,7 +239,9 @@ def run_ai(
                                     Text.assemble(
                                         badge("timeout", "warning"),
                                         Text("  "),
-                                        subtle(f"{display_label} timed out after {elapsed:.0f}s."),
+                                        subtle(
+                                            "Project generation took longer than the allowed time."
+                                        ),
                                     ),
                                     muted(failure.summary),
                                     muted(failure.remediation),
@@ -246,7 +254,6 @@ def run_ai(
                     return ProviderExit(124, failure.category)
                 with lock:
                     current_activities = tracker.visible_steps()
-                    current_detail = last_line if last_line != tracker.current else None
                 loader = make_loader_panel(
                     display_label,
                     tracker.current,
@@ -254,7 +261,7 @@ def run_ai(
                     spinner_frame=spinner_frame(elapsed),
                     spinner_style=spinner_style(accent, elapsed),
                     accent=accent,
-                    detail=current_detail,
+                    detail=None,
                     activities=current_activities,
                 )
                 if phase_context:
@@ -281,11 +288,9 @@ def run_ai(
             Text.assemble(
                 badge("failed", "error"),
                 Text("  "),
-                subtle(f"{display_label} exited with code {proc.returncode}."),
+                subtle("Project generation stopped before this step finished."),
             )
         ]
-        if last_line:
-            failure_lines.append(muted(format_activity(last_line, limit=110)))
         failure_lines.extend([muted(failure.summary), muted(failure.remediation)])
         console.print(make_panel(grouped_lines(failure_lines), title="Execution", accent="plum"))
 
@@ -385,13 +390,13 @@ def run_ai_parallel(
                     if not clean:
                         continue
                     with lock:
-                        trackers[label].lines.append(clean)
-                        if len(trackers[label].lines) > 200:
-                            del trackers[label].lines[0]
                         trackers[label].last_line = clean
-                        trackers[label].summary = progress_summary_for_line(
-                            clean, trackers[label].summary
-                        )
+                        safe_summary = progress_summary_for_line(clean, trackers[label].summary)
+                        if safe_summary != trackers[label].summary:
+                            trackers[label].summary = safe_summary
+                            trackers[label].lines.append(safe_summary)
+                            if len(trackers[label].lines) > 200:
+                                del trackers[label].lines[0]
         except ValueError:
             pass
 
@@ -429,7 +434,9 @@ def run_ai_parallel(
         except FileNotFoundError:
             with lock:
                 trackers[label].returncode = 1
-                trackers[label].summary = f"{backend} command not found"
+                trackers[
+                    label
+                ].summary = "The selected AI tool could not start. Run `forge doctor`, then retry."
             return label, ProviderExit(127, "missing_binary")
 
         with lock:
@@ -526,19 +533,35 @@ def ensure_git_init(project_dir: Path) -> bool:
         git_check = subprocess.run(["git", "--version"], capture_output=True, text=True)
     except FileNotFoundError:
         console.print(
-            status_line("git is not installed. Install git to enable repo setup.", accent="amber")
+            status_line(
+                "Git is not installed, so Forge could not create the first commit. Install "
+                "Git, then initialize and commit the project manually.",
+                accent="amber",
+            )
         )
         return False
 
     if git_check.returncode != 0:
-        console.print(status_line("git is not working correctly.", accent="amber"))
+        console.print(
+            status_line(
+                "Forge could not use Git in the project folder. Run `git status` there, fix "
+                "the reported issue, then create the first commit manually.",
+                accent="amber",
+            )
+        )
         return False
 
     if not git_dir.exists():
         console.print(status_line("Git not initialized by AI — setting up...", accent="violet"))
         result = subprocess.run(["git", "init"], cwd=project_dir, capture_output=True, text=True)
         if result.returncode != 0:
-            console.print(status_line(f"git init failed: {result.stderr.strip()}", accent="amber"))
+            console.print(
+                status_line(
+                    "Forge could not start version control. Run `git init` in the project "
+                    "folder, then create the first commit manually.",
+                    accent="amber",
+                )
+            )
             return False
 
     # Check whether there is at least one commit
@@ -553,7 +576,13 @@ def ensure_git_init(project_dir: Path) -> bool:
     console.print(status_line("No commits found — creating initial commit...", accent="violet"))
     result = subprocess.run(["git", "add", "-A"], cwd=project_dir, capture_output=True, text=True)
     if result.returncode != 0:
-        console.print(status_line(f"git add failed: {result.stderr.strip()}", accent="amber"))
+        console.print(
+            status_line(
+                "Forge could not stage the generated files. Review the project, then run "
+                "`git add -A` and commit manually.",
+                accent="amber",
+            )
+        )
         return False
 
     result = subprocess.run(
@@ -563,7 +592,13 @@ def ensure_git_init(project_dir: Path) -> bool:
         text=True,
     )
     if result.returncode != 0:
-        console.print(status_line(f"git commit failed: {result.stderr.strip()}", accent="amber"))
+        console.print(
+            status_line(
+                "Forge could not create the first commit. Check your Git identity, then commit "
+                "the generated files manually.",
+                accent="amber",
+            )
+        )
         return False
 
     console.print(status_line("Git initialized with initial commit", accent="aqua"))
@@ -616,7 +651,13 @@ def open_in_editor(project_dir: Path, preferred_editor: str = "") -> None:
             console.print(status_line(f"Opened {project_dir} in {editor}"))
             return
 
-    console.print(status_line("No editor found. Open the project manually.", accent="amber"))
+    console.print(
+        status_line(
+            "Forge could not open an editor. Open the project manually, or rerun "
+            "`forge --setup` to choose an available editor.",
+            accent="amber",
+        )
+    )
 
 
 HOOKS_DIR = FORGE_DIR / "hooks"
@@ -658,23 +699,28 @@ def run_post_scaffold_hook(
             timeout=60,
         )
     except subprocess.TimeoutExpired:
-        console.print(status_line("Post-scaffold hook timed out (60s limit).", accent="amber"))
+        console.print(
+            status_line(
+                "The post-scaffold hook took too long and was stopped. Review it locally, then "
+                "run it again from the project folder.",
+                accent="amber",
+            )
+        )
+        return False
+
+    if result.returncode != 0:
+        console.print(
+            status_line(
+                "The post-scaffold hook did not finish successfully. Review the hook locally, "
+                "fix it, and run it again from the project folder.",
+                accent="amber",
+            )
+        )
         return False
 
     if result.stdout.strip():
         for line in result.stdout.strip().splitlines():
             console.print(f"  {line}")
-
-    if result.returncode != 0:
-        console.print(
-            status_line(
-                f"Post-scaffold hook exited with code {result.returncode}.",
-                accent="amber",
-            )
-        )
-        if result.stderr.strip():
-            console.print(f"  {result.stderr.strip()}")
-        return False
 
     console.print(status_line("Post-scaffold hook completed.", accent="aqua"))
     return True

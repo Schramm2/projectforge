@@ -155,10 +155,10 @@ def test_resolve_markdown_open_path_only_allows_convention_markdown(sample_tree:
 
     assert resolved == sample_tree / "languages" / "python" / "style.md"
 
-    with pytest.raises(ConventionValidationError, match="markdown"):
+    with pytest.raises(ConventionValidationError, match=r"\.md"):
         resolve_open_path(sample_tree, "languages/python/metadata.yaml")
 
-    with pytest.raises(ConventionValidationError, match="outside"):
+    with pytest.raises(ConventionValidationError, match="inside the conventions folder"):
         resolve_open_path(sample_tree, "../README.md")
 
 
@@ -198,3 +198,18 @@ def test_load_history_reads_non_interactive_git_log(monkeypatch, sample_tree: Pa
     assert history.available is True
     assert history.entries == ("abc123 Add FastAPI overview",)
     assert seen_commands == [["git", "log", "--oneline", "--", "conventions/stacks/fastapi"]]
+
+
+def test_load_history_hides_os_error_details(monkeypatch, sample_tree: Path) -> None:
+    from projectforge.convention_history import load_history
+
+    def _failed_git(*args, **kwargs):
+        raise OSError("private checkout detail")
+
+    monkeypatch.setattr("projectforge.convention_history.subprocess.run", _failed_git)
+
+    history = load_history(sample_tree, "stacks/fastapi")
+
+    assert history.available is False
+    assert "Confirm Git works" in history.message
+    assert "private checkout detail" not in history.message

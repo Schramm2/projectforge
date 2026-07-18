@@ -214,7 +214,9 @@ def _make_single_task_plan(
     return DecompositionPlan(
         tasks=[task],
         execution_order=[[task.id]],
-        rationale="Single-task fallback — planning was skipped or failed.",
+        rationale=(
+            "Forge is continuing with the standard workflow because task planning was unavailable."
+        ),
     )
 
 
@@ -303,7 +305,8 @@ def _get_plan(
 
     _console.print(
         ui.status_line(
-            f"Planning failed — falling back to standard mode ({elapsed:.0f}s)", accent="amber"
+            "Forge could not create a task plan, so it will continue with the standard workflow.",
+            accent="amber",
         )
     )
     return _make_single_task_plan(brief, phase, backend)
@@ -351,7 +354,10 @@ def _execute_task_graph(
                         task_id=tid,
                         files_created=[],
                         files_modified=[],
-                        summary="Skipped: dependency failed",
+                        summary=(
+                            "Not run because an earlier task did not finish. Fix the earlier "
+                            "issue, then retry with `--resume`."
+                        ),
                         success=False,
                         duration=0.0,
                         returncode=-1,
@@ -400,7 +406,10 @@ def _execute_task_graph(
                         task_id=tid,
                         files_created=[],
                         files_modified=[],
-                        summary="Skipped: dependency failed",
+                        summary=(
+                            "Not run because an earlier task did not finish. Fix the earlier "
+                            "issue, then retry with `--resume`."
+                        ),
                         success=False,
                         duration=0.0,
                         returncode=-1,
@@ -490,7 +499,10 @@ def _reconcile(
     if rc == 0:
         _console.print(ui.status_line(f"Reconciliation complete ({elapsed:.0f}s)", accent="aqua"))
     else:
-        msg = f"Reconciliation had issues ({elapsed:.0f}s) — non-fatal"
+        msg = (
+            "Forge could not run the final consistency pass. Review the generated project "
+            "before using it."
+        )
         _console.print(ui.status_line(msg, accent="amber"))
     return rc
 
@@ -501,12 +513,12 @@ def map_progress_to_activity(event: ProgressEvent) -> str:
     - "started"   -> "{agent_label}: {message}"
     - "progress"  -> "{agent_label}: {message}"
     - "completed" -> "{agent_label}: Done"
-    - "failed"    -> "{agent_label}: Failed — {message}"
+    - "failed"    -> a stable recovery-safe failure summary
     """
     if event.event_type == "completed":
         return f"{event.agent_label}: Done"
     if event.event_type == "failed":
-        return f"{event.agent_label}: Failed \u2014 {event.message}"
+        return "A planned task stopped before it finished. Forge will preserve completed work."
     # "started" and "progress" both forward the message
     return f"{event.agent_label}: {event.message}"
 

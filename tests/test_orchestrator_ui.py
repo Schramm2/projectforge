@@ -37,4 +37,8 @@ class TestMapProgressToActivity:
     def test_failed_event(self) -> None:
         event = _make_event("failed", "subprocess timed out")
         result = map_progress_to_activity(event)
-        assert result == "claude[arch]: Failed — subprocess timed out"
+        assert result == (
+            "A planned task stopped before it finished. Forge will preserve completed work."
+        )
+        assert "claude" not in result
+        assert "subprocess" not in result

@@ -85,7 +85,7 @@ def _check_claude_status() -> BackendStatus:
         return BackendStatus(
             installed=True,
             ready=None,
-            detail="Could not verify Claude login status.",
+            detail="Forge could not run this tool's sign-in check.",
             login_command="claude auth login",
         )
 
@@ -114,14 +114,14 @@ def _check_claude_status() -> BackendStatus:
         return BackendStatus(
             installed=True,
             ready=False,
-            detail="Claude is installed but not authenticated.",
+            detail="This tool is installed but needs sign-in.",
             login_command="claude auth login",
         )
 
     return BackendStatus(
         installed=True,
         ready=None,
-        detail="Claude is installed; login state could not be confirmed.",
+        detail="Forge could not confirm that this tool is ready.",
         login_command="claude auth login",
     )
 
@@ -136,7 +136,7 @@ def _check_codex_status() -> BackendStatus:
         return BackendStatus(
             installed=True,
             ready=None,
-            detail="Could not verify Codex login status.",
+            detail="Forge could not run this tool's sign-in check.",
             login_command="codex login",
         )
 
@@ -145,7 +145,7 @@ def _check_codex_status() -> BackendStatus:
         return BackendStatus(
             installed=True,
             ready=False,
-            detail="Codex is installed but not authenticated.",
+            detail="This tool is installed but needs sign-in.",
             login_command="codex login",
         )
     if result.returncode == 0 and "logged in" in output:
@@ -160,7 +160,7 @@ def _check_codex_status() -> BackendStatus:
     return BackendStatus(
         installed=True,
         ready=None,
-        detail="Codex is installed; login state could not be confirmed.",
+        detail="Forge could not confirm that this tool is ready.",
         login_command="codex login",
     )
 
@@ -175,7 +175,7 @@ def _check_antigravity_status() -> BackendStatus:
         return BackendStatus(
             installed=True,
             ready=None,
-            detail="Antigravity is installed, but Forge could not run its version check.",
+            detail="Forge could not run this tool's version check.",
             login_command="agy",
         )
 
@@ -186,7 +186,7 @@ def _check_antigravity_status() -> BackendStatus:
         return BackendStatus(
             installed=True,
             ready=None,
-            detail="Antigravity is installed; its sign-in check timed out.",
+            detail="This tool's sign-in check took too long.",
             login_command="agy",
         )
 
@@ -206,14 +206,14 @@ def _check_antigravity_status() -> BackendStatus:
         return BackendStatus(
             installed=True,
             ready=False,
-            detail="Antigravity is installed but needs Google Sign-In.",
+            detail="This tool is installed but needs sign-in.",
             login_command="agy",
         )
 
     return BackendStatus(
         installed=True,
         ready=None,
-        detail="Antigravity is installed; its sign-in state could not be confirmed.",
+        detail="Forge could not confirm that this tool is ready.",
         login_command="agy",
     )
 
@@ -226,7 +226,7 @@ def get_backend_status(backend: str) -> BackendStatus:
         return _check_codex_status()
     if backend == "antigravity":
         return _check_antigravity_status()
-    return BackendStatus(installed=False, ready=False, detail="Unsupported backend.")
+    return BackendStatus(installed=False, ready=False, detail="That AI tool is not supported.")
 
 
 def get_backend_statuses() -> dict[str, BackendStatus]:

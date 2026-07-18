@@ -163,7 +163,8 @@ def test_run_check_fail(mock_run, tmp_path):
     mock_run.return_value = MagicMock(returncode=1, stderr="some error output")
     result = _run_check("lint", "uv run ruff check .", tmp_path)
     assert result.passed is False
-    assert "some error output" in result.detail
+    assert result.detail == "This check did not pass."
+    assert "some error output" not in result.detail
     assert result.exit_code == 1
     assert "uv run ruff check ." in result.remediation
 
@@ -173,7 +174,7 @@ def test_run_check_timeout(mock_run, tmp_path):
     mock_run.side_effect = subprocess.TimeoutExpired(cmd="test", timeout=60)
     result = _run_check("test", "uv run pytest tests/", tmp_path)
     assert result.passed is False
-    assert "timed out" in result.detail
+    assert result.detail == "This check took too long and was stopped."
     assert result.exit_code is None
     assert result.timeout_seconds == 60
 
@@ -210,7 +211,9 @@ def test_install_deps_fullstack(mock_check, tmp_path):
 def test_install_deps_unknown_stack(tmp_path):
     result = _install_deps("unknown", tmp_path)
     assert result.passed is False
-    assert "unknown stack" in result.detail
+    assert result.detail == "Forge cannot verify this project type."
+    assert "unknown" not in result.detail
+    assert result.remediation
 
 
 # --- verify_scaffold ---

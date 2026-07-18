@@ -12,10 +12,12 @@ class UnsafeExecutionError(ValueError):
 def validate_approval_mode(approval_mode: str, *, allow_unsafe: bool) -> None:
     """Validate a Forge approval mode before any provider process starts."""
     if approval_mode not in APPROVAL_MODES:
-        valid = ", ".join(APPROVAL_MODES)
-        raise ValueError(f"unknown approval mode {approval_mode!r}; choose from: {valid}")
+        raise ValueError("That approval mode is not available. Choose `safe`, `plan`, or `unsafe`.")
     if approval_mode == "unsafe" and not allow_unsafe:
-        raise UnsafeExecutionError("unsafe execution requires explicit consent via --allow-unsafe")
+        raise UnsafeExecutionError(
+            "Unsafe mode removes normal protections. Add `--allow-unsafe` only inside an "
+            "isolated environment you control."
+        )
 
 
 def build_provider_command(

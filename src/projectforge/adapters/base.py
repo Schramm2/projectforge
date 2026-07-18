@@ -83,12 +83,16 @@ class CLIAdapterBase:
             )
         except FileNotFoundError:
             duration = time.monotonic() - start
-            emit("failed", f"Command not found: {cmd[0]!r}")
+            summary = (
+                "The selected AI tool could not start. Run `forge doctor`, fix the reported "
+                "setup issue, then retry with `--resume`."
+            )
+            emit("failed", summary)
             return AgentResult(
                 task_id=task.id,
                 files_created=[],
                 files_modified=[],
-                summary=f"Command not found: {cmd[0]!r}",
+                summary=summary,
                 success=False,
                 duration=duration,
                 returncode=-1,
@@ -131,7 +135,10 @@ class CLIAdapterBase:
         duration = time.monotonic() - start
 
         if timed_out:
-            summary = f"Timed out after {PHASE_TIMEOUT}s"
+            summary = (
+                "This task took longer than allowed. Your completed work is safe; "
+                "retry with `--resume`."
+            )
             emit("failed", summary)
             return AgentResult(
                 task_id=task.id,
@@ -148,7 +155,10 @@ class CLIAdapterBase:
             summary = last_lines[-1] if last_lines else "Completed"
             emit("completed", summary)
         else:
-            summary = "; ".join(last_lines) if last_lines else f"Exited with code {returncode}"
+            summary = (
+                "This task stopped before it finished. Your completed work is safe; "
+                "run `forge doctor`, then retry with `--resume`."
+            )
             emit("failed", summary)
 
         return AgentResult(

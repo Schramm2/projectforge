@@ -64,14 +64,14 @@ def test_doctor_report_is_deterministic_and_excludes_provider_detail(monkeypatch
     )
     assert report["providers"]["antigravity"]["check"] == {
         "command": "agy --version; agy models",
-        "observed": "The readiness check did not return a recognized authentication result.",
+        "observed": "The readiness check could not confirm sign-in.",
     }
     assert report["providers"]["claude"]["check"] == {
         "command": "PATH lookup for `claude`",
-        "observed": "No `claude` executable was found on PATH.",
+        "observed": "Forge could not find this tool on your system.",
     }
     assert "codex login" not in report["providers"]["codex"]["repair"]
-    assert "google sign-in" in report["providers"]["antigravity"]["repair"].lower()
+    assert "manual readiness check" in report["providers"]["antigravity"]["repair"]
     assert report["config"] == {"status": "valid"}
     assert report["environment"]["python"]["supported"] is True
     assert "secret@example.com" not in serialized
@@ -118,7 +118,7 @@ def test_doctor_reports_advanced_model_override_without_other_config(monkeypatch
     }
 
 
-def test_doctor_gives_antigravity_browser_and_ssh_login_guidance(monkeypatch, tmp_path):
+def test_doctor_gives_identity_safe_login_guidance(monkeypatch, tmp_path):
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps({"preferred_editor": "code"}))
     monkeypatch.setattr("projectforge.doctor.CONFIG_PATH", config_path)
@@ -139,10 +139,9 @@ def test_doctor_gives_antigravity_browser_and_ssh_login_guidance(monkeypatch, tm
 
     repair = build_doctor_report()["providers"]["antigravity"]["repair"]
 
-    assert "Google Sign-In" in repair
-    assert "browser" in repair
-    assert "SSH URL" in repair
-    assert "/exit" in repair
+    assert "official sign-in flow" in repair
+    assert "projectforge doctor" in repair
+    assert "agy" not in repair
 
 
 def test_doctor_inconclusive_codex_has_exact_check_and_next_step(monkeypatch, tmp_path):
@@ -167,11 +166,9 @@ def test_doctor_inconclusive_codex_has_exact_check_and_next_step(monkeypatch, tm
     provider = build_doctor_report()["providers"]["codex"]
 
     assert provider["check"]["command"] == "codex login status"
-    assert provider["check"]["observed"] == (
-        "The readiness check did not return a recognized authentication result."
-    )
-    assert "codex login status" in provider["repair"]
-    assert "codex login" in provider["repair"]
+    assert provider["check"]["observed"] == ("The readiness check could not confirm sign-in.")
+    assert "manual readiness check" in provider["repair"]
+    assert "codex" not in provider["repair"]
 
 
 def test_doctor_exit_code_requires_valid_config_and_ready_provider():

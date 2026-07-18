@@ -38,11 +38,11 @@ STACK_CHOICES = [
 def _validate_project_name(name: str) -> bool | str:
     """Validate that the project name is a valid directory name."""
     if not name.strip():
-        return "Project name cannot be empty."
+        return "Enter a project name, for example `customer-api`."
     if not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$", name):
         return (
-            "Must start with a letter/number and contain only"
-            " letters, numbers, dots, hyphens, or underscores."
+            "Start with a letter or number. Use only letters, numbers, dots, hyphens, "
+            "or underscores."
         )
     return True
 
@@ -272,7 +272,13 @@ def _ask_project_basics(answers: dict, *, docker_available: bool) -> None:
     meta = STACK_META.get(stack)
     if not docker_available:
         answers["docker"] = False
-        console.print(status_line("Docker not detected — skipping Docker setup.", accent="amber"))
+        console.print(
+            status_line(
+                "Docker is not installed, so Forge will skip container setup. Install Docker "
+                "and restart Forge to configure it now.",
+                accent="amber",
+            )
+        )
         return
 
     docker_default = answers.get("docker")
