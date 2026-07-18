@@ -3,8 +3,8 @@ class Projectforge < Formula
 
   desc "Scaffold projects with AI coding tools and shared conventions"
   homepage "https://github.com/Schramm2/projectforge"
-  url "https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.0.tar.gz"
-  sha256 "f1293f2405690a7c6c33182fa826a29ce5a39d41323e80ac491f9f573764955d"
+  url "https://github.com/Schramm2/projectforge/archive/refs/tags/v0.5.1.tar.gz"
+  sha256 "708b0dbf2217bae68e8b75c5f46ce788d8b86204f7b40be97f98b5afc5feb2d8"
   license "MIT"
   head "https://github.com/Schramm2/projectforge.git", branch: "main"
 
