@@ -23,7 +23,7 @@ def append_scaffold_log(
         "name": answers.get("name", ""),
         "stack": answers.get("stack", ""),
         "backends": backends_used,
-        "directory": str(project_dir),
+        "directory": project_dir.name,
         "demo_mode": answers.get("demo_mode", False),
         "timestamp": datetime.now(UTC).isoformat(),
     }

@@ -1,6 +1,8 @@
 """Tests for convention loading and validation."""
 
-from ubundiforge.convention_models import CompiledBundle
+import pytest
+
+from ubundiforge.convention_models import CompiledBundle, ConventionValidationError
 from ubundiforge.conventions import (
     MIN_CONVENTIONS_LENGTH,
     load_bundled_conventions,
@@ -158,6 +160,26 @@ def test_stack_bundle_composes_profile_user_and_project_layers_with_hashes(
     assert all(item.sha256.startswith("sha256:") for item in bundle.contributions)
 
 
+def test_stack_bundle_rejects_credential_shaped_user_content(tmp_path, monkeypatch):
+    root = tmp_path / "bundled"
+    (root / "global").mkdir(parents=True)
+    (root / "global" / "shared.md").write_text("Safe bundled defaults for every project.")
+    profiles_dir = tmp_path / "profiles"
+    profiles_dir.mkdir()
+    (profiles_dir / "default.md").write_text(
+        "Never print ghp_abcdefghijklmnopqrstuvwxyz1234567890"
+    )
+    monkeypatch.setattr("ubundiforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
+    monkeypatch.setattr("ubundiforge.conventions.PROFILES_DIR", profiles_dir)
+    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", tmp_path / "missing.md")
+    monkeypatch.setattr(
+        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH", tmp_path / "missing-local.md"
+    )
+
+    with pytest.raises(ConventionValidationError, match="credential-like"):
+        load_conventions_bundle(stack="fastapi")
+
+
 def test_load_conventions_stack_ignores_placeholder_local_override(tmp_path, monkeypatch):
     root = tmp_path / "conventions"
     (root / "global").mkdir(parents=True)
@@ -217,7 +239,7 @@ def test_load_conventions_stack_keeps_bundle_warnings_when_bundle_is_empty(tmp_p
     )
     monkeypatch.setattr(
         "ubundiforge.conventions.load_conventions_bundle",
-        lambda stack=None: CompiledBundle(
+        lambda stack=None, profile="default": CompiledBundle(
             bundle_id=stack or "default",
             prompt_block="",
             sources=(),

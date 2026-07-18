@@ -445,7 +445,7 @@ def test_mock_backends_cover_full_cli_flow_without_installed_ai_clis(monkeypatch
     assert (project_dir / "frontend-ui.txt").exists()
     assert (project_dir / "tests-automation.txt").exists()
     assert (project_dir / "verify-fix.txt").exists()
-    assert "Project Ready" in result.stdout
+    assert "Project Created" in result.stdout
 
 
 def test_first_run_setup_prompts_before_interactive_scaffold(monkeypatch):
@@ -577,7 +577,7 @@ def test_first_run_with_explicit_scaffold_flags_skips_post_setup_prompt(monkeypa
     assert result.exit_code == 0
     assert setup_calls["count"] == 1
     assert prompt_calls["count"] == 0
-    assert "Project Ready" in result.stdout
+    assert "Project Created" in result.stdout
 
 
 def test_replay_without_snapshot_loads_compiled_conventions_for_manifest_stack(
@@ -799,6 +799,36 @@ def test_admin_conventions_validate_passes() -> None:
 
     assert result.exit_code == 0
     assert "Validation passed" in result.stdout
+
+
+def test_user_convention_profile_init_select_and_inspect(monkeypatch, tmp_path):
+    forge_dir = tmp_path / ".forge"
+    profiles_dir = forge_dir / "profiles"
+    config_path = forge_dir / "config.json"
+    monkeypatch.setattr("ubundiforge.convention_profiles.PROFILES_DIR", profiles_dir)
+    monkeypatch.setattr("ubundiforge.conventions.PROFILES_DIR", profiles_dir)
+    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", forge_dir / "conventions.md")
+    monkeypatch.setattr(
+        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH",
+        tmp_path / "project" / ".forge" / "conventions.md",
+    )
+    monkeypatch.setattr("ubundiforge.setup.FORGE_DIR", forge_dir)
+    monkeypatch.setattr("ubundiforge.setup.CONFIG_PATH", config_path)
+
+    initialized = runner.invoke(app, ["conventions", "init", "team"])
+    selected = runner.invoke(app, ["conventions", "select", "team"])
+    inspected = runner.invoke(
+        app,
+        ["conventions", "inspect", "--stack", "fastapi", "--json"],
+    )
+
+    assert initialized.exit_code == 0
+    assert selected.exit_code == 0
+    assert inspected.exit_code == 0
+    assert json.loads(config_path.read_text())["conventions_profile"] == "team"
+    report = json.loads(inspected.stdout)
+    assert report["profile"] == "team"
+    assert any(source["source_id"] == "profile:team" for source in report["sources"])
 
 
 def test_admin_conventions_preview_stack() -> None:

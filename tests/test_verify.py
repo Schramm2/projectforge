@@ -8,11 +8,13 @@ from rich.console import Console
 from ubundiforge.verify import (
     CheckResult,
     VerifyReport,
+    _check_health,
     _extract_port,
     _install_deps,
     _run_check,
     print_report,
     verify_scaffold,
+    write_verification_report,
 )
 
 # --- CheckResult / VerifyReport ---
@@ -76,6 +78,25 @@ def test_extract_port_default():
     assert _extract_port("uvicorn api.app:app") == 8000
 
 
+@patch("ubundiforge.verify.time.sleep", return_value=None)
+@patch("ubundiforge.verify.urlopen")
+@patch("ubundiforge.verify.subprocess.Popen")
+def test_health_result_records_configured_endpoint_and_command(
+    mock_popen, mock_urlopen, _mock_sleep, tmp_path
+):
+    process = MagicMock()
+    process.poll.return_value = None
+    mock_popen.return_value = process
+    mock_urlopen.return_value = MagicMock(status=200)
+
+    result = _check_health(tmp_path, "uvicorn app:app --port 8123", endpoints=("/status",))
+
+    assert result.passed is True
+    assert result.command == "uvicorn app:app --port 8123"
+    assert result.cwd == str(tmp_path)
+    assert result.attempted_endpoints == ("http://localhost:8123/status",)
+
+
 # --- _run_check ---
 
 
@@ -85,6 +106,10 @@ def test_run_check_pass(mock_run, tmp_path):
     result = _run_check("lint", "uv run ruff check .", tmp_path)
     assert result.passed is True
     assert result.name == "lint"
+    assert result.command == "uv run ruff check ."
+    assert result.cwd == str(tmp_path)
+    assert result.timeout_seconds == 30
+    assert result.exit_code == 0
 
 
 @patch("ubundiforge.verify.subprocess.run")
@@ -93,6 +118,8 @@ def test_run_check_fail(mock_run, tmp_path):
     result = _run_check("lint", "uv run ruff check .", tmp_path)
     assert result.passed is False
     assert "some error output" in result.detail
+    assert result.exit_code == 1
+    assert "uv run ruff check ." in result.remediation
 
 
 @patch("ubundiforge.verify.subprocess.run")
@@ -101,6 +128,8 @@ def test_run_check_timeout(mock_run, tmp_path):
     result = _run_check("test", "uv run pytest tests/", tmp_path)
     assert result.passed is False
     assert "timed out" in result.detail
+    assert result.exit_code is None
+    assert result.timeout_seconds == 30
 
 
 # --- _install_deps ---
@@ -185,6 +214,34 @@ def test_verify_scaffold_no_health_for_cli(mock_install, mock_check, tmp_path):
     assert "health" not in check_names
 
 
+@patch("ubundiforge.verify._check_health")
+@patch("ubundiforge.verify._run_check")
+def test_python_verification_uses_generated_project_metadata(mock_check, mock_health, tmp_path):
+    """Regression: the showcase layout must not inherit stale stack command assumptions."""
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "pyproject.toml").write_text(
+        """[project]
+name = "showcase"
+version = "0.1.0"
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+"""
+    )
+    mock_check.return_value = CheckResult(name="check", passed=True)
+    mock_health.return_value = CheckResult(name="health", passed=True)
+
+    report = verify_scaffold("python-cli", tmp_path)
+
+    commands = [call.args[1] for call in mock_check.call_args_list]
+    assert commands[0] == "uv sync --extra dev"
+    assert "uv run pytest -q" in commands
+    assert report.all_passed is True
+
+
 # --- print_report ---
 
 
@@ -199,3 +256,29 @@ def test_print_report_renders():
     console = Console(file=MagicMock(), force_terminal=True, width=120)
     # Should not raise
     print_report(report, console)
+
+
+def test_write_verification_report_persists_reproducible_command_metadata(tmp_path):
+    report = VerifyReport(
+        checks=[
+            CheckResult(
+                name="test",
+                passed=False,
+                detail="one test failed",
+                command="uv run pytest -q",
+                cwd=str(tmp_path),
+                timeout_seconds=30,
+                exit_code=1,
+                remediation="Run the test command and inspect output.",
+                duration_seconds=1.25,
+            )
+        ]
+    )
+
+    output_path = write_verification_report(report, tmp_path)
+    payload = __import__("json").loads(output_path.read_text())
+
+    assert payload["all_passed"] is False
+    assert payload["checks"][0]["cwd"] == "."
+    assert payload["checks"][0]["command"] == "uv run pytest -q"
+    assert payload["checks"][0]["exit_code"] == 1
