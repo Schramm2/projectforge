@@ -51,8 +51,13 @@ def test_scaffold_context_hides_hashes_unless_verbose(monkeypatch):
         claude_md_loaded=False,
         design_template_label=None,
         convention_sources=(source,),
+        conventions_profile="team",
+        project_brief_added=True,
+        project_context_files=2,
     )
 
+    assert "Convention profile: team" in output.getvalue()
+    assert "Project brief: added; nearby context: 2 selected" in output.getvalue()
     assert "Conventions: 1 source, 9,800 chars (hashes recorded)" in output.getvalue()
     assert "sha256:secret-detail" not in output.getvalue()
 
@@ -1052,6 +1057,40 @@ def test_replay_prefers_snapshot_over_compiled_bundle(monkeypatch, tmp_path):
     assert "snapshot conventions" in result.stdout
 
 
+def test_replay_restores_saved_project_brief_and_selected_context(monkeypatch, tmp_path):
+    project_dir = tmp_path / "atlas"
+    forge_dir = project_dir / ".forge"
+    forge_dir.mkdir(parents=True)
+    (forge_dir / "scaffold.json").write_text(
+        json.dumps(
+            {
+                "name": "atlas",
+                "stack": "fastapi",
+                "description": "Replay me",
+                "project_brief": {
+                    "audience": "Support coordinators",
+                    "first_success": "Assign one shift",
+                },
+                "context_hash": "sha256:recorded",
+                "routing": [{"phase": "architecture", "backend": "claude"}],
+            }
+        )
+    )
+    (forge_dir / "conventions-snapshot.md").write_text("snapshot conventions")
+    (forge_dir / "context-snapshot.md").write_text(
+        "<project_context>\nSelected file: PRODUCT.md\nSaved product context\n</project_context>\n"
+    )
+
+    monkeypatch.chdir(project_dir)
+    monkeypatch.setattr("projectforge.router.check_backend_installed", lambda backend: True)
+
+    result = runner.invoke(app, ["replay", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "Selected file: PRODUCT.md" in result.stdout
+    assert "Saved product context" in result.stdout
+
+
 def test_replay_reports_bundle_validation_errors(monkeypatch, tmp_path):
     project_dir = tmp_path / "atlas"
     forge_dir = project_dir / ".forge"
@@ -1251,7 +1290,7 @@ def test_run_setup_does_not_create_legacy_conventions_file(monkeypatch, tmp_path
     config_path = forge_dir / "config.json"
     conventions_path = forge_dir / "conventions.md"
 
-    prompt_select_answers = iter(["_provider_default"])
+    prompt_select_answers = iter(["_provider_default", "keep"])
 
     monkeypatch.setattr("projectforge.setup.FORGE_DIR", forge_dir)
     monkeypatch.setattr("projectforge.setup.CONFIG_PATH", config_path)
@@ -1264,7 +1303,14 @@ def test_run_setup_does_not_create_legacy_conventions_file(monkeypatch, tmp_path
             "codex": BackendStatus(installed=False, ready=False),
         },
     )
-    monkeypatch.setattr("projectforge.setup.load_forge_config", lambda: {})
+    monkeypatch.setattr(
+        "projectforge.setup.load_forge_config",
+        lambda: {
+            "conventions_profile": "team",
+            "agents": True,
+            "sound": False,
+        },
+    )
     monkeypatch.setattr("projectforge.setup._check_editor_installed", lambda *_: (False, False))
     monkeypatch.setattr(
         "projectforge.setup.prompt_select",
@@ -1286,10 +1332,13 @@ def test_run_setup_does_not_create_legacy_conventions_file(monkeypatch, tmp_path
 
     assert config["available_backends"] == ["claude"]
     assert config["backend_models"] == {}
+    assert config["conventions_profile"] == "team"
+    assert config["agents"] is True
+    assert config["sound"] is False
     assert not conventions_path.exists()
-    assert "bundled conventions" in output.lower()
-    assert "bundled source tree" in output.lower()
-    assert "forge admin conventions" in output
+    assert "Conventions tell Forge how you want projects built" in output
+    assert "import team instructions" in output
+    assert "change the selected profile later" in output
 
 
 def test_setup_missing_providers_shows_official_install_auth_recheck_flow(monkeypatch):

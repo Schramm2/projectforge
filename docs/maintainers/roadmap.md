@@ -109,6 +109,7 @@ truth.
 
 ## Interactive Improvements
 
+- [DONE] **Convention and context onboarding**: First-run setup can keep defaults, import explicitly selected nearby instruction files, or create a reusable profile through a short interview. Interactive scaffolding keeps the project brief separate from durable conventions and loads only user-selected, bounded, secret-scanned nearby Markdown.
 - [DONE] **Smart defaults**: Forge learns answer patterns across scaffolds and offers to pre-fill dominant choices. After 3+ scaffolds with >70% consistency on an answer, shows "Your usual setup: Auth: clerk, Docker: yes" with a confirm prompt. The review screen remains the final gate.
 - **Saved presets**: `forge --save-preset api-starter` saves your current answers. Next time: `forge --preset api-starter` skips the questions entirely.
 - **Recent projects**: `forge --last` repeats the most recent scaffold with the same settings but a new name.

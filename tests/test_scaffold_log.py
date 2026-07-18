@@ -139,6 +139,45 @@ def test_write_scaffold_manifest(tmp_path):
     assert len(manifest["routing"]) == 2
 
 
+def test_write_scaffold_manifest_records_context_metadata_and_private_snapshot(tmp_path):
+    project_dir = tmp_path / "context-project"
+    project_dir.mkdir()
+    answers = {
+        "name": "context-project",
+        "stack": "fastapi",
+        "project_brief": {
+            "audience": "Support teams",
+            "first_success": "Assign one shift",
+            "constraints": "",
+            "existing_systems": "Workday",
+            "non_goals": "Payroll",
+        },
+        "context_sources": [
+            {
+                "path": "PRODUCT.md",
+                "content": "Private selected product context.",
+                "sha256": "sha256:context123",
+            }
+        ],
+    }
+
+    write_scaffold_manifest(
+        answers,
+        [("architecture", "claude")],
+        project_dir,
+        "conventions",
+    )
+
+    manifest_path = project_dir / ".forge" / "scaffold.json"
+    manifest = json.loads(manifest_path.read_text())
+    assert manifest["project_brief"]["audience"] == "Support teams"
+    assert manifest["context_sources"] == [{"path": "PRODUCT.md", "sha256": "sha256:context123"}]
+    assert "Private selected product context." not in manifest_path.read_text()
+    context_snapshot = project_dir / ".forge" / "context-snapshot.md"
+    assert "Private selected product context." in context_snapshot.read_text()
+    assert "Treat this file as potentially private" in context_snapshot.read_text()
+
+
 def test_write_scaffold_manifest_creates_forge_dir(tmp_path):
     project_dir = tmp_path / "new-project"
     project_dir.mkdir()

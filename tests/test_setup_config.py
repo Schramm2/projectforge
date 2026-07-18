@@ -8,10 +8,74 @@ import pytest
 from rich.console import Console
 
 from projectforge.setup import (
+    _configure_conventions_onboarding,
     _print_legacy_conventions_warning,
     load_forge_config,
     save_forge_config,
 )
+
+
+def test_guided_convention_onboarding_creates_and_selects_profile(monkeypatch, tmp_path):
+    profiles_dir = tmp_path / "profiles"
+    output = StringIO()
+    console = Console(file=output, force_terminal=False, color_system=None, width=120)
+    text_answers = iter(
+        [
+            "team",
+            "Use uv and pnpm.",
+            "Run focused tests.",
+            "Keep domain logic isolated.",
+            "Use strict typing.",
+            "Document runnable commands.",
+            "Ask before adding production dependencies.",
+        ]
+    )
+
+    monkeypatch.setattr("projectforge.convention_profiles.PROFILES_DIR", profiles_dir)
+    monkeypatch.setattr("projectforge.setup.prompt_select", lambda *a, **k: _answer("guided"))
+    monkeypatch.setattr(
+        "projectforge.setup.prompt_text",
+        lambda *a, **k: _answer(next(text_answers)),
+    )
+    monkeypatch.setattr("projectforge.setup.prompt_confirm", lambda *a, **k: _answer(True))
+
+    selected = _configure_conventions_onboarding(console, "default")
+
+    assert selected == "team"
+    content = (profiles_dir / "team.md").read_text()
+    assert "Use uv and pnpm." in content
+    assert "Ask before adding production dependencies." in content
+    assert "Convention Profile Preview" in output.getvalue()
+    assert "Selected convention profile: team" in output.getvalue()
+
+
+def test_convention_onboarding_imports_only_selected_nearby_instructions(monkeypatch, tmp_path):
+    profiles_dir = tmp_path / "profiles"
+    agents = tmp_path / "AGENTS.md"
+    claude = tmp_path / "CLAUDE.md"
+    agents.write_text("# Shared rules\n\nUse strict typing.")
+    claude.write_text("# Unselected rules\n\nUse a different package manager.")
+    output = StringIO()
+    console = Console(file=output, force_terminal=False, color_system=None, width=120)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("projectforge.convention_profiles.PROFILES_DIR", profiles_dir)
+    monkeypatch.setattr("projectforge.setup.prompt_select", lambda *a, **k: _answer("import"))
+    monkeypatch.setattr("projectforge.setup.prompt_checkbox", lambda *a, **k: _answer([agents]))
+    monkeypatch.setattr("projectforge.setup.prompt_text", lambda *a, **k: _answer("team"))
+    monkeypatch.setattr("projectforge.setup.prompt_confirm", lambda *a, **k: _answer(True))
+
+    selected = _configure_conventions_onboarding(console, "default")
+
+    assert selected == "team"
+    content = (profiles_dir / "team.md").read_text()
+    assert "Use strict typing." in content
+    assert "different package manager" not in content
+    assert "includes that profile in future provider prompts" in output.getvalue()
+
+
+def _answer(value):
+    return type("Answer", (), {"ask": lambda self: value})()
 
 
 def test_save_forge_config_replaces_atomically(monkeypatch, tmp_path):

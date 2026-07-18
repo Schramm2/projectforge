@@ -107,8 +107,15 @@ The interactive equivalent is simply:
 forge
 ```
 
-The first interactive run opens setup, then lets you create a project, revisit setup, or exit. The
-questionnaire ends at a review screen before provider execution.
+The first interactive run opens setup, then lets you create a project, revisit setup, or exit.
+During setup, choose Forge's bundled conventions, import nearby instruction files, or create a
+reusable profile through a short interview.
+
+The project questionnaire keeps reusable conventions separate from project context. It asks who
+the project is for, what the first useful version should demonstrate, and which constraints matter.
+If known Markdown files are present in the current folder, Forge lists them without reading their
+content into the prompt. Only files you select are loaded, secret-scanned, and included. The review
+screen shows the active brief and selected-file count before provider execution.
 
 ## 5. Read the evidence
 
@@ -116,7 +123,8 @@ After a successful run, inspect:
 
 - `.forge/progress.json` for phase status, attempts, and durations;
 - `.forge/scaffold.json` for routing, approval mode, models, and convention hashes;
-- `.forge/conventions-snapshot.md` for exact replay input; and
+- `.forge/conventions-snapshot.md` for exact convention replay input;
+- `.forge/context-snapshot.md` for the approved brief and selected file content, when supplied; and
 - `.forge/verification.json` for commands, timeouts, exits, endpoints, and remediation.
 
 `Project Ready` means required verification passed. `Project Created` means verification was not
