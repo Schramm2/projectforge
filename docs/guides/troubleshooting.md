@@ -24,10 +24,12 @@ which codex
 
 **Fix by install method:**
 
-- **GitHub tool install:** Re-run `uv tool install --force git+https://github.com/Schramm2/projectforge.git@v0.4.1`, then follow uv's PATH guidance if it reports that its tool bin directory is not on PATH.
+- **GitHub tool install:** Re-run `uv tool install --force https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz`, then follow uv's PATH guidance if it reports that its tool bin directory is not on PATH.
+- **Homebrew:** Run `brew reinstall --build-from-source schramm2/tap/projectforge`, then check
+  `brew --prefix` is represented on your PATH.
 - **Development checkout:** Run `uv sync --dev`, then use `./forge` from the repository root.
 
-PyPI and Homebrew are not currently supported ProjectForge install routes.
+ProjectForge is not currently published to PyPI.
 
 ## Setup wizard keeps running
 

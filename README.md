@@ -58,11 +58,10 @@ See [docs/guides/stacks.md](docs/guides/stacks.md) for detailed structure, libra
 
 ## Installation
 
-The supported public route installs the `projectforge` distribution from an immutable release in
-the canonical GitHub repository.
+Install the `projectforge` distribution from the immutable GitHub release:
 
 ```bash
-uv tool install git+https://github.com/Schramm2/projectforge.git@v0.4.1
+uv tool install https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz
 ```
 
 Verify the installed command:
@@ -75,6 +74,12 @@ forge --help
 ProjectForge is not currently published to PyPI. See
 [Getting Started](docs/guides/getting-started.md) for prerequisites and a source-development
 setup.
+
+Homebrew is also supported:
+
+```bash
+brew install --build-from-source schramm2/tap/projectforge
+```
 
 ## Quick Start
 

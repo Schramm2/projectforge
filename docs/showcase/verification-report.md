@@ -4,23 +4,20 @@ Verified on 2026-07-18 from macOS with Python 3.12 and uv 0.9.22.
 
 ## Public identity and release channels
 
-Read-only live checks reported:
+| Check | Measured result |
+| --- | --- |
+| Repository | `Schramm2/projectforge`, public, default branch `main` |
+| GitHub release | [v0.4.1](https://github.com/Schramm2/projectforge/releases/tag/v0.4.1), published and not a prerelease |
+| Homebrew workflow | [Release Homebrew run 29638625788](https://github.com/Schramm2/projectforge/actions/runs/29638625788), completed successfully on `main` |
+| Homebrew tap | `Schramm2/homebrew-tap/Formula/projectforge.rb`, synchronized for v0.4.1 |
+| PyPI | `projectforge` JSON endpoint returned HTTP 404; this channel is deliberately unpublished |
+| GitHub homepage | Blank by choice; no custom domain is required for this release |
+| Portfolio evidence | [ProjectForge case study on Vercel](https://matt-schramm-portfolio-v2-mattschramm1235-gmailcoms-projects.vercel.app/work/projectforge), HTTP 200 |
 
-```text
-repository: Schramm2/projectforge
-visibility: public
-default branch: main
-GitHub homepage field: pending case-study publication
-target release: v0.4.1
-PyPI projectforge JSON endpoint: HTTP 404
-Homebrew tap: release verification pending
-```
+The supported public install routes are the immutable GitHub archive through uv and the public
+Homebrew tap. PyPI is not advertised.
 
-Decision: use the GitHub-backed uv install as the only supported public route. Keep the repository
-as the current public destination. After the case study is live, use
-`https://mattschramm.com/work/projectforge` as both the GitHub homepage and portfolio destination.
-
-## Clean installation
+## Clean uv installation
 
 Command, with uv's tool, bin, and cache directories pointing at an empty directory:
 
@@ -29,19 +26,10 @@ UV_TOOL_DIR=/tmp/projectforge-clean-install/tools \
 UV_TOOL_BIN_DIR=/tmp/projectforge-clean-install/bin \
 UV_CACHE_DIR=/tmp/projectforge-clean-install/cache \
 uv tool install --python 3.12 --no-config \
-  git+https://github.com/Schramm2/projectforge.git@v0.4.1
+  https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz
 ```
 
-Relevant output:
-
-```text
-Updated https://github.com/Schramm2/projectforge.git
-Built projectforge
-projectforge==0.4.1
-Installed 1 executable: forge
-```
-
-## Installed CLI
+Measured result: exit 0, `projectforge==0.4.1` built, and one executable named `forge` installed.
 
 ```bash
 forge --version
@@ -69,75 +57,74 @@ forge --dry-run \
   --no-verify
 ```
 
-Measured result: exit 0; rendered a three-phase routing plan and prompt preview with bundled
+Measured result: exit 0; Forge rendered a three-phase routing plan and prompt preview with bundled
 conventions loaded. No project directory was created.
 
-## Live scaffold boundary
+## Homebrew release and installation
 
-The authenticated live scaffold is run only with explicit operator approval and an authenticated
-backend. Its final status and artifact checks are recorded here after the run.
-
-Attempted command:
-
-```bash
-cd /tmp
-/tmp/projectforge-clean-install/bin/forge \
-  --use codex \
-  --model gpt-5.4-mini \
-  --name forge-proof-cli \
-  --stack python-cli \
-  --description "A tiny greeting CLI used as reproducible ProjectForge portfolio evidence" \
-  --no-docker \
-  --no-ci \
-  --no-open \
-  --verify \
-  --no-agents \
-  --extra "Keep the scaffold minimal. Implement a greet command, tests, Ruff configuration, and no network-dependent runtime behavior."
-```
-
-The checked-in [generated-project](generated-project/) is verified separately below. The
-operator-run proof uses [terminal-demo.sh](terminal-demo.sh) and records the real manifest and
-terminal capture without inventing output.
-
-## Staging Homebrew formula
-
-Command:
-
-```bash
-curl -sSfL \
-  https://github.com/Schramm2/projectforge/archive/refs/tags/v0.4.1.tar.gz \
-  -o /tmp/projectforge-v0.4.1.tar.gz
-shasum -a 256 /tmp/projectforge-v0.4.1.tar.gz
-```
-
-Measured checksum:
+The v0.4.1 source archive checksum is:
 
 ```text
-Recorded after the release tag is published.
+6fb78e853864e028e7c929f6e2138424b7d8bb4632b72258ca0355b31e237cd4
 ```
 
-This repairs the checked-in formula's repository identity but does not make Homebrew a supported
-route. The separate tap still requires the handoff in
-[the Homebrew runbook](../maintainers/homebrew-release.md).
+That checksum and archive URL match `Formula/projectforge.rb` in this repository and the public
+tap. The tap retains `Formula/projectforge.rb`; the superseded formula was removed.
 
-## Repository verification
-
-Final results are recorded after the implementation is complete:
-
-```text
-public-safety scan: PASS (168 tracked and prospective public files)
-Ruff: PASS (src/ubundiforge and tests)
-pytest: PASS (413 tests; audited baseline 409 plus four identity, release, and scanner regressions)
-package build: PASS (projectforge-0.4.1.tar.gz and projectforge-0.4.1-py3-none-any.whl)
-generated-project install/lint/test/CLI: PASS (1 test; `Hello, Ada!`)
-```
-
-Commands:
+Clean-environment checks:
 
 ```bash
-.venv/bin/python scripts/scan_safety.py
-.venv/bin/ruff check src/ubundiforge tests
-.venv/bin/pytest
+brew install --build-from-source schramm2/tap/projectforge
+brew test schramm2/tap/projectforge
+forge --version
+```
+
+Measured result: install and formula test passed; the installed command reported
+`projectforge 0.4.1`.
+
+## Authenticated live scaffold
+
+The terminal proof used the isolated installer and scaffold flow represented by
+[terminal-demo.sh](terminal-demo.sh), with `FORGE_BACKEND=claude` and `FORGE_MODEL=haiku`. The
+current script also codifies the independent verification commands used after the captured run.
+ProjectForge used Claude Haiku 4.5 for all three phases and wrote the manifest at
+`2026-07-18T09:54:04.586177+00:00`.
+
+| Phase | Backend | Exit | Duration |
+| --- | --- | ---: | ---: |
+| Architecture & Core | Claude | 0 | 550.1 s |
+| Tests & Automation | Claude | 0 | 513.2 s |
+| Verify & Fix | Claude | 0 | 119.2 s |
+
+The generated repository contained four phase commits ending at
+`f394709 chore: integrate multi-phase scaffold and verify all systems`. Independent checks in the
+generated repository passed:
+
+```bash
+uv sync --extra dev
+uv run ruff check .
+uv run pytest -q
+uv run mypy src tests
+uv run hello-forge greet Ada
+```
+
+Measured result: Ruff passed, mypy passed, 23 tests passed with 100% coverage, and the CLI printed
+`Hello, Ada!` with a party emoji. A privacy scan of the project and terminal capture found no
+company, legacy-brand, credential, or machine-local identity strings.
+
+The scaffold took about 20 minutes of backend runtime. The 30–60 second target in the
+[shot list](terminal-demo-shot-list.md) is an edited evidence clip, not a generation-time claim.
+The Forge dashboard displayed successful phase exits but incorrectly marked its inferred install,
+lint, and test health checks as failed; the independent commands above are the authoritative
+verification. This display mismatch remains a product follow-up and is not hidden from the
+showcase record.
+
+## Repository and deterministic fixture verification
+
+```bash
+uv run python scripts/scan_safety.py
+uv run ruff check src/ubundiforge tests
+uv run pytest
 uv build --out-dir /tmp/projectforge-build-20260718
 
 cd docs/showcase/generated-project
@@ -147,9 +134,19 @@ uv sync --dev
 .venv/bin/hello-forge --name Ada
 ```
 
-The full suite passed all 413 tests with no checks skipped or weakened.
+Recorded repository result: public-safety scan passed, Ruff passed, all 413 tests passed, and the
+source and wheel packages built. The deterministic checked-in fixture passed its install, lint,
+single test, and CLI checks. It is intentionally separate from the authenticated 23-test live
+scaffold above.
 
-Wheel metadata was inspected and reported `Name: projectforge`, the four canonical GitHub project
-URLs, `forge = ubundiforge.__main__:main`, and the expected bundled conventions. Regenerating the
-formula with the measured archive URL and checksum produced a byte-for-byte match with
+Wheel metadata reported `Name: projectforge`, the canonical GitHub project URLs,
+`forge = ubundiforge.__main__:main`, and the expected bundled conventions. Regenerating the formula
+with the measured archive URL and checksum produced a byte-for-byte match with
 `Formula/projectforge.rb`.
+
+## Privacy boundary
+
+The current public tree contains no standalone company brand, company domain, credentials, or
+private workspace paths. The historical Python import namespace remains for compatibility and is
+not presented as company branding. This working-tree review does not rewrite or make claims about
+historical commits, reflogs, forks, or third-party caches.

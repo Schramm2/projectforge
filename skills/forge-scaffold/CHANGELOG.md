@@ -5,7 +5,7 @@ All notable changes to the Forge Scaffolding Assistant skill will be documented 
 ## Unreleased
 
 ### Changed
-- Replaced the unavailable Homebrew path with the verified GitHub-backed `uv tool install` route.
+- Documented the verified GitHub archive and Homebrew tap install routes.
 - Clarified that demo mode removes application-service credentials, not AI CLI authentication.
 - Added the canonical public repository URL.
 
