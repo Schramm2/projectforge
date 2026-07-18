@@ -1,0 +1,64 @@
+# Migrating from ProjectForge 0.4.1
+
+The next pre-1.0 release keeps the `projectforge` distribution, `forge` command, and
+`ubundiforge` Python namespace. Existing projects and user configuration remain usable.
+
+## Configuration
+
+Forge reads the unversioned 0.4.1 `~/.forge/config.json` format and normalizes it to schema version
+1. Existing per-provider model overrides are preserved. New setups omit model overrides by default
+so each provider can select its current default or auto model.
+
+Config saves are now atomic and use user-only permissions. If the file is invalid or contains an
+unsupported key, Forge preserves it as `config.json.corrupt-<timestamp>` and asks you to run
+`forge --setup`. Do not delete the recovery copy until you have reviewed it locally.
+
+## Conventions
+
+The 0.4.1 user-wide file `~/.forge/conventions.md` is still supported. Effective precedence is now:
+
+1. bundled defaults;
+2. the selected user profile under `~/.forge/profiles/`;
+3. `~/.forge/conventions.md`; and
+4. project-local `.forge/conventions.md`.
+
+Later layers have higher precedence. Start without replacing existing instructions:
+
+```bash
+forge conventions init team
+forge conventions import ./AGENTS.md --name imported-team
+forge conventions list
+forge conventions select team
+forge conventions inspect --stack fastapi --json
+forge conventions validate --stack fastapi
+```
+
+Every live or preview scaffold shows ordered source hashes. New manifests record those sources and
+the conventions snapshot remains the replay input.
+
+## Provider execution
+
+Normal runs now default to `--approval-mode safe` and provider-default models. The former implicit
+provider bypass/yolo behavior is removed. A blanket bypass requires both
+`--approval-mode unsafe` and `--allow-unsafe` on that specific command.
+
+Run `forge doctor` after upgrading. A provider must be both installed and verifiably ready before
+Forge routes a live phase to it. Gemini may remain `preflight_required` because its CLI does not
+offer a deterministic credential-status command.
+
+## Evidence and recovery
+
+New scaffolds write `.forge/progress.json` before provider execution. If a phase fails, preserve the
+directory and repeat the same command with `--resume`; changed options, routing, prompt hashes, or
+approval mode are rejected. Scaffolds created by 0.4.1 do not have this phase ledger and cannot use
+the new resume path retroactively.
+
+Verification now follows generated Python metadata, supports bounded project-declared health paths
+under `[tool.forge.verification]`, and writes `.forge/verification.json`. The dashboard reports
+`Project Ready` only when required verification passes.
+
+## Shipped agent skill
+
+The Forge operator skill no longer hard-codes release or model catalogs. Agents are instructed to
+consult live help, `forge doctor --json`, safe preview/execution, and durable evidence. If you copied
+an older skill into another agent workspace, replace that copy from the current release archive.

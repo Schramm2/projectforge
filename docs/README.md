@@ -8,6 +8,8 @@ Current product truth lives in `guides/`, `maintainers/`, and the code under `sr
 
 - [guides/getting-started.md](guides/getting-started.md) — install Forge and run the first scaffold
 - [guides/configuration.md](guides/configuration.md) — user config, conventions, hooks, and manifests
+- [guides/security-privacy.md](guides/security-privacy.md) — provider, workspace, local-data, and unsafe-mode boundaries
+- [guides/migrating-from-0.4.1.md](guides/migrating-from-0.4.1.md) — compatibility and migration notes
 - [guides/stacks.md](guides/stacks.md) — supported stack catalog and defaults
 - [guides/troubleshooting.md](guides/troubleshooting.md) — common issues and fixes
 - [showcase/README.md](showcase/README.md) — measured portfolio evidence and terminal demo flow
@@ -19,6 +21,9 @@ Current product truth lives in `guides/`, `maintainers/`, and the code under `sr
 - [maintainers/homebrew-release.md](maintainers/homebrew-release.md) — formula and tap release notes
 - [maintainers/public-release-checklist.md](maintainers/public-release-checklist.md) — final public identity and privacy checklist
 - [maintainers/roadmap.md](maintainers/roadmap.md) — product roadmap and future work
+- [maintainers/provider-compatibility.md](maintainers/provider-compatibility.md) — dated official sources and runtime provider evidence
+- [maintainers/production-readiness-plan.md](maintainers/production-readiness-plan.md) — release gates and evidence status
+- [maintainers/skill-behavioral-evidence.md](maintainers/skill-behavioral-evidence.md) — shipped skill RED/GREEN forward tests
 
 ## Reference
 
@@ -29,7 +34,6 @@ Current product truth lives in `guides/`, `maintainers/`, and the code under `sr
 ## Skills
 
 - [skills/forge-scaffold/SKILL.md](../skills/forge-scaffold/SKILL.md) — portable skill that teaches AI agents how to use the Forge command surface professionally
-- [skills/forge-scaffold/README.md](../skills/forge-scaffold/README.md) — human-facing usage and testing guide for the skill
 
 ## Diagrams
 

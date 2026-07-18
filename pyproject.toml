@@ -41,13 +41,17 @@ projectforge = "ubundiforge.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ubundiforge"]
-force-include = { "conventions" = "ubundiforge/conventions" }
+force-include = { "conventions" = "ubundiforge/conventions", "skills/forge-scaffold" = "ubundiforge/skills/forge-scaffold" }
 
 [tool.hatch.build.targets.sdist]
 include = [
     "/src/ubundiforge",
     "/conventions",
+    "/skills/forge-scaffold",
+    "/docs",
     "/README.md",
+    "/CHANGELOG.md",
+    "/SECURITY.md",
     "/LICENSE",
 ]
 

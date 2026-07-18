@@ -4,6 +4,8 @@
 
 Inspect structured fields, not entire files by default:
 
+- `.forge/progress.json` — prompt hashes, phase attempts, durations, failure category, and resume
+  state. It must not contain prompt or provider output.
 - `.forge/scaffold.json` — Forge version, requested project facts, routing, model override behavior,
   approval mode, convention bundle hash, and ordered convention source metadata.
 - `.forge/conventions-snapshot.md` — exact effective instructions for replay. Treat as potentially
@@ -41,6 +43,10 @@ For a failed recorded check:
 - Permission denied: retain safe mode; adjust a scoped provider policy or ask before unsafe mode.
 - Timeout: preserve partial output and rerun only the failed command/phase with a justified limit.
 - Unknown: report provider, exit, redacted tail, target, and the exact safe retry path.
+
+For a scaffold phase failure, fix the classified provider problem and repeat the original command
+with `--resume`. Resume validates name, stack, routing, prompt hashes, and approval mode, preserves
+completed phases, and retries incomplete phases. A changed contract requires a new target.
 
 ## Privacy receipt
 

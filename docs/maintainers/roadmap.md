@@ -2,7 +2,10 @@
 
 Live roadmap for expanding Forge into a production-grade project scaffolder. Organized by theme, not strict priority.
 
-Items marked with [DONE] are implemented in this repository as of `0.4.1`. Planned items are intentionally aspirational; example commands below describe direction, not guaranteed current CLI flags.
+Items marked with [DONE] are implemented in the current repository. Planned items are intentionally
+aspirational; example commands below describe direction, not guaranteed current CLI flags. Use
+live `forge --help` and the [production-readiness plan](production-readiness-plan.md) for release
+truth.
 
 ---
 
@@ -36,10 +39,13 @@ Items marked with [DONE] are implemented in this repository as of `0.4.1`. Plann
 
 ## Multi-Convention Support
 
-- **Named convention profiles**: `forge --conventions fintech-client` loads `~/.forge/conventions/fintech-client.md` instead of the default. Different clients, different standards.
-- **Convention composition**: Stack multiple convention files — a base profile plus a client-specific overlay.
+- [DONE] **Named convention profiles**: `forge conventions` initializes, imports, lists, selects,
+  inspects, previews, validates, and edits profiles under `~/.forge/profiles/`.
+- [DONE] **Convention composition**: Bundled defaults, selected profile, user-wide, and
+  project-local layers compose in deterministic order with hashes.
 - [DONE] **Convention drift detection**: `forge check` audits any project against organization conventions with a pass/warn/fail scorecard. Checks structure (required files/directories), tooling (Ruff config, MyPy strict, pre-commit, CI), and runtime (health endpoint, Docker non-root, HEALTHCHECK). Supports `--fix` for auto-generating missing files and `--export report.md` for sharing audits.
-- [DONE] **Project-local conventions**: Checks `.forge/conventions.md` in the current directory first, falls back to `~/.forge/conventions.md`.
+- [DONE] **Project-local conventions**: Project-local rules layer above selected profile and
+  user-wide conventions.
 - [DONE] **Convention validation**: Warns if the conventions file is empty or suspiciously short.
 
 ---
@@ -87,6 +93,10 @@ Items marked with [DONE] are implemented in this repository as of `0.4.1`. Plann
 - [DONE] **Auto-git-init**: Verifies git was initialized after scaffold; if not, runs `git init` and makes an initial commit.
 - [DONE] **Health check**: The verify phase starts the dev server and probes `/health` or `/ready` endpoints to confirm the project boots.
 - [DONE] **Post-scaffold verification**: `--verify/--no-verify` runs lint, typecheck, build, and test commands after scaffolding with a Rich table summary of results.
+- [DONE] **Inspectable verification evidence**: `.forge/verification.json` records metadata-aware
+  commands, portable working directories, timeouts, exits, endpoints, and remediation.
+- [DONE] **Phase recovery**: `.forge/progress.json` and `--resume` preserve completed phases and
+  reject execution-contract drift.
 - [DONE] **Post-scaffold hooks**: User-defined scripts in `~/.forge/hooks/post-scaffold.sh` that run after every scaffold (e.g. configure git remote, set up pre-commit hooks, copy .env from a vault).
 - [DONE] **Forge card**: Auto-generated SVG project card saved to `.forge/card.svg` and shields.io-style badge auto-injected into README.md after scaffolding. Shows project name, stack, backends, and scaffold date.
 
@@ -107,7 +117,8 @@ Items marked with [DONE] are implemented in this repository as of `0.4.1`. Plann
 
 ## Output Quality
 
-- **Scaffold validation**: After the AI finishes, run basic checks — does the expected file structure exist? Is there a package.json/pyproject.toml? Does it parse correctly?
+- [DONE] **Scaffold validation**: Generated metadata selects appropriate install, lint, type, build,
+  test, and bounded health checks before the dashboard can report `Project Ready`.
 - **Diff review**: Show a tree of created files with line counts before the AI starts writing, let the user approve.
 - **Retry with feedback**: If the scaffold is bad, `forge retry "the auth setup is wrong, use Clerk not NextAuth"` re-runs with the original prompt plus correction.
 - [DONE] **Multi-pass scaffolding**: Scaffold phases (architecture, frontend, tests, verify) run sequentially, each reviewing and building on the previous phase's output. The verify phase acts as a final QA pass.
@@ -156,6 +167,10 @@ Items marked with [DONE] are implemented in this repository as of `0.4.1`. Plann
 - **Observability bootstrap**: Generate structured logging, request IDs, health endpoints, readiness checks, and a starter metrics/tracing setup for supported backend stacks.
 - **Readiness scorecard**: After scaffolding, grade the project against a production checklist — tests, linting, CI, Docker health checks, docs, env file examples, logging, and error handling.
 - [DONE] **Secrets-safe prompts**: Scans extra instructions for Stripe keys, GitHub tokens, AWS keys, Slack tokens, JWTs, and private keys. Blocks execution if detected.
+- [DONE] **Bounded provider execution**: Normal runs use provider-neutral safe workspace modes;
+  blanket bypass requires `--approval-mode unsafe --allow-unsafe`.
+- [DONE] **Credential-free diagnostics**: `forge doctor` reports config, environment, provider
+  readiness, model behavior, and repair without account identity.
 
 ---
 
@@ -182,7 +197,8 @@ Items marked with [DONE] are implemented in this repository as of `0.4.1`. Plann
 
 - [DONE] **Integration tests**: Spin up a test scaffold with `--dry-run` and validate the prompt contains expected sections.
 - [DONE] **Snapshot tests**: Store expected prompt outputs and diff against them on changes.
-- [DONE] **CI pipeline**: GitHub Actions running Ruff, the full pytest suite, package builds, and a `forge --dry-run` smoke check on pushes and PRs.
+- [DONE] **CI pipeline**: GitHub Actions runs safety/docs/skill checks, Ruff, pytest, package build
+  and inspection, and a zero-call dry-run smoke test on Python 3.12/3.13 across Ubuntu and macOS.
 - [DONE] **Mock backends**: Test the full flow without requiring actual AI CLIs installed.
 - [DONE] **Automated test suite**: Coverage spans the dashboard, activity feed, phase timeline, file tree, quality memory, preferences, analytics, evolutions, checks, card, sound, scaffold log, protocol, subprocess utilities, adapters, and orchestration. Use the latest verified showcase report for the measured count.
 
@@ -212,14 +228,17 @@ Steps to ship:
 
 ---
 
-## CLI Commands Summary (v0.4.1)
+## CLI Commands Summary (current development)
 
 | Command | Description |
 |---------|-------------|
 | `forge` | Interactive scaffold flow (default) |
+| `forge doctor` | Credential-free environment and provider readiness diagnostics |
 | `forge --agents` | Scaffold with multi-agent orchestration |
+| `forge --resume` | Resume a matching failed scaffold without rerunning completed phases |
 | `forge stats` | Scaffold analytics dashboard |
 | `forge evolve [capability]` | Add capabilities to existing projects |
 | `forge check` | Convention drift detection |
 | `forge replay` | Reproduce past scaffolds |
-| `forge conventions` | Manage bundled convention bundles |
+| `forge conventions` | Manage user-owned convention profiles |
+| `forge admin conventions` | Inspect and maintain bundled convention sources |
