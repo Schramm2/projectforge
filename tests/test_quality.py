@@ -3,14 +3,14 @@
 import json
 from pathlib import Path
 
-from ubundiforge.quality import append_quality_signal, compute_backend_scores, read_quality_signals
-from ubundiforge.verify import CheckResult, VerifyReport
+from projectforge.quality import append_quality_signal, compute_backend_scores, read_quality_signals
+from projectforge.verify import CheckResult, VerifyReport
 
 
 def test_append_quality_signal_creates_file(tmp_path: Path, monkeypatch):
     quality_path = tmp_path / "quality.jsonl"
-    monkeypatch.setattr("ubundiforge.quality.QUALITY_LOG_PATH", quality_path)
-    monkeypatch.setattr("ubundiforge.quality.FORGE_DIR", tmp_path)
+    monkeypatch.setattr("projectforge.quality.QUALITY_LOG_PATH", quality_path)
+    monkeypatch.setattr("projectforge.quality.FORGE_DIR", tmp_path)
 
     report = VerifyReport(
         checks=[
@@ -44,8 +44,8 @@ def test_append_quality_signal_creates_file(tmp_path: Path, monkeypatch):
 
 def test_append_quality_signal_without_verify_is_not_recorded(tmp_path: Path, monkeypatch):
     quality_path = tmp_path / "quality.jsonl"
-    monkeypatch.setattr("ubundiforge.quality.QUALITY_LOG_PATH", quality_path)
-    monkeypatch.setattr("ubundiforge.quality.FORGE_DIR", tmp_path)
+    monkeypatch.setattr("projectforge.quality.QUALITY_LOG_PATH", quality_path)
+    monkeypatch.setattr("projectforge.quality.FORGE_DIR", tmp_path)
 
     append_quality_signal(
         stack="nextjs",
@@ -58,7 +58,7 @@ def test_append_quality_signal_without_verify_is_not_recorded(tmp_path: Path, mo
 
 def test_read_quality_signals_empty(tmp_path: Path, monkeypatch):
     quality_path = tmp_path / "quality.jsonl"
-    monkeypatch.setattr("ubundiforge.quality.QUALITY_LOG_PATH", quality_path)
+    monkeypatch.setattr("projectforge.quality.QUALITY_LOG_PATH", quality_path)
 
     signals = read_quality_signals()
     assert signals == []
@@ -71,7 +71,7 @@ def test_read_quality_signals_skips_malformed(tmp_path: Path, monkeypatch):
         "BAD LINE\n"
         '{"stack":"nextjs","backend":"antigravity","phase":"frontend"}\n'
     )
-    monkeypatch.setattr("ubundiforge.quality.QUALITY_LOG_PATH", quality_path)
+    monkeypatch.setattr("projectforge.quality.QUALITY_LOG_PATH", quality_path)
 
     signals = read_quality_signals()
     assert len(signals) == 2

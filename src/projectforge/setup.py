@@ -12,16 +12,16 @@ from pathlib import Path
 import questionary
 from rich.console import Console
 
-from ubundiforge.config import (
+from projectforge.config import (
     SUPPORTED_BACKENDS,
     BackendStatus,
     get_backend_statuses,
     normalize_legacy_backend,
 )
-from ubundiforge.conventions import BUNDLED_CONVENTIONS_DIR, CONVENTIONS_PATH, FORGE_DIR
-from ubundiforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
-from ubundiforge.safety import check_for_secrets
-from ubundiforge.ui import (
+from projectforge.conventions import BUNDLED_CONVENTIONS_DIR, CONVENTIONS_PATH, FORGE_DIR
+from projectforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
+from projectforge.safety import check_for_secrets
+from projectforge.ui import (
     badge,
     grouped_lines,
     make_panel,
@@ -177,7 +177,7 @@ def load_forge_config() -> dict:
         try:
             return _normalize_forge_config(json.loads(CONFIG_PATH.read_text()))
         except (json.JSONDecodeError, ValueError):
-            from ubundiforge.ui import create_console, status_line
+            from projectforge.ui import create_console, status_line
 
             timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
             backup_path = CONFIG_PATH.with_name(f"{CONFIG_PATH.name}.corrupt-{timestamp}")
@@ -714,7 +714,7 @@ def run_setup(console: Console) -> dict:
         )
 
     # Check media collections in the repo's media/ folder
-    from ubundiforge.media_assets import MEDIA_DIR, list_collections
+    from projectforge.media_assets import MEDIA_DIR, list_collections
 
     MEDIA_DIR.mkdir(parents=True, exist_ok=True)
     collections = list_collections()

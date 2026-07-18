@@ -1,6 +1,6 @@
 """Tests for scaffold option helpers."""
 
-from ubundiforge.scaffold_options import (
+from projectforge.scaffold_options import (
     auth_provider_choices_for_stack,
     auth_provider_ids_for_stack,
     auth_provider_supported_for_stack,

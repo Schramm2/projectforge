@@ -1,6 +1,6 @@
 """Tests for secrets detection."""
 
-from ubundiforge.safety import check_for_secrets, redact_secrets
+from projectforge.safety import check_for_secrets, redact_secrets
 
 
 def test_no_secrets_in_normal_text():

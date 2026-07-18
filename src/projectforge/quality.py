@@ -5,8 +5,8 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
-from ubundiforge.conventions import FORGE_DIR
-from ubundiforge.verify import VerifyReport
+from projectforge.conventions import FORGE_DIR
+from projectforge.verify import VerifyReport
 
 QUALITY_LOG_PATH = FORGE_DIR / "quality.jsonl"
 

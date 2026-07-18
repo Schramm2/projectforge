@@ -13,9 +13,9 @@ from urllib.request import urlopen
 
 from rich.console import Console
 
-from ubundiforge.safety import redact_secrets
-from ubundiforge.stacks import STACK_META
-from ubundiforge.ui import badge, make_table, muted
+from projectforge.safety import redact_secrets
+from projectforge.stacks import STACK_META
+from projectforge.ui import badge, make_table, muted
 
 
 @dataclass

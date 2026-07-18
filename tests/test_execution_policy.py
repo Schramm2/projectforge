@@ -2,7 +2,7 @@
 
 import pytest
 
-from ubundiforge.execution_policy import (
+from projectforge.execution_policy import (
     UnsafeExecutionError,
     build_provider_command,
     validate_approval_mode,

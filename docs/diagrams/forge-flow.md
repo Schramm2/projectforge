@@ -4,16 +4,16 @@ These diagrams are now split into focused documents so each flow stays readable 
 
 Current state in this section is based on the scaffold path implemented in:
 
-- `src/ubundiforge/cli.py`
-- `src/ubundiforge/setup.py`
-- `src/ubundiforge/prompts.py`
-- `src/ubundiforge/router.py`
-- `src/ubundiforge/prompt_builder.py`
-- `src/ubundiforge/runner.py`
-- `src/ubundiforge/verify.py`
-- `src/ubundiforge/quality.py`
-- `src/ubundiforge/media_assets.py`
-- `src/ubundiforge/scaffold_log.py`
+- `src/projectforge/cli.py`
+- `src/projectforge/setup.py`
+- `src/projectforge/prompts.py`
+- `src/projectforge/router.py`
+- `src/projectforge/prompt_builder.py`
+- `src/projectforge/runner.py`
+- `src/projectforge/verify.py`
+- `src/projectforge/quality.py`
+- `src/projectforge/media_assets.py`
+- `src/projectforge/scaffold_log.py`
 
 ## Diagram Map
 

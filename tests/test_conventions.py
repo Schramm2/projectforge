@@ -2,8 +2,8 @@
 
 import pytest
 
-from ubundiforge.convention_models import CompiledBundle, ConventionValidationError
-from ubundiforge.conventions import (
+from projectforge.convention_models import CompiledBundle, ConventionValidationError
+from projectforge.conventions import (
     MIN_CONVENTIONS_LENGTH,
     load_bundled_conventions,
     load_conventions,
@@ -40,10 +40,10 @@ def test_resolve_bundled_conventions_dir_falls_back_to_repo_dir(tmp_path):
 def test_empty_conventions_warns(tmp_path, monkeypatch):
     conv_path = tmp_path / "conventions.md"
     conv_path.write_text("")
-    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", conv_path)
-    monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path)
+    monkeypatch.setattr("projectforge.conventions.CONVENTIONS_PATH", conv_path)
+    monkeypatch.setattr("projectforge.conventions.FORGE_DIR", tmp_path)
     monkeypatch.setattr(
-        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH",
+        "projectforge.conventions.LOCAL_CONVENTIONS_PATH",
         tmp_path / ".forge" / "conventions.md",
     )
 
@@ -55,10 +55,10 @@ def test_empty_conventions_warns(tmp_path, monkeypatch):
 def test_short_conventions_warns(tmp_path, monkeypatch):
     conv_path = tmp_path / "conventions.md"
     conv_path.write_text("short")
-    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", conv_path)
-    monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path)
+    monkeypatch.setattr("projectforge.conventions.CONVENTIONS_PATH", conv_path)
+    monkeypatch.setattr("projectforge.conventions.FORGE_DIR", tmp_path)
     monkeypatch.setattr(
-        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH",
+        "projectforge.conventions.LOCAL_CONVENTIONS_PATH",
         tmp_path / ".forge" / "conventions.md",
     )
 
@@ -70,10 +70,10 @@ def test_short_conventions_warns(tmp_path, monkeypatch):
 def test_valid_conventions_no_warnings(tmp_path, monkeypatch):
     conv_path = tmp_path / "conventions.md"
     conv_path.write_text("x" * 100)
-    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", conv_path)
-    monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path)
+    monkeypatch.setattr("projectforge.conventions.CONVENTIONS_PATH", conv_path)
+    monkeypatch.setattr("projectforge.conventions.FORGE_DIR", tmp_path)
     monkeypatch.setattr(
-        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH",
+        "projectforge.conventions.LOCAL_CONVENTIONS_PATH",
         tmp_path / ".forge" / "conventions.md",
     )
 
@@ -84,10 +84,10 @@ def test_valid_conventions_no_warnings(tmp_path, monkeypatch):
 
 def test_missing_conventions_creates_default(tmp_path, monkeypatch):
     conv_path = tmp_path / "conventions.md"
-    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", conv_path)
-    monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path)
+    monkeypatch.setattr("projectforge.conventions.CONVENTIONS_PATH", conv_path)
+    monkeypatch.setattr("projectforge.conventions.FORGE_DIR", tmp_path)
     monkeypatch.setattr(
-        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH",
+        "projectforge.conventions.LOCAL_CONVENTIONS_PATH",
         tmp_path / ".forge" / "conventions.md",
     )
 
@@ -102,9 +102,9 @@ def test_load_conventions_prefers_bundled_tree(tmp_path, monkeypatch):
     root = tmp_path / "conventions"
     (root / "global").mkdir(parents=True)
     (root / "global" / "shared.md").write_text("Use strict typing.")
-    monkeypatch.setattr("ubundiforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
+    monkeypatch.setattr("projectforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
     monkeypatch.setattr(
-        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH",
+        "projectforge.conventions.LOCAL_CONVENTIONS_PATH",
         tmp_path / ".forge" / "conventions.md",
     )
 
@@ -123,8 +123,8 @@ def test_load_conventions_stack_composes_bundle_before_local_override(tmp_path, 
     local.parent.mkdir(parents=True)
     local.write_text("Local rules always win, even when we mention TODO items in prose.")
 
-    monkeypatch.setattr("ubundiforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
-    monkeypatch.setattr("ubundiforge.conventions.LOCAL_CONVENTIONS_PATH", local)
+    monkeypatch.setattr("projectforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
+    monkeypatch.setattr("projectforge.conventions.LOCAL_CONVENTIONS_PATH", local)
 
     content, warnings = load_conventions(stack="fastapi")
 
@@ -148,10 +148,10 @@ def test_stack_bundle_composes_profile_user_and_project_layers_with_hashes(
     local_path.parent.mkdir(parents=True)
     local_path.write_text("Project-local rules apply last.")
 
-    monkeypatch.setattr("ubundiforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
-    monkeypatch.setattr("ubundiforge.conventions.PROFILES_DIR", profiles_dir)
-    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", user_path)
-    monkeypatch.setattr("ubundiforge.conventions.LOCAL_CONVENTIONS_PATH", local_path)
+    monkeypatch.setattr("projectforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
+    monkeypatch.setattr("projectforge.conventions.PROFILES_DIR", profiles_dir)
+    monkeypatch.setattr("projectforge.conventions.CONVENTIONS_PATH", user_path)
+    monkeypatch.setattr("projectforge.conventions.LOCAL_CONVENTIONS_PATH", local_path)
 
     bundle = load_conventions_bundle(stack="fastapi", profile="default")
 
@@ -177,11 +177,11 @@ def test_stack_bundle_rejects_credential_shaped_user_content(tmp_path, monkeypat
     (profiles_dir / "default.md").write_text(
         "Never print ghp_abcdefghijklmnopqrstuvwxyz1234567890"
     )
-    monkeypatch.setattr("ubundiforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
-    monkeypatch.setattr("ubundiforge.conventions.PROFILES_DIR", profiles_dir)
-    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", tmp_path / "missing.md")
+    monkeypatch.setattr("projectforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
+    monkeypatch.setattr("projectforge.conventions.PROFILES_DIR", profiles_dir)
+    monkeypatch.setattr("projectforge.conventions.CONVENTIONS_PATH", tmp_path / "missing.md")
     monkeypatch.setattr(
-        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH", tmp_path / "missing-local.md"
+        "projectforge.conventions.LOCAL_CONVENTIONS_PATH", tmp_path / "missing-local.md"
     )
 
     with pytest.raises(ConventionValidationError, match="credential-like"):
@@ -196,8 +196,8 @@ def test_load_conventions_stack_ignores_placeholder_local_override(tmp_path, mon
     local.parent.mkdir(parents=True)
     local.write_text("TODO: add conventions")
 
-    monkeypatch.setattr("ubundiforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
-    monkeypatch.setattr("ubundiforge.conventions.LOCAL_CONVENTIONS_PATH", local)
+    monkeypatch.setattr("projectforge.conventions.BUNDLED_CONVENTIONS_DIR", root)
+    monkeypatch.setattr("projectforge.conventions.LOCAL_CONVENTIONS_PATH", local)
 
     content, warnings = load_conventions(stack="fastapi")
 
@@ -212,15 +212,15 @@ def test_load_bundled_conventions_skips_legacy_local_and_user_files(tmp_path, mo
     local.write_text("Local rules should not be used here.")
     user_path = tmp_path / "user-conventions.md"
 
-    monkeypatch.setattr("ubundiforge.conventions.LOCAL_CONVENTIONS_PATH", local)
-    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", user_path)
-    monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path / "forge-home")
+    monkeypatch.setattr("projectforge.conventions.LOCAL_CONVENTIONS_PATH", local)
+    monkeypatch.setattr("projectforge.conventions.CONVENTIONS_PATH", user_path)
+    monkeypatch.setattr("projectforge.conventions.FORGE_DIR", tmp_path / "forge-home")
     monkeypatch.setattr(
-        "ubundiforge.conventions.build_registry",
+        "projectforge.conventions.build_registry",
         lambda root=None: "registry",
     )
     monkeypatch.setattr(
-        "ubundiforge.conventions.compile_bundle",
+        "projectforge.conventions.compile_bundle",
         lambda registry, stack=None: CompiledBundle(
             bundle_id=stack or "default",
             prompt_block=f"Compiled bundle for {stack}",
@@ -239,14 +239,14 @@ def test_load_bundled_conventions_skips_legacy_local_and_user_files(tmp_path, mo
 def test_load_conventions_stack_keeps_bundle_warnings_when_bundle_is_empty(tmp_path, monkeypatch):
     user_path = tmp_path / "user-conventions.md"
 
-    monkeypatch.setattr("ubundiforge.conventions.CONVENTIONS_PATH", user_path)
-    monkeypatch.setattr("ubundiforge.conventions.FORGE_DIR", tmp_path / "forge-home")
+    monkeypatch.setattr("projectforge.conventions.CONVENTIONS_PATH", user_path)
+    monkeypatch.setattr("projectforge.conventions.FORGE_DIR", tmp_path / "forge-home")
     monkeypatch.setattr(
-        "ubundiforge.conventions.LOCAL_CONVENTIONS_PATH",
+        "projectforge.conventions.LOCAL_CONVENTIONS_PATH",
         tmp_path / ".forge" / "conventions.md",
     )
     monkeypatch.setattr(
-        "ubundiforge.conventions.load_conventions_bundle",
+        "projectforge.conventions.load_conventions_bundle",
         lambda stack=None, profile="default": CompiledBundle(
             bundle_id=stack or "default",
             prompt_block="",

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 
-from ubundiforge.protocol import AgentTask, DecompositionPlan
+from projectforge.protocol import AgentTask, DecompositionPlan
 
 # Required top-level keys in a decomposition plan
 _PLAN_KEYS = {"tasks", "execution_order", "rationale"}

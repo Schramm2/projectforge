@@ -7,15 +7,15 @@ import platform
 import shutil
 import sys
 
-from ubundiforge import __version__
-from ubundiforge.config import (
+from projectforge import __version__
+from projectforge.config import (
     SUPPORTED_BACKENDS,
     BackendStatus,
     _run_status_command,
     get_backend_statuses,
 )
-from ubundiforge.provider_capabilities import PROVIDER_CAPABILITIES
-from ubundiforge.setup import CONFIG_PATH, _normalize_forge_config
+from projectforge.provider_capabilities import PROVIDER_CAPABILITIES
+from projectforge.setup import CONFIG_PATH, _normalize_forge_config
 
 _VERSION_COMMANDS = {
     "claude": ["claude", "--version"],

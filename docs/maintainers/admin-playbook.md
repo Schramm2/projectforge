@@ -77,20 +77,20 @@ Edit the bundled `conventions/` tree for:
 
 Relevant code lives in:
 
-- `src/ubundiforge/convention_registry.py`
-- `src/ubundiforge/convention_compiler.py`
-- `src/ubundiforge/convention_admin.py`
-- `src/ubundiforge/convention_history.py`
-- `src/ubundiforge/conventions.py`
+- `src/projectforge/convention_registry.py`
+- `src/projectforge/convention_compiler.py`
+- `src/projectforge/convention_admin.py`
+- `src/projectforge/convention_history.py`
+- `src/projectforge/conventions.py`
 
-`src/ubundiforge/conventions.py` now acts mainly as the compatibility loader for bundled bundles plus legacy local overrides.
+`src/projectforge/conventions.py` now acts mainly as the compatibility loader for bundled bundles plus legacy local overrides.
 
 ### Frontend brand and design direction
 
 If you want to change the default visual language for frontend scaffolds, update:
 
-- `src/ubundiforge/design_templates.py`
-- `src/ubundiforge/templates/design-templates/default-design-guide.md`
+- `src/projectforge/design_templates.py`
+- `src/projectforge/templates/design-templates/default-design-guide.md`
 
 If you want to add a new selectable design template, add it to `DESIGN_TEMPLATE_OPTIONS` and bundle a matching template file.
 
@@ -116,17 +116,17 @@ Use [adding-a-stack.md](adding-a-stack.md) as the implementation checklist.
 
 In practice, a new stack usually requires changes in all of these places:
 
-- `src/ubundiforge/stacks.py`
+- `src/projectforge/stacks.py`
   Add the `StackMeta` entry.
-- `src/ubundiforge/prompts.py`
+- `src/projectforge/prompts.py`
   Add the interactive menu choice.
-- `src/ubundiforge/router.py`
+- `src/projectforge/router.py`
   Add the stack's scaffold phases.
-- `src/ubundiforge/prompt_builder.py`
+- `src/projectforge/prompt_builder.py`
   Add the human-readable stack label.
-- `src/ubundiforge/cli.py`
+- `src/projectforge/cli.py`
   Add CLI aliases.
-- `src/ubundiforge/scaffold_options.py`
+- `src/projectforge/scaffold_options.py`
   Add CI support and optional auth support if applicable.
 - `tests/`
   Add or update tests for routing, prompt generation, CLI parsing, and options.
@@ -139,7 +139,7 @@ After making the code changes, verify with:
 
 ```bash
 uv run pytest
-uv run ruff check src/ubundiforge tests
+uv run ruff check src/projectforge tests
 ./forge --dry-run --name test-project --stack <new-stack> --description "test scaffold"
 ```
 
@@ -148,12 +148,12 @@ uv run ruff check src/ubundiforge tests
 Use this rough rule of thumb:
 
 - Edit `conventions/` for bundled convention content.
-- Edit `src/ubundiforge/stacks.py` for stack structures, libraries, commands, services, and env hints.
-- Edit `src/ubundiforge/scaffold_options.py` for auth and CI options.
-- Edit `src/ubundiforge/design_templates.py` and bundled templates for visual/brand direction.
-- Edit `src/ubundiforge/prompt_builder.py` if the prompt contract itself should change.
-- Edit `src/ubundiforge/router.py` if certain work should route to different AI backends.
-- Edit `src/ubundiforge/verify.py` if scaffolds should be validated differently.
+- Edit `src/projectforge/stacks.py` for stack structures, libraries, commands, services, and env hints.
+- Edit `src/projectforge/scaffold_options.py` for auth and CI options.
+- Edit `src/projectforge/design_templates.py` and bundled templates for visual/brand direction.
+- Edit `src/projectforge/prompt_builder.py` if the prompt contract itself should change.
+- Edit `src/projectforge/router.py` if certain work should route to different AI backends.
+- Edit `src/projectforge/verify.py` if scaffolds should be validated differently.
 
 ## Release workflow
 
@@ -164,7 +164,7 @@ Once the repo changes are ready, publish them as a new Forge release.
 Bump the version in both files:
 
 - `pyproject.toml`
-- `src/ubundiforge/__init__.py`
+- `src/projectforge/__init__.py`
 
 These must stay in sync.
 
@@ -182,7 +182,7 @@ Run:
 uv run python scripts/scan_safety.py
 uv run python scripts/check_docs.py
 uv run python scripts/validate_forge_skill.py
-uv run ruff check src/ubundiforge tests
+uv run ruff check src/projectforge tests
 uv run pytest
 uv build
 uv run python scripts/inspect_artifacts.py
@@ -281,7 +281,7 @@ At that point:
 For a normal admin release:
 
 1. Update conventions, stacks, prompts, templates, or routing in this repo.
-2. Bump version in `pyproject.toml` and `src/ubundiforge/__init__.py`.
+2. Bump version in `pyproject.toml` and `src/projectforge/__init__.py`.
 3. Refresh `uv.lock` if dependencies changed.
 4. Run tests and a dry-run scaffold.
 5. Merge the reviewed feature/release PR through the hosted workflow.

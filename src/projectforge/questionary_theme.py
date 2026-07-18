@@ -6,7 +6,7 @@ from typing import Any
 
 import questionary
 
-from ubundiforge.ui import ACCENTS, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY
+from projectforge.ui import ACCENTS, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY
 
 QUESTIONARY_STYLE = questionary.Style(
     [

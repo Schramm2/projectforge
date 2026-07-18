@@ -1,10 +1,10 @@
-"""Google Antigravity CLI backend adapter."""
+"""Claude Code backend adapter."""
 
 from __future__ import annotations
 
-from ubundiforge.adapters.base import CLIAdapterBase
-from ubundiforge.adapters.json_parsing import parse_decomposition_plan
-from ubundiforge.protocol import AgentTask, DecompositionPlan
+from projectforge.adapters.base import CLIAdapterBase
+from projectforge.adapters.json_parsing import parse_decomposition_plan
+from projectforge.protocol import AgentTask, DecompositionPlan
 
 _PLANNING_PROMPT_TEMPLATE = """\
 You are a scaffold planning agent. Given this project brief and phase, \
@@ -18,11 +18,8 @@ Decompose this phase into 2-6 focused tasks. Each task should own a \
 distinct set of files. Assign non-overlapping file territories to tasks \
 that can run in parallel.
 
-You MUST respond with ONLY a valid JSON object. No text before or after. \
-No markdown fences. No explanation. The response must start with {{ and end \
-with }}.
-
-Return a JSON object with this exact structure:
+Return ONLY a JSON object — no markdown fences, no explanation — with \
+this exact structure:
 {{
   "tasks": [
     {{"id": "task-1", "description": "...", "file_territory": ["..."], "dependencies": []}}
@@ -32,10 +29,10 @@ Return a JSON object with this exact structure:
 }}"""
 
 
-class AntigravityAdapter(CLIAdapterBase):
-    """Backend adapter for Google Antigravity CLI (`agy`)."""
+class ClaudeAdapter(CLIAdapterBase):
+    """Backend adapter for Claude Code (`claude` CLI)."""
 
-    backend = "antigravity"
+    backend = "claude"
 
     def build_prompt(self, task: AgentTask) -> str:
         territory = "\n".join(f"- {f}" for f in task.file_territory)

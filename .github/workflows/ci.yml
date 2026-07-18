@@ -44,7 +44,7 @@ jobs:
         run: uv run python scripts/validate_forge_skill.py
 
       - name: Lint
-        run: uv run ruff check src/ubundiforge tests
+        run: uv run ruff check src/projectforge tests
 
       - name: Run tests
         run: uv run pytest
@@ -57,7 +57,7 @@ jobs:
 
       - name: Smoke-test forge dry run
         run: |
-          uv run python -m ubundiforge \
+          uv run python -m projectforge \
             --dry-run \
             --name ci-smoke \
             --stack fastapi \

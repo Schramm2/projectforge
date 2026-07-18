@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from ubundiforge.evolutions import build_evolve_prompt, get_capabilities, get_capability
+from projectforge.evolutions import build_evolve_prompt, get_capabilities, get_capability
 
 
 def test_capabilities_exist_for_fastapi():

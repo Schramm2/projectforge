@@ -10,9 +10,9 @@ from pathlib import Path
 from queue import Empty, Queue
 from threading import Thread
 
-from ubundiforge.execution_policy import build_provider_command
-from ubundiforge.protocol import AgentResult, AgentTask, DecompositionPlan, ProgressEvent
-from ubundiforge.subprocess_utils import PHASE_TIMEOUT, sanitize_progress_line
+from projectforge.execution_policy import build_provider_command
+from projectforge.protocol import AgentResult, AgentTask, DecompositionPlan, ProgressEvent
+from projectforge.subprocess_utils import PHASE_TIMEOUT, sanitize_progress_line
 
 
 class CLIAdapterBase:

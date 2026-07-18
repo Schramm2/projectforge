@@ -4,7 +4,7 @@ from io import StringIO
 
 from rich.console import Console
 
-from ubundiforge.analytics import aggregate_stats, render_stats
+from projectforge.analytics import aggregate_stats, render_stats
 
 
 def test_aggregate_stats_empty():

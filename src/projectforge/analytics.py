@@ -5,8 +5,8 @@ from collections import Counter
 from rich.console import Console
 from rich.text import Text
 
-from ubundiforge.quality import SIGNAL_KEYS
-from ubundiforge.ui import ACCENTS, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY, muted, subtle
+from projectforge.quality import SIGNAL_KEYS
+from projectforge.ui import ACCENTS, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY, muted, subtle
 
 
 def aggregate_stats(

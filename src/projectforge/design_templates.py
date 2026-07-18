@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from ubundiforge.conventions import FORGE_DIR
+from projectforge.conventions import FORGE_DIR
 
 
 @dataclass(frozen=True)

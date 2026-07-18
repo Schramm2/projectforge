@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from ubundiforge.orchestrator import (
+from projectforge.orchestrator import (
     CONTEXT_CAP,
     _execute_task_graph,
     _make_single_task_plan,
@@ -15,7 +15,7 @@ from ubundiforge.orchestrator import (
     run_phase_orchestrated,
     snapshot_directory,
 )
-from ubundiforge.protocol import AgentResult, AgentTask, DecompositionPlan
+from projectforge.protocol import AgentResult, AgentTask, DecompositionPlan
 
 
 def _make_task(description: str = "Build the thing", task_id: str = "task-1") -> AgentTask:
@@ -313,7 +313,7 @@ class TestExecuteTaskGraph:
 
 
 class TestRunPhaseOrchestrated:
-    @patch("ubundiforge.orchestrator.get_adapter")
+    @patch("projectforge.orchestrator.get_adapter")
     def test_falls_back_on_bad_plan(self, mock_get_adapter, tmp_path: Path) -> None:
         """When planning fails, falls back to single-task plan and executes it."""
         adapter = MagicMock()
@@ -325,7 +325,7 @@ class TestRunPhaseOrchestrated:
         adapter.parse_plan.return_value = None  # parse failure
         adapter.execute.return_value = _ok_result("sole-task")
 
-        with patch("ubundiforge.orchestrator.subprocess.run") as mock_run:
+        with patch("projectforge.orchestrator.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=1, stdout="garbage", stderr="")
             rc, stats = run_phase_orchestrated(
                 phase="scaffold",

@@ -13,17 +13,17 @@ import questionary
 import typer
 from rich.text import Text
 
-from ubundiforge import __version__
-from ubundiforge.card import inject_badge_into_readme, write_card
-from ubundiforge.checks import CheckResult, detect_stack, generate_fix, run_checks
-from ubundiforge.config import (
+from projectforge import __version__
+from projectforge.card import inject_badge_into_readme, write_card
+from projectforge.checks import CheckResult, detect_stack, generate_fix, run_checks
+from projectforge.config import (
     SUPPORTED_BACKENDS,
     BackendStatus,
     check_backend_installed,
     get_backend_statuses,
     normalize_legacy_backend,
 )
-from ubundiforge.convention_admin import (
+from projectforge.convention_admin import (
     list_scopes,
     render_bundle_preview,
     render_history_result,
@@ -31,34 +31,34 @@ from ubundiforge.convention_admin import (
     render_validation_summary,
     resolve_open_path,
 )
-from ubundiforge.convention_history import load_history
-from ubundiforge.convention_models import CompiledBundle, ConventionValidationError
-from ubundiforge.convention_profiles import (
+from projectforge.convention_history import load_history
+from projectforge.convention_models import CompiledBundle, ConventionValidationError
+from projectforge.convention_profiles import (
     import_profile,
     initialize_profile,
     list_profiles,
     profile_path,
 )
-from ubundiforge.conventions import (
+from projectforge.conventions import (
     build_registry,
     load_bundled_conventions,
     load_claude_md_template,
     load_conventions,
     load_conventions_bundle,
 )
-from ubundiforge.dashboard import render_dashboard
-from ubundiforge.design_templates import (
+from projectforge.dashboard import render_dashboard
+from projectforge.design_templates import (
     DESIGN_TEMPLATE_OPTIONS,
     design_template_ids_for_stack,
     design_template_supported_for_stack,
     load_design_template,
 )
-from ubundiforge.doctor import build_doctor_report, doctor_exit_code
-from ubundiforge.evolutions import build_evolve_prompt, get_capabilities, get_capability
-from ubundiforge.execution_policy import validate_approval_mode
-from ubundiforge.execution_state import ProgressContractError, initialize_progress, mark_phase
-from ubundiforge.logo import print_logo
-from ubundiforge.media_assets import (
+from projectforge.doctor import build_doctor_report, doctor_exit_code
+from projectforge.evolutions import build_evolve_prompt, get_capabilities, get_capability
+from projectforge.execution_policy import validate_approval_mode
+from projectforge.execution_state import ProgressContractError, initialize_progress, mark_phase
+from projectforge.logo import print_logo
+from projectforge.media_assets import (
     MEDIA_DIR,
     build_asset_manifest,
     copy_assets,
@@ -66,12 +66,12 @@ from ubundiforge.media_assets import (
     scan_assets,
     target_asset_dir,
 )
-from ubundiforge.preferences import record_preferences
-from ubundiforge.prompt_builder import build_phase_prompt
-from ubundiforge.prompts import collect_answers
-from ubundiforge.quality import append_quality_signal, compute_backend_scores, read_quality_signals
-from ubundiforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
-from ubundiforge.router import (
+from projectforge.preferences import record_preferences
+from projectforge.prompt_builder import build_phase_prompt
+from projectforge.prompts import collect_answers
+from projectforge.quality import append_quality_signal, compute_backend_scores, read_quality_signals
+from projectforge.questionary_theme import prompt_confirm, prompt_select, prompt_text
+from projectforge.router import (
     PHASE_ARCHITECTURE,
     PHASE_LABELS,
     PHASE_VERIFY,
@@ -79,7 +79,7 @@ from ubundiforge.router import (
     merge_adjacent_phases,
     pick_phase_backends,
 )
-from ubundiforge.runner import (
+from projectforge.runner import (
     ensure_git_init,
     open_in_editor,
     reset_project_dir,
@@ -87,23 +87,23 @@ from ubundiforge.runner import (
     run_ai_parallel,
     run_post_scaffold_hook,
 )
-from ubundiforge.safety import check_for_secrets
-from ubundiforge.scaffold_log import (
+from projectforge.safety import check_for_secrets
+from projectforge.scaffold_log import (
     SCAFFOLD_LOG_PATH,
     append_scaffold_log,
     latest_scaffold_duration,
     write_scaffold_manifest,
 )
-from ubundiforge.scaffold_options import (
+from projectforge.scaffold_options import (
     AUTH_PROVIDER_OPTIONS,
     CI_TEMPLATE_MODES,
     auth_provider_ids_for_stack,
     auth_provider_supported_for_stack,
     ci_action_ids_for_stack,
 )
-from ubundiforge.setup import load_forge_config, needs_setup, run_setup, save_forge_config
-from ubundiforge.sound import play_completion_sound
-from ubundiforge.ui import (
+from projectforge.setup import load_forge_config, needs_setup, run_setup, save_forge_config
+from projectforge.sound import play_completion_sound
+from projectforge.ui import (
     ACCENTS,
     BACKEND_ACCENTS,
     TEXT_MUTED,
@@ -120,7 +120,7 @@ from ubundiforge.ui import (
     status_line,
     subtle,
 )
-from ubundiforge.verify import verify_scaffold, write_verification_report
+from projectforge.verify import verify_scaffold, write_verification_report
 
 app = typer.Typer()
 admin_app = typer.Typer(help="Repo admin tools.")
@@ -523,7 +523,7 @@ def _has_explicit_scaffold_request(**kwargs: object) -> bool:
 
 def _prompt_post_setup_next_step() -> str:
     """Ask a first-run user what they want to do after setup completes."""
-    from ubundiforge.config import get_usable_backends
+    from projectforge.config import get_usable_backends
 
     has_usable = bool(get_usable_backends())
 
@@ -937,9 +937,9 @@ def stats(
     """Show scaffold analytics and backend performance."""
     import json
 
-    from ubundiforge.analytics import aggregate_stats, render_stats
-    from ubundiforge.history import repair_history
-    from ubundiforge.quality import QUALITY_LOG_PATH, read_quality_signals
+    from projectforge.analytics import aggregate_stats, render_stats
+    from projectforge.history import repair_history
+    from projectforge.quality import QUALITY_LOG_PATH, read_quality_signals
 
     if repair:
         repair_result = repair_history(
@@ -1676,7 +1676,7 @@ def main(
             console.print(f"[red]Unknown stack '{stack}'. Choose from: {valid}[/red]")
             raise typer.Exit(1)
 
-        from ubundiforge.stacks import STACK_META
+        from projectforge.stacks import STACK_META
 
         svc_list = [s.strip() for s in services.split(",")] if services else []
         meta = STACK_META.get(resolved_stack)
@@ -2209,7 +2209,7 @@ def main(
         phase_start = time.monotonic()
         mark_phase(project_dir, phase, status="running")
         if agents:
-            from ubundiforge.orchestrator import run_phase_orchestrated
+            from projectforge.orchestrator import run_phase_orchestrated
 
             returncode, _phase_stats = run_phase_orchestrated(
                 phase=phase,
@@ -2277,7 +2277,7 @@ def main(
                     step += 1
         if agents:
             # Orchestrator handles its own internal parallelism — run sequentially here
-            from ubundiforge.orchestrator import run_phase_orchestrated
+            from projectforge.orchestrator import run_phase_orchestrated
 
             for phase, backend in parallel_middle:
                 label = PHASE_LABELS.get(phase, phase)
@@ -2475,7 +2475,7 @@ def main(
         phase_start = time.monotonic()
         mark_phase(project_dir, phase, status="running")
         if agents:
-            from ubundiforge.orchestrator import run_phase_orchestrated
+            from projectforge.orchestrator import run_phase_orchestrated
 
             returncode, _phase_stats = run_phase_orchestrated(
                 phase=phase,

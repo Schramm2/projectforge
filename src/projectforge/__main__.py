@@ -1,6 +1,6 @@
-"""Module entry point for `python -m ubundiforge`."""
+"""Module entry point for `python -m projectforge`."""
 
-from ubundiforge.cli import app
+from projectforge.cli import app
 
 
 def main() -> None:

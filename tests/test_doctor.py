@@ -2,16 +2,16 @@
 
 import json
 
-from ubundiforge.config import BackendStatus
-from ubundiforge.doctor import _provider_check, build_doctor_report, doctor_exit_code
+from projectforge.config import BackendStatus
+from projectforge.doctor import _provider_check, build_doctor_report, doctor_exit_code
 
 
 def test_doctor_report_is_deterministic_and_excludes_provider_detail(monkeypatch, tmp_path):
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps({"preferred_editor": "code"}))
-    monkeypatch.setattr("ubundiforge.doctor.CONFIG_PATH", config_path)
+    monkeypatch.setattr("projectforge.doctor.CONFIG_PATH", config_path)
     monkeypatch.setattr(
-        "ubundiforge.doctor.get_backend_statuses",
+        "projectforge.doctor.get_backend_statuses",
         lambda: {
             "antigravity": BackendStatus(installed=True, ready=None, detail="secret@example.com"),
             "codex": BackendStatus(
@@ -25,11 +25,11 @@ def test_doctor_report_is_deterministic_and_excludes_provider_detail(monkeypatch
         },
     )
     monkeypatch.setattr(
-        "ubundiforge.doctor.get_backend_version",
+        "projectforge.doctor.get_backend_version",
         lambda backend: {"codex": "codex-cli 1.2.3", "antigravity": "0.9.0"}.get(backend),
     )
     monkeypatch.setattr(
-        "ubundiforge.doctor.build_environment_report",
+        "projectforge.doctor.build_environment_report",
         lambda: {
             "python": {"version": "3.12.1", "supported": True},
             "git": {"installed": True, "version": "git version 2.50.0"},
@@ -94,17 +94,17 @@ def test_doctor_reports_only_antigravity_version_command_when_models_was_not_run
 def test_doctor_reports_advanced_model_override_without_other_config(monkeypatch, tmp_path):
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps({"backend_models": {"claude": "sonnet"}}))
-    monkeypatch.setattr("ubundiforge.doctor.CONFIG_PATH", config_path)
+    monkeypatch.setattr("projectforge.doctor.CONFIG_PATH", config_path)
     monkeypatch.setattr(
-        "ubundiforge.doctor.get_backend_statuses",
+        "projectforge.doctor.get_backend_statuses",
         lambda: {
             "claude": BackendStatus(installed=True, ready=True, auth_mode="authenticated"),
             "antigravity": BackendStatus(installed=False, ready=False),
             "codex": BackendStatus(installed=False, ready=False),
         },
     )
-    monkeypatch.setattr("ubundiforge.doctor.get_backend_version", lambda backend: None)
-    monkeypatch.setattr("ubundiforge.doctor.build_environment_report", lambda: {})
+    monkeypatch.setattr("projectforge.doctor.get_backend_version", lambda backend: None)
+    monkeypatch.setattr("projectforge.doctor.build_environment_report", lambda: {})
 
     report = build_doctor_report()
 
@@ -121,9 +121,9 @@ def test_doctor_reports_advanced_model_override_without_other_config(monkeypatch
 def test_doctor_gives_antigravity_browser_and_ssh_login_guidance(monkeypatch, tmp_path):
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps({"preferred_editor": "code"}))
-    monkeypatch.setattr("ubundiforge.doctor.CONFIG_PATH", config_path)
+    monkeypatch.setattr("projectforge.doctor.CONFIG_PATH", config_path)
     monkeypatch.setattr(
-        "ubundiforge.doctor.get_backend_statuses",
+        "projectforge.doctor.get_backend_statuses",
         lambda: {
             "claude": BackendStatus(installed=False, ready=False),
             "antigravity": BackendStatus(
@@ -134,8 +134,8 @@ def test_doctor_gives_antigravity_browser_and_ssh_login_guidance(monkeypatch, tm
             "codex": BackendStatus(installed=False, ready=False),
         },
     )
-    monkeypatch.setattr("ubundiforge.doctor.get_backend_version", lambda backend: None)
-    monkeypatch.setattr("ubundiforge.doctor.build_environment_report", lambda: {})
+    monkeypatch.setattr("projectforge.doctor.get_backend_version", lambda backend: None)
+    monkeypatch.setattr("projectforge.doctor.build_environment_report", lambda: {})
 
     repair = build_doctor_report()["providers"]["antigravity"]["repair"]
 
@@ -148,9 +148,9 @@ def test_doctor_gives_antigravity_browser_and_ssh_login_guidance(monkeypatch, tm
 def test_doctor_inconclusive_codex_has_exact_check_and_next_step(monkeypatch, tmp_path):
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps({"preferred_editor": "code"}))
-    monkeypatch.setattr("ubundiforge.doctor.CONFIG_PATH", config_path)
+    monkeypatch.setattr("projectforge.doctor.CONFIG_PATH", config_path)
     monkeypatch.setattr(
-        "ubundiforge.doctor.get_backend_statuses",
+        "projectforge.doctor.get_backend_statuses",
         lambda: {
             "claude": BackendStatus(installed=False, ready=False),
             "antigravity": BackendStatus(installed=False, ready=False),
@@ -161,8 +161,8 @@ def test_doctor_inconclusive_codex_has_exact_check_and_next_step(monkeypatch, tm
             ),
         },
     )
-    monkeypatch.setattr("ubundiforge.doctor.get_backend_version", lambda backend: None)
-    monkeypatch.setattr("ubundiforge.doctor.build_environment_report", lambda: {})
+    monkeypatch.setattr("projectforge.doctor.get_backend_version", lambda backend: None)
+    monkeypatch.setattr("projectforge.doctor.build_environment_report", lambda: {})
 
     provider = build_doctor_report()["providers"]["codex"]
 

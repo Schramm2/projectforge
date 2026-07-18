@@ -1,8 +1,8 @@
-"""Tests for ubundiforge.media_assets."""
+"""Tests for projectforge.media_assets."""
 
 from pathlib import Path
 
-from ubundiforge.media_assets import (
+from projectforge.media_assets import (
     MEDIA_DIR,
     MEDIA_EXTENSIONS,
     AssetInfo,
@@ -116,7 +116,7 @@ def test_copy_assets_skips_oversized_files(tmp_path: Path) -> None:
 
 
 def test_list_collections_finds_subdirectories(tmp_path: Path, monkeypatch: object) -> None:
-    monkeypatch.setattr("ubundiforge.media_assets.MEDIA_DIR", tmp_path)
+    monkeypatch.setattr("projectforge.media_assets.MEDIA_DIR", tmp_path)
 
     _create_file(tmp_path / "default_assets" / "logo.svg", b"<svg/>")
     _create_file(tmp_path / "default_assets" / "hero.png", b"png")
@@ -135,7 +135,7 @@ def test_list_collections_finds_subdirectories(tmp_path: Path, monkeypatch: obje
 
 
 def test_list_collections_returns_empty_when_no_dirs(tmp_path: Path, monkeypatch: object) -> None:
-    monkeypatch.setattr("ubundiforge.media_assets.MEDIA_DIR", tmp_path)
+    monkeypatch.setattr("projectforge.media_assets.MEDIA_DIR", tmp_path)
     # Only loose files, no subdirectories
     _create_file(tmp_path / "stray.png", b"png")
 
@@ -143,7 +143,7 @@ def test_list_collections_returns_empty_when_no_dirs(tmp_path: Path, monkeypatch
 
 
 def test_list_collections_skips_dirs_without_media(tmp_path: Path, monkeypatch: object) -> None:
-    monkeypatch.setattr("ubundiforge.media_assets.MEDIA_DIR", tmp_path)
+    monkeypatch.setattr("projectforge.media_assets.MEDIA_DIR", tmp_path)
     _create_file(tmp_path / "empty-brand" / "readme.txt", b"not media")
 
     assert list_collections() == []

@@ -2,7 +2,7 @@
 
 import re
 
-from ubundiforge.safety import redact_secrets
+from projectforge.safety import redact_secrets
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 

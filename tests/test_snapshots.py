@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-from ubundiforge.prompt_builder import build_phase_prompt, build_prompt
+from projectforge.prompt_builder import build_phase_prompt, build_prompt
 
 SNAPSHOT_DIR = Path(__file__).parent / "snapshots"
 

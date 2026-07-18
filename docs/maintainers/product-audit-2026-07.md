@@ -85,11 +85,10 @@ that exists in `~/.forge/`). Fear of unbounded spend is the #1 objection to agen
 Forge has the data to answer it and doesn't.
 
 ### 4. Identity fragmentation
-Four names for one product: **projectforge** (package/formula), **forge** (command),
-**ubundiforge** (import namespace), **Schramm2/projectforge** (repo, locally checked out as
-`forge`). Worse, the `forge` command collides with Foundry's `forge`, one of the most
-installed tools in the Ethereum ecosystem — any user with Foundry on PATH gets a silent
-conflict. Pick one name; at minimum document the collision and offer an alias.
+ProjectForge now aligns the product, command, formula, and Python namespace around
+**projectforge**, but the PyPI distribution remains **matt-projectforge** and the short **forge**
+alias remains available. The alias collides with Foundry's `forge`, one of the most installed tools
+in the Ethereum ecosystem. Keep `projectforge` canonical and document the alias collision.
 
 ### 5. Prompt quality: phase prompts are not stack-aware
 The dry run for a **FastAPI-only** project produced a Verify & Fix prompt full of Next.js
@@ -100,7 +99,7 @@ scaffold and a live risk of the model inventing frontend artifacts in an API pro
 
 ### 6. Mixed signals in the interactive flow
 The execution-mode prompt labels multi-agent "**(recommended)**: higher quality" while the
-default selection is Standard ([prompts.py:370](../../src/ubundiforge/prompts.py)). Either
+default selection is Standard ([prompts.py:370](../../src/projectforge/prompts.py)). Either
 it's recommended — then default to it — or it isn't; recommending one thing and defaulting to
 another erodes trust in every other default. The full question flow is also long (up to ~12
 decisions before the review screen); smart defaults only kick in after 3+ scaffolds, which is
@@ -171,11 +170,10 @@ providers, resume without re-spend, and verified evidence. That's a real answer,
 be *shown* (demo, before/after, a failed-verification story) rather than asserted.
 
 **Monetization.** As an MIT CLI wrapping other companies' paid CLIs, the value accrues to the
-providers. Realistic near-term value: (a) internal Ubundi leverage — consistent client-project
-starts with delivery evidence; (b) credibility/portfolio asset demonstrating production-grade
-agent-tooling craft; (c) a wedge to validate whether "scaffold evidence for client delivery"
-is a paid team product. Recommendation: treat (a) and (b) as the current product, and gate any
-investment in team features on 3–5 external users actually adopting it.
+providers. Realistic near-term value: (a) delivery-team leverage through consistent project starts
+with evidence; (b) credibility as a production-grade agent-tooling product; and (c) a wedge to
+validate whether "scaffold evidence for client delivery" is a paid team product. Gate investment
+in team features on 3–5 external users actually adopting it.
 
 **Feedback loop.** The no-telemetry stance is a genuine privacy differentiator, but it means
 zero signal about real usage. Cheapest fix: a visible "was this scaffold good? (y/n)" prompt
@@ -226,8 +224,8 @@ explicitly opt-in anonymous version ping later.
 
 ### P2 — product direction (decide, then build)
 
-10. **Pick the customer.** If the answer is "Ubundi internal + portfolio": stop expanding
-    stacks, harden the three that get used, and invest in the showcase. If the answer is
+10. **Pick the customer.** If the answer is "maintainer portfolio + internal delivery": stop
+    expanding stacks, harden the three that get used, and invest in the showcase. If the answer is
     "teams/agencies": prioritize shared conventions via git, convention locking, and standard
     packs — the roadmap items that make the moat real — and find 3–5 external design partners
     before writing code.

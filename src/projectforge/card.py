@@ -1,4 +1,4 @@
-# src/ubundiforge/card.py
+# src/projectforge/card.py
 """Forge card — SVG badge and project card generation."""
 
 from pathlib import Path

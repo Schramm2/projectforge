@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
-from ubundiforge import __version__
+from projectforge import __version__
 
 FORMULA_NAME = "projectforge"
 DISTRIBUTION_NAME = "matt-projectforge"

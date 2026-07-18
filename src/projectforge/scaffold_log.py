@@ -6,10 +6,10 @@ import math
 from datetime import UTC, datetime
 from pathlib import Path
 
-from ubundiforge import __version__
-from ubundiforge.convention_models import ConventionContribution
-from ubundiforge.conventions import FORGE_DIR
-from ubundiforge.verify import VerifyReport
+from projectforge import __version__
+from projectforge.convention_models import ConventionContribution
+from projectforge.conventions import FORGE_DIR
+from projectforge.verify import VerifyReport
 
 SCAFFOLD_LOG_PATH = FORGE_DIR / "scaffold.log"
 

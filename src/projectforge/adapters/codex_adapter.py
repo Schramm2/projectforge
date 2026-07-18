@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from ubundiforge.adapters.base import CLIAdapterBase
-from ubundiforge.adapters.json_parsing import parse_decomposition_plan
-from ubundiforge.protocol import AgentTask, DecompositionPlan
+from projectforge.adapters.base import CLIAdapterBase
+from projectforge.adapters.json_parsing import parse_decomposition_plan
+from projectforge.protocol import AgentTask, DecompositionPlan
 
 _PLANNING_PROMPT_TEMPLATE = """\
 Scaffold planning agent. Decompose a project phase into subagent tasks.

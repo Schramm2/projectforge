@@ -6,7 +6,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.text import Text
 
-from ubundiforge.ui import (
+from projectforge.ui import (
     ACCENTS,
     TEXT_MUTED,
     TEXT_PRIMARY,
@@ -16,7 +16,7 @@ from ubundiforge.ui import (
     muted,
     subtle,
 )
-from ubundiforge.verify import VerifyReport
+from projectforge.verify import VerifyReport
 
 _HIDDEN_DIRS = {".git", ".venv", "__pycache__", "node_modules", ".forge", ".ruff_cache"}
 _BINARY_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2", ".ttf", ".eot"}
@@ -173,7 +173,7 @@ def render_dashboard(
         console.print()
 
     # --- Next steps ---
-    from ubundiforge.stacks import STACK_META
+    from projectforge.stacks import STACK_META
 
     console.print(muted("  NEXT STEPS"))
     console.print(command_text(f"  cd {project_dir.name}"))

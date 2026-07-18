@@ -3,8 +3,8 @@
 import sys
 from pathlib import Path  # noqa: E402
 
-from ubundiforge.adapters.base import CLIAdapterBase
-from ubundiforge.protocol import AgentTask, ProgressEvent
+from projectforge.adapters.base import CLIAdapterBase
+from projectforge.protocol import AgentTask, ProgressEvent
 
 # ---------------------------------------------------------------------------
 # Stub concrete adapter using echo / false for testing

@@ -13,17 +13,17 @@ from pathlib import Path
 from rich.live import Live
 from rich.text import Text
 
-from ubundiforge import ui
-from ubundiforge.adapters import get_adapter
-from ubundiforge.agent_quality import append_agent_quality_signal
-from ubundiforge.protocol import (
+from projectforge import ui
+from projectforge.adapters import get_adapter
+from projectforge.agent_quality import append_agent_quality_signal
+from projectforge.protocol import (
     AgentResult,
     AgentTask,
     DecompositionPlan,
     ProgressEvent,
 )
-from ubundiforge.quality import QUALITY_LOG_PATH
-from ubundiforge.subprocess_utils import spinner_frame, spinner_style
+from projectforge.quality import QUALITY_LOG_PATH
+from projectforge.subprocess_utils import spinner_frame, spinner_style
 
 log = logging.getLogger(__name__)
 _console = ui.create_console()

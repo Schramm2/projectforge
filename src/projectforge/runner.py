@@ -14,10 +14,10 @@ from pathlib import Path
 from rich.live import Live
 from rich.text import Text
 
-from ubundiforge.conventions import FORGE_DIR
-from ubundiforge.execution_policy import build_provider_command
-from ubundiforge.failure_taxonomy import classify_provider_failure
-from ubundiforge.subprocess_utils import (
+from projectforge.conventions import FORGE_DIR
+from projectforge.execution_policy import build_provider_command
+from projectforge.failure_taxonomy import classify_provider_failure
+from projectforge.subprocess_utils import (
     PHASE_TIMEOUT,
     format_activity,
     progress_summary_for_line,
@@ -26,7 +26,7 @@ from ubundiforge.subprocess_utils import (
     spinner_style,
     summarize_output_line,
 )
-from ubundiforge.ui import (
+from projectforge.ui import (
     BACKEND_ACCENTS,
     badge,
     create_console,

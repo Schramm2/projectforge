@@ -8,9 +8,9 @@ Each phase has two prompt variants:
   - best: used when the ideal/specialist backend handles the phase
 """
 
-from ubundiforge.router import PHASE_IDEAL_BACKEND
-from ubundiforge.scaffold_options import AUTH_PROVIDER_OPTIONS, CI_ACTION_OPTIONS
-from ubundiforge.stacks import CROSS_RECIPE_DEFAULTS, STACK_META
+from projectforge.router import PHASE_IDEAL_BACKEND
+from projectforge.scaffold_options import AUTH_PROVIDER_OPTIONS, CI_ACTION_OPTIONS
+from projectforge.stacks import CROSS_RECIPE_DEFAULTS, STACK_META
 
 DEMO_MODE_BLOCK = """\
 

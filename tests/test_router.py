@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from ubundiforge.router import (
+from projectforge.router import (
     merge_adjacent_phases,
     pick_backend,
     pick_backend_with_fallback,
@@ -26,28 +26,28 @@ def test_default_is_claude():
 # --- Fallback chain tests (legacy) ---
 
 
-@patch("ubundiforge.router.check_backend_installed", return_value=True)
+@patch("projectforge.router.check_backend_installed", return_value=True)
 def test_fallback_not_needed_when_primary_installed(mock_check):
     backend, was_fallback = pick_backend_with_fallback("fastapi")
     assert backend == "claude"
     assert was_fallback is False
 
 
-@patch("ubundiforge.router.check_backend_installed", side_effect=lambda b: b != "claude")
+@patch("projectforge.router.check_backend_installed", side_effect=lambda b: b != "claude")
 def test_fallback_to_antigravity_when_claude_missing(mock_check):
     backend, was_fallback = pick_backend_with_fallback("fastapi")
     assert backend == "antigravity"
     assert was_fallback is True
 
 
-@patch("ubundiforge.router.check_backend_installed", side_effect=lambda b: b == "codex")
+@patch("projectforge.router.check_backend_installed", side_effect=lambda b: b == "codex")
 def test_fallback_to_codex_when_others_missing(mock_check):
     backend, was_fallback = pick_backend_with_fallback("fastapi")
     assert backend == "codex"
     assert was_fallback is True
 
 
-@patch("ubundiforge.router.check_backend_installed", return_value=False)
+@patch("projectforge.router.check_backend_installed", return_value=False)
 def test_fallback_returns_primary_when_nothing_installed(mock_check):
     backend, was_fallback = pick_backend_with_fallback("fastapi")
     assert backend == "claude"
@@ -57,7 +57,7 @@ def test_fallback_returns_primary_when_nothing_installed(mock_check):
 # --- Phase-based routing tests ---
 
 
-@patch("ubundiforge.router.check_backend_installed", return_value=True)
+@patch("projectforge.router.check_backend_installed", return_value=True)
 def test_all_three_installed_nextjs_gets_four_phases(mock_check):
     result = pick_phase_backends("nextjs")
     assert result == [
@@ -68,7 +68,7 @@ def test_all_three_installed_nextjs_gets_four_phases(mock_check):
     ]
 
 
-@patch("ubundiforge.router.check_backend_installed", return_value=True)
+@patch("projectforge.router.check_backend_installed", return_value=True)
 def test_all_three_installed_fastapi_gets_three_phases(mock_check):
     result = pick_phase_backends("fastapi")
     assert result == [
@@ -78,7 +78,7 @@ def test_all_three_installed_fastapi_gets_three_phases(mock_check):
     ]
 
 
-@patch("ubundiforge.router.check_backend_installed", side_effect=lambda b: b == "claude")
+@patch("projectforge.router.check_backend_installed", side_effect=lambda b: b == "claude")
 def test_only_claude_handles_everything(mock_check):
     result = pick_phase_backends("nextjs")
     assert result == [
@@ -90,7 +90,7 @@ def test_only_claude_handles_everything(mock_check):
 
 
 @patch(
-    "ubundiforge.router.check_backend_installed",
+    "projectforge.router.check_backend_installed",
     side_effect=lambda b: b in ("claude", "antigravity"),
 )
 def test_claude_antigravity_routes_frontend_to_antigravity(mock_check):
@@ -103,7 +103,10 @@ def test_claude_antigravity_routes_frontend_to_antigravity(mock_check):
     ]
 
 
-@patch("ubundiforge.router.check_backend_installed", side_effect=lambda b: b in ("claude", "codex"))
+@patch(
+    "projectforge.router.check_backend_installed",
+    side_effect=lambda b: b in ("claude", "codex"),
+)
 def test_claude_codex_routes_tests_to_codex(mock_check):
     result = pick_phase_backends("fastapi")
     assert result == [
@@ -125,7 +128,7 @@ def test_phase_fallback_uses_declared_backend_order_when_claude_is_unavailable()
     ]
 
 
-@patch("ubundiforge.router.check_backend_installed", return_value=True)
+@patch("projectforge.router.check_backend_installed", return_value=True)
 def test_override_forces_single_backend(mock_check):
     result = pick_phase_backends("nextjs", override="antigravity")
     assert result == [
@@ -136,38 +139,38 @@ def test_override_forces_single_backend(mock_check):
     ]
 
 
-@patch("ubundiforge.router.check_backend_installed", return_value=True)
+@patch("projectforge.router.check_backend_installed", return_value=True)
 def test_description_phrases_route_architecture_to_codex(mock_check):
     result = pick_phase_backends("fastapi", description="a CI pipeline automation tool")
     assert result[0] == ("architecture", "codex")
 
 
-@patch("ubundiforge.router.check_backend_installed", return_value=True)
+@patch("projectforge.router.check_backend_installed", return_value=True)
 def test_description_phrases_testing_framework_routes_to_codex(mock_check):
     result = pick_phase_backends("fastapi", description="a testing framework for APIs")
     assert result[0] == ("architecture", "codex")
 
 
-@patch("ubundiforge.router.check_backend_installed", return_value=True)
+@patch("projectforge.router.check_backend_installed", return_value=True)
 def test_description_phrases_no_false_positive_on_pipeline(mock_check):
     """'deal pipeline' is a CRM concept, not CI — should NOT route to Codex."""
     result = pick_phase_backends("fastapi", description="CRM with deal pipeline boards")
     assert result[0] == ("architecture", "claude")
 
 
-@patch("ubundiforge.router.check_backend_installed", return_value=True)
+@patch("projectforge.router.check_backend_installed", return_value=True)
 def test_description_phrases_no_match_keeps_claude(mock_check):
     result = pick_phase_backends("fastapi", description="a customer dashboard")
     assert result[0] == ("architecture", "claude")
 
 
-@patch("ubundiforge.router.check_backend_installed", side_effect=lambda b: b == "codex")
+@patch("projectforge.router.check_backend_installed", side_effect=lambda b: b == "codex")
 def test_codex_only_handles_all_phases(mock_check):
     result = pick_phase_backends("nextjs")
     assert all(backend == "codex" for _, backend in result)
 
 
-@patch("ubundiforge.router.check_backend_installed", return_value=False)
+@patch("projectforge.router.check_backend_installed", return_value=False)
 def test_prompt_only_routing_uses_ideal_backends_even_when_none_installed(mock_check):
     result = pick_phase_backends("nextjs", prefer_installed_backends=False)
     assert result == [

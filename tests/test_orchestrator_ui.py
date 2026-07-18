@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import time
 
-from ubundiforge.orchestrator import map_progress_to_activity
-from ubundiforge.protocol import ProgressEvent
+from projectforge.orchestrator import map_progress_to_activity
+from projectforge.protocol import ProgressEvent
 
 
 def _make_event(event_type: str, message: str = "some message") -> ProgressEvent:
