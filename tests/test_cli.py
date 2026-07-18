@@ -448,6 +448,101 @@ def test_mock_backends_cover_full_cli_flow_without_installed_ai_clis(monkeypatch
     assert "Project Created" in result.stdout
 
 
+def test_root_help_documents_safe_resume_contract():
+    result = runner.invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    assert "--resume" in result.stdout
+    assert "completed phases" in result.stdout
+
+
+def test_resume_preserves_completed_phases_and_finishes_failed_scaffold(monkeypatch, tmp_path):
+    monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
+    monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: False)
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_forge_config",
+        lambda: {"projects_dir": str(tmp_path)},
+    )
+    monkeypatch.setattr(
+        "ubundiforge.cli.get_backend_statuses",
+        lambda: {
+            "claude": BackendStatus(installed=True, ready=True),
+            "gemini": BackendStatus(installed=False, ready=False),
+            "codex": BackendStatus(installed=False, ready=False),
+        },
+    )
+    monkeypatch.setattr("ubundiforge.router.check_backend_installed", lambda backend: True)
+    monkeypatch.setattr(
+        "ubundiforge.cli.load_conventions",
+        lambda stack=None: ("Use strict typing.", []),
+    )
+    monkeypatch.setattr("ubundiforge.cli.load_claude_md_template", lambda: None)
+    monkeypatch.setattr("ubundiforge.cli.ensure_git_init", lambda project_dir: True)
+    monkeypatch.setattr("ubundiforge.cli.append_quality_signal", lambda **kwargs: None)
+    monkeypatch.setattr("ubundiforge.cli.append_scaffold_log", lambda *args: None)
+    monkeypatch.setattr("ubundiforge.cli.record_preferences", lambda answers: None)
+    monkeypatch.setattr("ubundiforge.cli.run_post_scaffold_hook", lambda *args: None)
+    monkeypatch.setattr("ubundiforge.cli.write_card", lambda *args, **kwargs: None)
+    monkeypatch.setattr("ubundiforge.cli.inject_badge_into_readme", lambda project_dir: None)
+
+    calls: list[str] = []
+    failed_once = {"value": False}
+
+    def _fake_run_ai(
+        backend,
+        prompt,
+        project_dir,
+        model=None,
+        verbose=False,
+        label="",
+        phase_context=None,
+        approval_mode="safe",
+        allow_unsafe=False,
+    ):
+        calls.append(label)
+        project_dir.mkdir(parents=True, exist_ok=True)
+        (project_dir / f"{label.lower().replace(' ', '-')}.txt").write_text("partial")
+        if label == "Tests & Automation" and not failed_once["value"]:
+            failed_once["value"] = True
+            return 9
+        return 0
+
+    monkeypatch.setattr("ubundiforge.cli.run_ai", _fake_run_ai)
+    command = [
+        "--use",
+        "claude",
+        "--name",
+        "resumable",
+        "--stack",
+        "fastapi",
+        "--description",
+        "A resumable API",
+        "--no-docker",
+        "--no-open",
+        "--no-verify",
+    ]
+
+    first = runner.invoke(app, command)
+    assert first.exit_code == 9
+    assert calls == ["Architecture & Core", "Tests & Automation"]
+    assert "Partial project output" in first.stdout
+
+    second = runner.invoke(app, [*command, "--resume"])
+    assert second.exit_code == 0
+    assert calls == [
+        "Architecture & Core",
+        "Tests & Automation",
+        "Tests & Automation",
+        "Verify & Fix",
+    ]
+    assert "Preserved completed phase: Architecture & Core" in second.stdout
+
+    progress = json.loads((tmp_path / "resumable" / ".forge" / "progress.json").read_text())
+    assert progress["status"] == "completed"
+    assert progress["resume_count"] == 1
+    assert [phase["attempts"] for phase in progress["phases"]] == [1, 2, 1]
+
+
 def test_first_run_setup_prompts_before_interactive_scaffold(monkeypatch):
     monkeypatch.setattr("ubundiforge.cli.print_logo", lambda console: None)
     monkeypatch.setattr("ubundiforge.cli.needs_setup", lambda: True)
