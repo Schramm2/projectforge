@@ -5,7 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
+
+ProgressEventType = Literal["started", "progress", "completed", "failed"]
 
 
 @dataclass
@@ -41,7 +43,7 @@ class ProgressEvent:
 
     task_id: str
     agent_label: str
-    event_type: str  # "started" | "progress" | "completed" | "failed"
+    event_type: ProgressEventType
     message: str
     timestamp: float
 

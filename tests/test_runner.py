@@ -1,13 +1,17 @@
 """Tests for the runner module."""
 
 import stat
+import sys
 from pathlib import Path
 
 from projectforge.runner import (
     ActivityTracker,
+    ProviderExit,
     _build_cmd,
     _initial_phase_summary,
     reset_project_dir,
+    run_ai,
+    run_ai_parallel,
     run_post_scaffold_hook,
 )
 from projectforge.subprocess_utils import progress_summary_for_line as _progress_summary_for_line
@@ -96,6 +100,72 @@ def test_codex_cmd_with_model():
 def test_unknown_backend_returns_empty():
     cmd = _build_cmd("unknown", "do stuff")
     assert cmd == []
+
+
+def test_run_ai_executes_provider_command_and_returns_integer_compatible_exit(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(
+        "projectforge.runner._build_cmd",
+        lambda *_args, **_kwargs: [sys.executable, "-c", "print('Applying patch')"],
+    )
+
+    result = run_ai("claude", "prompt", tmp_path / "generated", label="Architecture & Core")
+
+    assert isinstance(result, ProviderExit)
+    assert result == 0
+    assert result.failure_category is None
+    assert (tmp_path / "generated").is_dir()
+
+
+def test_run_ai_classifies_provider_failure_without_echoing_output(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    private_output = "authentication failed for private-account@example.com"
+    monkeypatch.setattr(
+        "projectforge.runner._build_cmd",
+        lambda *_args, **_kwargs: [
+            sys.executable,
+            "-c",
+            f"import sys; print({private_output!r}); sys.exit(9)",
+        ],
+    )
+
+    result = run_ai("claude", "prompt", tmp_path / "generated", label="Architecture & Core")
+
+    assert result == 9
+    assert result.failure_category == "authentication"
+    assert private_output not in capsys.readouterr().out
+
+
+def test_run_ai_parallel_preserves_phase_order_and_failure_categories(monkeypatch, tmp_path):
+    def command_for_phase(_backend, prompt, *_args, **_kwargs):
+        if prompt == "fail":
+            return [
+                sys.executable,
+                "-c",
+                "import sys; print('login required'); sys.exit(9)",
+            ]
+        return [sys.executable, "-c", "print('Applying patch')"]
+
+    monkeypatch.setattr("projectforge.runner._build_cmd", command_for_phase)
+
+    results = run_ai_parallel(
+        [
+            {"label": "Frontend & UI", "backend": "antigravity", "prompt": "ok"},
+            {"label": "Tests & Automation", "backend": "codex", "prompt": "fail"},
+        ],
+        tmp_path / "generated",
+    )
+
+    assert [(label, int(exit_code)) for label, exit_code in results] == [
+        ("Frontend & UI", 0),
+        ("Tests & Automation", 9),
+    ]
+    assert results[1][1].failure_category == "authentication"
 
 
 def test_initial_phase_summary_matches_known_phase_labels():
