@@ -647,8 +647,8 @@ def _choose_preferred_editor(console: Console) -> str:
         preferred_editor = ""
         console.print(
             status_line(
-                "Forge could not find an editor command. Open projects manually, or install an "
-                "editor command and rerun `forge --setup`.",
+                "Forge could not find a supported editor. Open projects manually, or install one "
+                "and rerun `forge --setup`.",
                 accent="amber",
             )
         )
@@ -866,7 +866,7 @@ def _configure_conventions_and_media(console: Console, existing_config: dict) ->
         existing_config.get("conventions_profile", "default"),
     )
 
-    # Check media collections in the repo's media/ folder
+    # Check user-owned media collections under the Forge home directory.
     from projectforge.media_assets import MEDIA_DIR, list_collections
 
     MEDIA_DIR.mkdir(parents=True, exist_ok=True)
@@ -883,7 +883,7 @@ def _configure_conventions_and_media(console: Console, existing_config: dict) ->
                         subtle(
                             "Create a named subfolder and drop images, fonts, or icons inside it."
                         ),
-                        subtle("Example: media/my-brand/logo.svg"),
+                        subtle("Example collection: my-brand/logo.svg"),
                         muted("Forge will offer to import the collection during each scaffold."),
                     ]
                 ),

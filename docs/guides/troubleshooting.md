@@ -1,7 +1,8 @@
 # Troubleshooting
 
-This guide documents ProjectForge v0.7.0, including the Antigravity provider and privacy-safe
-failure handling. Older releases retain their own bundled troubleshooting guidance.
+This guide documents current source after ProjectForge v0.7.0, including the Antigravity provider
+and privacy-safe failure handling. Older releases retain their own bundled troubleshooting
+guidance.
 
 Start with the credential-free diagnostic:
 
@@ -26,6 +27,24 @@ Check the install route:
 Current source installs both `projectforge` (preferred) and `forge` (compatibility). If Foundry's
 Ethereum CLI already owns `forge` on PATH, run `projectforge` or inspect `command -v forge` and
 `command -v projectforge`. Follow PATH guidance printed by uv, pipx, or Homebrew.
+
+## Homebrew command is shadowed by a virtual environment
+
+A source checkout installed into an active virtual environment can appear before Homebrew on
+`PATH`. Homebrew reports this as a shadowed executable. Leave the environment, refresh shell
+command lookup, and verify the packaged command from a directory outside the checkout:
+
+```bash
+deactivate
+rehash  # zsh; use `hash -r` in bash
+cd ~/Projects/forge-playground
+command -v projectforge
+projectforge --version
+```
+
+The expected Homebrew command is `/opt/homebrew/bin/projectforge` on Apple Silicon or
+`/usr/local/bin/projectforge` on Intel macOS. Do not delete the source environment merely to change
+command precedence.
 
 ## Provider is missing or needs login
 

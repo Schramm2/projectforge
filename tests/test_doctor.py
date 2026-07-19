@@ -3,7 +3,12 @@
 import json
 
 from projectforge.config import BackendStatus
-from projectforge.doctor import _provider_check, build_doctor_report, doctor_exit_code
+from projectforge.doctor import (
+    _provider_check,
+    build_doctor_report,
+    build_environment_report,
+    doctor_exit_code,
+)
 
 
 def test_doctor_report_is_deterministic_and_excludes_provider_detail(monkeypatch, tmp_path):
@@ -76,6 +81,18 @@ def test_doctor_report_is_deterministic_and_excludes_provider_detail(monkeypatch
     assert report["environment"]["python"]["supported"] is True
     assert "secret@example.com" not in serialized
     assert "do-not-print" not in serialized
+
+
+def test_doctor_counts_supported_macos_app_as_available_editor(monkeypatch):
+    monkeypatch.setattr(
+        "projectforge.doctor._check_editor_installed",
+        lambda command, _app_bundle: (False, command == "code"),
+    )
+
+    report = build_environment_report()
+
+    assert report["editors"]["code"] is True
+    assert report["editors"]["cursor"] is False
 
 
 def test_doctor_reports_only_antigravity_version_command_when_models_was_not_run():

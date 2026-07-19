@@ -232,8 +232,8 @@
 
 <aside class="sidebar" id="sidebar" aria-label="Documentation navigation">
   <div class="release-note">
-    <strong class="mono">ProjectForge v0.7.0</strong>
-    <span>Release documentation. Older releases keep their own immutable docs.</span>
+    <strong class="mono">main · after v0.7.0</strong>
+    <span>Current source documentation. Published releases keep their own immutable docs.</span>
   </div>
   <nav>
     <div class="nav-group">
@@ -292,7 +292,7 @@
     <p class="section-intro">ProjectForge supports Python 3.12 and 3.13 on macOS and Linux. Install the current published release through Homebrew or as an isolated Python tool.</p>
 
     <h3>Homebrew</h3>
-    <p>The supported tap installs ProjectForge with pinned dependencies.</p>
+    <p>The supported tap installs ProjectForge with pinned dependencies. If Homebrew reports that an active source virtual environment shadows the commands, run <code>deactivate</code>, refresh shell command lookup, and test again outside the source checkout.</p>
     <div class="code-block"><div class="code-head"><span>Terminal</span><button class="copy-btn" data-copy="brew install schramm2/tap/projectforge">copy</button></div><pre><span class="prompt">$</span> brew install schramm2/tap/projectforge
 <span class="prompt">$</span> projectforge --version</pre></div>
 
@@ -305,12 +305,13 @@
 <span class="prompt">$</span> pipx install matt-projectforge</pre></div>
 
     <h3>Current source</h3>
-    <p>Use this route when you want to run the v0.7.0 source checkout.</p>
+    <p>Use this route when you want to run current source after v0.7.0.</p>
     <div class="code-block"><div class="code-head"><span>Terminal</span><button class="copy-btn" data-copy="git clone https://github.com/Schramm2/projectforge.git&#10;cd projectforge&#10;uv sync --dev&#10;./forge --version">copy</button></div><pre><span class="prompt">$</span> git clone https://github.com/Schramm2/projectforge.git
 <span class="prompt">$</span> cd projectforge
 <span class="prompt">$</span> uv sync --dev
 <span class="prompt">$</span> ./forge --version</pre></div>
-    <div class="note"><strong>Release boundary</strong>This page documents ProjectForge v0.7.0. For any installed release, its bundled documentation is the exact contract.</div>
+    <div class="note"><strong>First-run workspace</strong>Run setup from a dedicated directory such as <code>~/Projects/forge-playground</code>, not from the ProjectForge source checkout. Save that directory during setup if every scaffold should use it. Use <code>projectforge doctor</code>; <code>doctor</code> is a subcommand, not a root option.</div>
+    <div class="note"><strong>Release boundary</strong>This page follows current source after ProjectForge v0.7.0. For any installed release, its bundled documentation is the exact contract.</div>
   </section>
 
   <section class="doc-section" id="providers" data-title="Connect an AI provider" data-search="provider claude codex antigravity authentication login doctor readiness models agy">
@@ -529,7 +530,7 @@ health_request_timeout = 4</pre></div>
     <div class="table-wrap"><table>
       <thead><tr><th>Key</th><th>Meaning</th></tr></thead>
       <tbody>
-        <tr><td><code>preferred_editor</code></td><td>Editor command used for optional project opening.</td></tr>
+        <tr><td><code>preferred_editor</code></td><td>Editor identifier used for optional CLI or macOS application opening.</td></tr>
         <tr><td><code>available_backends</code></td><td>Providers seen during setup; readiness is always rechecked.</td></tr>
         <tr><td><code>backend_models</code></td><td>Optional advanced model overrides. Empty means provider default.</td></tr>
         <tr><td><code>docker_available</code></td><td>Docker availability observed during setup.</td></tr>
@@ -541,7 +542,7 @@ health_request_timeout = 4</pre></div>
     </table></div>
     <p>If config is invalid, Forge moves it to <code>config.json.corrupt-&lt;timestamp&gt;</code> when possible, uses safe defaults, and asks you to rerun setup. Review the recovery copy locally before removing it.</p>
     <h3>Design templates and media</h3>
-    <p>Frontend-capable stacks can use the bundled <code>default-design-guide</code>, a user override under <code>~/.forge/design-templates/</code>, or a project override under <code>.forge/design-templates/</code>. Named media collections come from the repository’s <code>media/&lt;collection&gt;/</code>; arbitrary paths are not accepted.</p>
+    <p>Frontend-capable stacks can use the bundled <code>default-design-guide</code>, a user override under <code>~/.forge/design-templates/</code>, or a project override under <code>.forge/design-templates/</code>. Named media collections come from <code>~/.forge/media/&lt;collection&gt;/</code>, or <code>$FORGE_HOME/media/&lt;collection&gt;/</code> when overridden; arbitrary paths are not accepted. Move collections from an older source checkout into the user-owned directory before removing that checkout, and do not store assets in a Homebrew Cellar path.</p>
     <h3>Post-scaffold hook</h3>
     <p>An executable <code>~/.forge/hooks/post-scaffold.sh</code> runs after verification with a 60-second limit. It receives <code>FORGE_PROJECT_DIR</code>, <code>FORGE_PROJECT_NAME</code>, <code>FORGE_STACK</code>, and <code>FORGE_DEMO_MODE</code>. It is user-authored shell code running with your account’s permissions—review it before use.</p>
     <h3>Local history</h3>
@@ -612,6 +613,8 @@ health_request_timeout = 4</pre></div>
     <h2>Troubleshooting</h2>
     <h3><code>forge: command not found</code></h3>
     <p>For source installs run <code>uv sync --dev</code> and use <code>./forge</code>. For uv or pipx inspect <code>uv tool list</code> or <code>pipx list</code>. For Homebrew inspect <code>brew info schramm2/tap/projectforge</code>. If Foundry owns <code>forge</code>, run <code>projectforge</code>.</p>
+    <h3>Homebrew command is shadowed</h3>
+    <p>Leave the active source virtual environment with <code>deactivate</code>, run <code>rehash</code> in zsh or <code>hash -r</code> in bash, then verify <code>command -v projectforge</code> from a directory outside the source checkout. Do not disable Homebrew trust or path checks to hide this warning.</p>
     <h3>Provider is missing or needs login</h3>
     <p>Install and authenticate through the provider’s official CLI, then run <code>forge doctor</code>. Forge never asks you to paste a credential.</p>
     <h3>Antigravity says <code>needs_login</code></h3>
