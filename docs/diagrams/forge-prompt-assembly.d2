@@ -23,7 +23,7 @@ safety: "Secret scan user-controlled text" {class: card}
 builder: "prompt_builder.py" {
   class: lavender-zone
   ownership: "One provider owns every phase?" {shape: diamond; class: card}
-  full: "Build full scaffold prompt" {class: card}
+  full: "Select full scaffold contract" {class: card}
   targeted: "Choose architecture, frontend,\ntests, or verify variant" {class: card}
   specialize: "Apply provider-specific wording" {class: card}
   ownership -> full: yes
@@ -31,9 +31,24 @@ builder: "prompt_builder.py" {
   targeted -> specialize
 }
 
-phase_prompt: "Final phase prompt" {class: accent}
-preview_prompt: "Merged preview or export prompt" {class: data}
-cli_args: "Model and approval flags\npassed separately to provider CLI" {class: muted}
+phase_content: "Provider-specific\nprompt content" {class: card}
+
+plan: "scaffold_prompts.py" {
+  class: lavender-zone
+  boundary: "Append Forge-owned\nruntime boundary" {class: muted}
+  live: "Live prompt per routed phase" {class: accent}
+  preview: "Preview per merged provider group" {class: data}
+  progress: "Resumable progress records" {class: data}
+  export: "Prompt-only print or export" {class: data}
+
+  boundary -> live: routed phase
+  boundary -> preview: merged group
+  live -> progress
+  preview -> export
+}
+
+cli_args: "Model and approval flags" {class: muted}
+provider_call: "Provider CLI invocation" {class: tag}
 
 inputs.answers -> safety
 inputs.stack -> builder.ownership
@@ -42,7 +57,8 @@ inputs.design -> safety
 inputs.starter -> builder.ownership
 inputs.phase -> builder.ownership
 safety -> builder.ownership
-builder.full -> phase_prompt
-builder.specialize -> phase_prompt
-phase_prompt -> preview_prompt: merge for prompt-only use
-cli_args -> phase_prompt
+builder.full -> phase_content
+builder.specialize -> phase_content
+phase_content -> plan.boundary
+plan.live -> provider_call: prompt content
+cli_args -> provider_call: execution settings
