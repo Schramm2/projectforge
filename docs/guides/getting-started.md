@@ -1,6 +1,6 @@
 # Getting Started
 
-> This guide documents ProjectForge v0.7.1 with the Claude, Antigravity, and Codex provider set.
+> This guide documents ProjectForge v0.7.2 with the Claude, Antigravity, and Codex provider set.
 >
 > Current source installs `projectforge` as the preferred collision-free command and keeps `forge`
 > as a compatibility alias. Foundry also installs a command named `forge`; use `projectforge` when
