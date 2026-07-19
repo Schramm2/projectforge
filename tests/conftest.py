@@ -30,6 +30,7 @@ def isolate_forge_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         "projectforge.design_templates.GLOBAL_DESIGN_TEMPLATES_DIR": (
             forge_home / "design-templates"
         ),
+        "projectforge.media_assets.MEDIA_DIR": forge_home / "media",
         "projectforge.runner.HOOKS_DIR": forge_home / "hooks",
         "projectforge.runner.POST_SCAFFOLD_HOOK": forge_home / "hooks" / "post-scaffold.sh",
         "projectforge.orchestrator.QUALITY_LOG_PATH": forge_home / "quality.jsonl",
