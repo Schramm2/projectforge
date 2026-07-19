@@ -101,9 +101,9 @@ warning did not describe the actual capability.
 
 ## Resolution record
 
-Implementation status: **Resolved in current source**
+Implementation status: **Resolved in ProjectForge v0.7.1**
 
-Distribution status: **Pending the next patch release**
+Distribution status: **Pending channel publication and clean-install verification**
 
 | Finding | Resolution |
 | --- | --- |
@@ -128,5 +128,5 @@ Verification completed on 2026-07-19:
 - Source `projectforge doctor` returned ready with the real saved config and reported both detected
   macOS applications.
 
-The published v0.7.0 Homebrew package still contains the original behavior. These corrections need
-a patch release before the public installation changes.
+ProjectForge v0.7.1 carries these corrections. GitHub, PyPI, and Homebrew availability remain
+release-time verification facts until each channel's clean installation passes.
