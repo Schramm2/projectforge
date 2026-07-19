@@ -6,7 +6,9 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-MEDIA_DIR = Path(__file__).resolve().parent.parent.parent / "media"
+from projectforge.conventions import FORGE_DIR
+
+MEDIA_DIR = FORGE_DIR / "media"
 
 MEDIA_EXTENSIONS = frozenset(
     {

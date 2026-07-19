@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from projectforge.conventions import FORGE_DIR
 from projectforge.media_assets import (
     MEDIA_DIR,
     MEDIA_EXTENSIONS,
@@ -13,16 +14,17 @@ from projectforge.media_assets import (
     target_asset_dir,
 )
 
+_ORIGINAL_FORGE_DIR = FORGE_DIR
+_ORIGINAL_MEDIA_DIR = MEDIA_DIR
+
 
 def _create_file(path: Path, content: bytes = b"x") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(content)
 
 
-def test_media_dir_points_to_repo_root_media_directory() -> None:
-    repo_root = Path(__file__).resolve().parent.parent
-
-    assert MEDIA_DIR == repo_root / "media"
+def test_media_dir_points_to_user_owned_forge_media_directory() -> None:
+    assert _ORIGINAL_MEDIA_DIR == _ORIGINAL_FORGE_DIR / "media"
 
 
 def test_scan_assets_finds_media_files(tmp_path: Path) -> None:

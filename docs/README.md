@@ -7,9 +7,10 @@ the code under `src/projectforge/`. Dated evidence, completed release plans, cha
 provider prompt captures remain intentionally historical. Each historical document should state
 its evidence or release boundary rather than being rewritten to match current source.
 
-ProjectForge v0.7.0 uses the `projectforge` Python namespace, privacy-safe recovery guidance
-across user-visible failure paths, and the product diagram/site surfaces listed below. Older tags
-and their bundled documentation remain the authority for those immutable releases.
+Current source after ProjectForge v0.7.0 uses the `projectforge` Python namespace, privacy-safe
+recovery guidance across user-visible failure paths, and the product diagram/site surfaces listed
+below. Older tags and their bundled documentation remain the authority for those immutable
+releases.
 
 ## User documentation
 
@@ -31,6 +32,7 @@ and their bundled documentation remain the authority for those immutable release
 - [maintainers/admin-playbook.md](maintainers/admin-playbook.md) — repo maintenance, stack changes, and release flow
 - [maintainers/adding-a-stack.md](maintainers/adding-a-stack.md) — concrete implementation checklist for new stacks
 - [maintainers/homebrew-release.md](maintainers/homebrew-release.md) — formula and tap release notes
+- [maintainers/homebrew-new-user-setup-audit-2026-07.md](maintainers/homebrew-new-user-setup-audit-2026-07.md) — v0.7.0 clean-install and first-run findings
 - [maintainers/pypi-release.md](maintainers/pypi-release.md) — trusted-publishing setup and verification
 - [maintainers/public-release-checklist.md](maintainers/public-release-checklist.md) — final public identity and privacy checklist
 - [maintainers/roadmap.md](maintainers/roadmap.md) — product roadmap and future work

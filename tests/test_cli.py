@@ -221,7 +221,7 @@ def test_doctor_human_output_includes_model_behavior_and_repair(monkeypatch):
     result = runner.invoke(app, ["doctor"])
 
     assert result.exit_code == 1
-    assert "no editor CLI on PATH" in result.stdout
+    assert "Editors: none found" in result.stdout
     assert "projectforge --setup" in result.stdout
     assert "model: provider default" in result.stdout
     assert "check: claude auth status" in result.stdout

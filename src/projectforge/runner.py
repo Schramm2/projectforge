@@ -710,7 +710,7 @@ def open_in_editor(project_dir: Path, preferred_editor: str = "") -> None:
 
     Args:
         project_dir: Path to the project directory.
-        preferred_editor: Editor command from config. Tried first before fallbacks.
+        preferred_editor: Editor identifier from config. Tried first before fallbacks.
     """
     candidates = ["cursor", "antigravity", "code"]
     if preferred_editor:
