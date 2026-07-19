@@ -47,9 +47,9 @@ pipx install matt-projectforge
 brew install --build-from-source schramm2/tap/projectforge
 ```
 
-Current `main` contains unreleased changes after v0.6.0, including the `projectforge` Python
-namespace. Keep those changes under `[Unreleased]` until the version, tag, artifacts, and all three
-installation routes have passed the release gates below.
+ProjectForge v0.7.0 includes the canonical `projectforge` Python namespace. Do not describe the
+version as available on a distribution channel until its tag, artifacts, and that channel's clean
+installation route have passed the release gates below.
 
 ## Release verification
 

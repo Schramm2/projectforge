@@ -1,14 +1,14 @@
 # Migrating from ProjectForge 0.4.1
 
-Current ProjectForge source after v0.6.0 uses `projectforge` as the preferred command and canonical
-Python namespace, with `forge` retained as a compatibility command. Existing projects and user
-configuration remain usable. The Gemini-to-Antigravity migration described below applies when
-upgrading from v0.5.0 or earlier.
+ProjectForge v0.7.0 uses `projectforge` as the preferred command and canonical Python namespace,
+with `forge` retained as a compatibility command. Existing projects and user configuration remain
+usable. The Gemini-to-Antigravity migration described below applies when upgrading from v0.5.0 or
+earlier.
 
-## Python import namespace after v0.6.0
+## Python import namespace in v0.7.0
 
-The unreleased source tree renamed the import package from `ubundiforge` to `projectforge` so the
-code, product, command, and Homebrew identity agree. Repository scripts, tests, workflow commands,
+ProjectForge v0.7.0 renamed the import package from `ubundiforge` to `projectforge` so the code,
+product, command, and Homebrew identity agree. Repository scripts, tests, workflow commands,
 and internal integrations should import from `projectforge`. The distribution name remains
 `matt-projectforge`, and the installed executable names remain `projectforge` and `forge`.
 
