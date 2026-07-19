@@ -1,6 +1,7 @@
 """Tests for the runner module."""
 
 import stat
+import subprocess
 import sys
 from pathlib import Path
 
@@ -9,6 +10,8 @@ from projectforge.runner import (
     ProviderExit,
     _build_cmd,
     _initial_phase_summary,
+    ensure_git_init,
+    initialize_git_repository,
     reset_project_dir,
     run_ai,
     run_ai_parallel,
@@ -226,6 +229,72 @@ def test_progress_summary_for_line_does_not_forward_unmatched_or_noisy_updates()
     assert _progress_summary_for_line("Traceback at /private/project/tool.py", current) == (
         "Working through an issue in the scaffold"
     )
+
+
+def test_initialize_git_repository_creates_unborn_main_branch(tmp_path):
+    project_dir = tmp_path / "demo"
+
+    assert initialize_git_repository(project_dir) is True
+
+    branch = subprocess.run(
+        ["git", "branch", "--show-current"],
+        cwd=project_dir,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    head = subprocess.run(
+        ["git", "rev-parse", "--verify", "HEAD"],
+        cwd=project_dir,
+        capture_output=True,
+    )
+    assert branch.stdout.strip() == "main"
+    assert head.returncode != 0
+
+    (project_dir / ".forge").mkdir()
+    (project_dir / ".forge" / "progress.json").write_text("{}\n")
+    ignored = subprocess.run(
+        ["git", "check-ignore", ".forge/progress.json"],
+        cwd=project_dir,
+        capture_output=True,
+        text=True,
+    )
+    assert ignored.returncode == 0
+
+
+def test_ensure_git_init_commits_final_changes_after_provider_commit(tmp_path):
+    project_dir = tmp_path / "demo"
+    assert initialize_git_repository(project_dir) is True
+    subprocess.run(
+        ["git", "config", "user.name", "Forge Test"], cwd=project_dir, check=True
+    )
+    subprocess.run(
+        ["git", "config", "user.email", "forge-test"],
+        cwd=project_dir,
+        check=True,
+    )
+    (project_dir / "README.md").write_text("Initial\n")
+    assert ensure_git_init(project_dir) is True
+
+    (project_dir / "README.md").write_text("Initial\n\nFinal badge\n")
+    assert ensure_git_init(project_dir) is True
+
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=project_dir,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    commit_count = subprocess.run(
+        ["git", "rev-list", "--count", "HEAD"],
+        cwd=project_dir,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert status.stdout == ""
+    assert commit_count.stdout.strip() == "2"
 
 
 def test_reset_project_dir_clears_existing_contents(tmp_path):

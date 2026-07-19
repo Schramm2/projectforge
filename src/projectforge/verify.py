@@ -49,7 +49,7 @@ class VerifyReport:
 
 # Checks to attempt per stack, in order.  Keys must match dev_commands keys
 # or the special names "install" and "health".
-_CHECK_ORDER = ["install", "lint", "typecheck", "build", "test", "health"]
+_CHECK_ORDER = ["install", "lint", "typecheck", "build", "test", "smoke", "health"]
 
 # Install commands keyed by package_manager value in StackMeta
 _INSTALL_COMMANDS: dict[str, str] = {
@@ -130,6 +130,65 @@ def _python_install_command(project_dir: Path) -> str:
     return "uv sync"
 
 
+def _python_entrypoint_smoke_command(pyproject: dict) -> str | None:
+    """Build a bounded help command for generated Python console entry points."""
+    scripts = pyproject.get("project", {}).get("scripts", {})
+    if not isinstance(scripts, dict):
+        return None
+    names = sorted(
+        name
+        for name in scripts
+        if isinstance(name, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name)
+    )
+    if not names:
+        return None
+    return " && ".join(f"uv run {name} --help" for name in names)
+
+
+def _gitignore_ignores_uv_lock(project_dir: Path) -> bool:
+    """Detect the direct lockfile ignore patterns Forge tells generated projects to avoid."""
+    gitignore = project_dir / ".gitignore"
+    if not gitignore.is_file():
+        return False
+    ignored = False
+    for raw_line in gitignore.read_text().splitlines():
+        pattern = raw_line.strip()
+        if not pattern or pattern.startswith("#"):
+            continue
+        negated = pattern.startswith("!")
+        normalized = pattern.removeprefix("!").removeprefix("/")
+        if normalized in {"uv.lock", "*.lock"}:
+            ignored = not negated
+    return ignored
+
+
+def _python_project_files_check(stack: str, project_dir: Path) -> CheckResult | None:
+    """Validate Python project files that make the generated handoff reproducible."""
+    meta = STACK_META[stack]
+    pyproject = _load_pyproject(project_dir)
+    if "uv" not in meta.package_manager or pyproject is None:
+        return None
+
+    required_pre_commit = any(
+        item.split("#", 1)[0].strip() == ".pre-commit-config.yaml"
+        for item in meta.default_structure
+    )
+    remediation: list[str] = []
+    if required_pre_commit and not (project_dir / ".pre-commit-config.yaml").is_file():
+        remediation.append("Add the required `.pre-commit-config.yaml`.")
+    if not (project_dir / "uv.lock").is_file():
+        remediation.append("Run `uv lock` and keep `uv.lock` with the project.")
+    elif _gitignore_ignores_uv_lock(project_dir):
+        remediation.append("Remove `uv.lock` from `.gitignore` so the lockfile can be committed.")
+
+    return CheckResult(
+        name="project-files",
+        passed=not remediation,
+        detail="" if not remediation else "Required project files are missing or ignored.",
+        remediation=" ".join(remediation),
+    )
+
+
 def _effective_dev_commands(stack: str, project_dir: Path) -> dict[str, str]:
     """Derive Python checks from generated metadata, falling back to stack recipes."""
     meta = STACK_META[stack]
@@ -154,6 +213,11 @@ def _effective_dev_commands(stack: str, project_dir: Path) -> dict[str, str]:
         commands["test"] = "uv run pytest -q"
     else:
         commands.pop("test", None)
+    smoke_command = _python_entrypoint_smoke_command(pyproject)
+    if smoke_command:
+        commands["smoke"] = smoke_command
+    else:
+        commands.pop("smoke", None)
     return commands
 
 
@@ -419,6 +483,9 @@ def verify_scaffold(
     # 1. Install dependencies
     install_result = _install_deps(stack, project_dir)
     report.checks.append(install_result)
+    project_files_result = _python_project_files_check(stack, project_dir)
+    if project_files_result is not None:
+        report.checks.append(project_files_result)
     if not install_result.passed:
         # Skip everything else — deps are required
         for check_name in _CHECK_ORDER[1:]:
@@ -441,8 +508,8 @@ def verify_scaffold(
             )
         return report
 
-    # 2. Run dev_commands checks (lint, typecheck, build, test)
-    for check_name in ("lint", "typecheck", "build", "test"):
+    # 2. Run dev_commands checks and bounded console-entry-point smoke tests.
+    for check_name in ("lint", "typecheck", "build", "test", "smoke"):
         cmd = dev.get(check_name)
         if not cmd:
             continue

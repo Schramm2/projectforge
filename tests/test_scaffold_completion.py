@@ -70,16 +70,16 @@ def test_completion_runs_required_evidence_and_handoff_in_order(tmp_path: Path) 
 
     assert calls == [
         "manifest",
-        "git",
         "verify",
         "verification-evidence",
         "quality",
         "hook",
         "log",
         "preferences",
-        "dashboard",
         "card",
         "badge",
+        "git",
+        "dashboard",
         "sound",
         "editor",
     ]

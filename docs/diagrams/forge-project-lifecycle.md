@@ -12,4 +12,10 @@ A Forge-managed project keeps enough local evidence to recover an interrupted sc
 - **Project Created:** generation finished, but verification was skipped, incomplete, or failed.
 - **Project Ready:** every required verification check passed.
 
-After handoff, `forge evolve` adds supported capabilities, `forge check` audits convention drift, `forge replay` reproduces or compares the original scaffold, and `forge stats` reports local outcomes.
+Live scaffolds create an unborn `main` Git repository before provider execution so every provider
+works inside the same trusted boundary. Completion writes verification and presentation artifacts,
+runs the optional hook, and commits any remaining generated changes before reporting the outcome.
+
+After handoff, `forge evolve` adds supported capabilities, `forge check` audits convention drift,
+`forge replay` reproduces or compares the original scaffold, and `forge stats` reports local
+outcomes.

@@ -13,6 +13,11 @@ from projectforge.failure_taxonomy import classify_provider_failure
         ("429 rate limit exceeded", False, "quota"),
         ("connection refused by upstream", False, "network"),
         ("permission denied for this workspace", False, "permission"),
+        (
+            "Not inside a trusted directory and --skip-git-repo-check was not specified",
+            False,
+            "permission",
+        ),
         ("model is not available", False, "model"),
         ("anything", True, "timeout"),
         ("unrecognized provider response", False, "unknown"),

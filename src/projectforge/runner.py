@@ -595,59 +595,103 @@ def reset_project_dir(project_dir: Path) -> None:
     project_dir.mkdir(parents=True, exist_ok=True)
 
 
-def ensure_git_init(project_dir: Path) -> bool:
-    """Verify git was initialized with at least one commit; if not, init and commit.
+def _ensure_local_git_excludes(project_dir: Path) -> bool:
+    """Keep Forge and local agent runtime state out of generated commits."""
+    exclude_path = project_dir / ".git" / "info" / "exclude"
+    if not exclude_path.parent.is_dir():
+        return True
+    try:
+        existing = exclude_path.read_text() if exclude_path.is_file() else ""
+        missing = [
+            pattern
+            for pattern in (".forge/", ".code-review-graph/")
+            if pattern not in existing.splitlines()
+        ]
+        if missing:
+            prefix = "" if not existing or existing.endswith("\n") else "\n"
+            exclude_path.write_text(existing + prefix + "\n".join(missing) + "\n")
+    except OSError:
+        console.print(
+            status_line(
+                "Forge could not protect its local runtime files from Git. Check that the "
+                "project's `.git` folder is writable, then repeat the scaffold command.",
+                accent="amber",
+            )
+        )
+        return False
+    return True
 
-    Returns:
-        True if the project has a git repo with at least one commit, False otherwise.
-    """
+
+def initialize_git_repository(project_dir: Path) -> bool:
+    """Create the main-branch repository providers require, without committing files."""
+    project_dir.mkdir(parents=True, exist_ok=True)
     git_dir = project_dir / ".git"
+    if git_dir.exists():
+        return _ensure_local_git_excludes(project_dir)
 
     try:
         git_check = subprocess.run(["git", "--version"], capture_output=True, text=True)
     except FileNotFoundError:
+        git_check = None
+    if git_check is None or git_check.returncode != 0:
         console.print(
             status_line(
-                "Git is not installed, so Forge could not create the first commit. Install "
-                "Git, then initialize and commit the project manually.",
+                "Git is required before Forge can start provider work. Install Git, then "
+                "repeat the scaffold command.",
                 accent="amber",
             )
         )
         return False
 
-    if git_check.returncode != 0:
+    result = subprocess.run(
+        ["git", "init", "-b", "main"],
+        cwd=project_dir,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
         console.print(
             status_line(
-                "Forge could not use Git in the project folder. Run `git status` there, fix "
-                "the reported issue, then create the first commit manually.",
+                "Forge could not start version control in the project folder. Check that the "
+                "folder is writable, then repeat the scaffold command.",
                 accent="amber",
             )
         )
         return False
+    return _ensure_local_git_excludes(project_dir)
 
-    if not git_dir.exists():
-        console.print(status_line("Git not initialized by AI — setting up...", accent="violet"))
-        result = subprocess.run(["git", "init"], cwd=project_dir, capture_output=True, text=True)
-        if result.returncode != 0:
-            console.print(
-                status_line(
-                    "Forge could not start version control. Run `git init` in the project "
-                    "folder, then create the first commit manually.",
-                    accent="amber",
-                )
-            )
-            return False
+
+def ensure_git_init(project_dir: Path) -> bool:
+    """Ensure the generated project has a repository and one initial commit."""
+    if not initialize_git_repository(project_dir):
+        return False
 
     # Check whether there is at least one commit
     has_commit = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=project_dir,
         capture_output=True,
+    ).returncode == 0
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=project_dir,
+        capture_output=True,
+        text=True,
     )
-    if has_commit.returncode == 0:
+    if status.returncode != 0:
+        console.print(
+            status_line(
+                "Forge could not inspect the generated repository. Run `git status` in the "
+                "project folder, then commit any remaining files manually.",
+                accent="amber",
+            )
+        )
+        return False
+    if has_commit and not status.stdout.strip():
         return True
 
-    console.print(status_line("No commits found — creating initial commit...", accent="violet"))
+    action = "Finalizing generated changes..." if has_commit else "Creating initial commit..."
+    console.print(status_line(action, accent="violet"))
     result = subprocess.run(["git", "add", "-A"], cwd=project_dir, capture_output=True, text=True)
     if result.returncode != 0:
         console.print(
@@ -659,8 +703,13 @@ def ensure_git_init(project_dir: Path) -> bool:
         )
         return False
 
+    commit_message = (
+        "Finalize scaffold (via ProjectForge)"
+        if has_commit
+        else "Initial commit (via ProjectForge)"
+    )
     result = subprocess.run(
-        ["git", "commit", "-m", "Initial commit (via ProjectForge)"],
+        ["git", "commit", "-m", commit_message],
         cwd=project_dir,
         capture_output=True,
         text=True,
@@ -675,7 +724,8 @@ def ensure_git_init(project_dir: Path) -> bool:
         )
         return False
 
-    console.print(status_line("Git initialized with initial commit", accent="aqua"))
+    message = "Generated changes committed" if has_commit else "Git initialized with initial commit"
+    console.print(status_line(message, accent="aqua"))
     return True
 
 
