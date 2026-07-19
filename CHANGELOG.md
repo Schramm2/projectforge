@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-07-19
+
 ### Added
 
 - A dated Homebrew new-user setup audit with install, setup, diagnostic, and packaging evidence.
@@ -264,7 +266,8 @@ See [the migration guide](docs/guides/migrating-from-0.4.1.md) for details.
 - pipx support for isolated global installs.
 - MIT license.
 
-[Unreleased]: https://github.com/Schramm2/projectforge/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Schramm2/projectforge/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/Schramm2/projectforge/releases/tag/v0.7.1
 [0.7.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.7.0
 [0.6.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.6.0
 [0.5.1]: https://github.com/Schramm2/projectforge/releases/tag/v0.5.1
