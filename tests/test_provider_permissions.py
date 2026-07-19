@@ -50,7 +50,7 @@ def test_preserves_existing_user_settings(tmp_path):
     ws.mkdir()
     settings = _settings(tmp_path)
     original = {
-        "permissions": {"allow": ["read_file(/home/user)"]},
+        "permissions": {"allow": ["read_file(/tmp/example)"]},
         "model": "gemini-pro",
     }
     settings.write_text(json.dumps(original, indent=2) + "\n")
@@ -59,7 +59,7 @@ def test_preserves_existing_user_settings(tmp_path):
     with workspace_write_permission("antigravity", "safe", ws, settings_path=settings):
         data = json.loads(settings.read_text())
         assert data["model"] == "gemini-pro"
-        assert "read_file(/home/user)" in data["permissions"]["allow"]
+        assert "read_file(/tmp/example)" in data["permissions"]["allow"]
         assert f"write_file({ws.resolve()})" in data["permissions"]["allow"]
 
     # The user's file is restored byte-for-byte.

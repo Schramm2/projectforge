@@ -7,7 +7,7 @@ the code under `src/projectforge/`. Dated evidence, completed release plans, cha
 provider prompt captures remain intentionally historical. Each historical document should state
 its evidence or release boundary rather than being rewritten to match current source.
 
-ProjectForge v0.7.1 uses the `projectforge` Python namespace, user-owned media storage,
+ProjectForge v0.7.2 uses the `projectforge` Python namespace, user-owned media storage,
 CLI-or-application editor diagnostics, privacy-safe recovery guidance, and the product diagram/site
 surfaces listed below. Older tags and their bundled documentation remain the authority for those
 immutable releases.
