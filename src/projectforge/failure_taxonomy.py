@@ -15,6 +15,13 @@ class ProviderFailure:
     remediation: str
 
 
+_HEADLESS_PERMISSION_FAILURE = re.compile(
+    r"headless mode cannot prompt|tool required.*permission|no output produced.*permission|"
+    r"permission.*(?:auto-denied|denied)",
+    re.I,
+)
+
+
 _RULES = (
     (
         "missing_binary",
@@ -61,6 +68,11 @@ _RULES = (
 )
 
 
+def is_headless_permission_failure(output: str) -> bool:
+    """Return whether a provider reported a denied non-interactive action."""
+    return bool(_HEADLESS_PERMISSION_FAILURE.search(output))
+
+
 def classify_provider_failure(
     output: str,
     *,
@@ -73,6 +85,15 @@ def classify_provider_failure(
             category="timeout",
             summary="Project generation took longer than the allowed time.",
             remediation="Keep the partial project and retry the incomplete work with `--resume`.",
+        )
+    if is_headless_permission_failure(output):
+        return ProviderFailure(
+            category="permission",
+            summary="A workspace permission blocked this step.",
+            remediation=(
+                "Keep safe mode, review the selected tool's workspace access, "
+                "then retry with `--resume`."
+            ),
         )
     for category, pattern, summary, remediation in _RULES:
         if pattern.search(output):

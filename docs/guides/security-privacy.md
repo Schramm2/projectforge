@@ -39,10 +39,21 @@ Safe mode still authorizes the provider to create and edit files inside the targ
 commands there, install dependencies, use network access allowed by the provider, and consume
 provider quota. Inspect the preflight panel and use `--no-open` when editor launch is unwanted.
 
-Antigravity safe mode passes `--mode accept-edits --sandbox` to `agy --print`. Its sandbox applies
-terminal restrictions; its permission engine and default disabled non-workspace access govern file
-scope. Unapproved commands may be denied in non-interactive print mode. Only Forge's explicit
-unsafe mode adds `--dangerously-skip-permissions` and removes the sandbox flag.
+Antigravity safe mode passes `--add-dir <workspace> --mode accept-edits --sandbox` to `agy
+--print`. Its sandbox applies terminal restrictions, while its permission engine governs file
+writes separately. Because print mode cannot answer an `Ask` prompt, safe headless scaffolding also
+requires a narrow `write_file(<workspace>)` allow rule. For the duration of a safe-mode run Forge
+adds exactly that rule to `~/.gemini/antigravity-cli/settings.json`, scoped to the target workspace
+and merged non-destructively with any existing settings, then restores the file to its prior state
+when the run ends. Unapproved commands may still be denied, and Antigravity can report a denied tool
+as exit 0, so as a safety net Forge converts its headless permission message into a failed phase
+instead of advancing. Only Forge's explicit unsafe mode adds `--dangerously-skip-permissions` and
+removes the sandbox flag.
+
+Claude safe mode adds the provider's `--safe-mode` to keep ambient hooks, plugins, MCP, memory,
+and project instruction discovery out of scripted Forge runs. Codex safe mode uses
+`--ephemeral --ignore-user-config` so provider session artifacts and ambient user exec rules do
+not change the explicit Forge policy.
 
 Generated code is untrusted until its recorded and independent checks pass. A successful provider
 exit alone is not verification.

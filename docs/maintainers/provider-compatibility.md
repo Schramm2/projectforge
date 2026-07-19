@@ -1,10 +1,10 @@
 # Provider Compatibility
 
-Evidence date: 2026-07-18
-Forge baseline: v0.5.1 release source
+Evidence date: 2026-07-19
+Forge baseline: v0.7.1 working source
 
-Release note: ProjectForge v0.7.0 includes newer failure-presentation behavior than the provider
-probes below. The probes remain dated evidence rather than current provider guarantees.
+The runtime evidence below is a bounded smoke-test record, not a guarantee that a provider's
+independent CLI contract will remain unchanged.
 
 This ledger records what ProjectForge may safely assume about each supported AI CLI. Provider
 documentation changes independently of Forge, so runtime help/version/status output is evidence
@@ -26,26 +26,27 @@ only for the tested version. Account identity and credential values are delibera
 
 | Provider | Local evidence | Authentication status | Default model behavior | Safe non-interactive baseline | Dangerous escape hatch |
 | --- | --- | --- | --- | --- | --- |
-| Claude Code | 2.1.214 | `claude auth status`; JSON `loggedIn=true`, auth method recorded without identity | Omit `--model`; Claude settings/default apply. Stable aliases include `sonnet`, `opus`, and `haiku` | `claude -p --permission-mode acceptEdits --no-session-persistence <prompt>` with workspace permissions/settings constrained by the provider | `--permission-mode bypassPermissions` / `--dangerously-skip-permissions` |
-| Codex CLI | 0.144.0 installed; 0.144.5 probed through the official latest npm package | `codex login status`; exit 0 and auth mode only | Omit `--model`; Codex uses the configured/recommended model | `codex --ask-for-approval never --sandbox workspace-write exec --cd <workspace> <prompt>`; `--json` and `--output-last-message` are available for inspection | `--dangerously-bypass-approvals-and-sandbox` / `--yolo`, only in an externally hardened environment |
-| Google Antigravity CLI | 1.1.4 installed | `agy models`; exit 0 with a non-empty catalog confirms the provider-owned Google session without an inference prompt | Omit `--model`; Antigravity uses the current session default | `agy --mode accept-edits --sandbox --print <prompt>`; unapproved commands may be denied in print mode | `--dangerously-skip-permissions` without `--sandbox`, only with explicit unsafe consent |
+| Claude Code | 2.1.215 | `claude auth status`; JSON `loggedIn=true`, auth method recorded without identity | Omit `--model`; provider default applies | `claude --safe-mode -p --permission-mode acceptEdits --no-session-persistence <prompt>` | `--permission-mode bypassPermissions` / `--dangerously-skip-permissions` |
+| Codex CLI | 0.144.6 | `codex login status`; exit 0 and auth mode only | Omit `--model`; provider default applies | `codex --cd <workspace> --ask-for-approval never --sandbox workspace-write exec --skip-git-repo-check --ephemeral --ignore-user-config --color never <prompt>` | `--dangerously-bypass-approvals-and-sandbox` / `--yolo`, only in an externally hardened environment |
+| Google Antigravity CLI | 1.1.4 | `agy models`; exit 0 with a non-empty catalog confirms the provider-owned Google session without an inference prompt | Omit `--model`; current session default applies | `agy --add-dir <workspace> --mode accept-edits --sandbox --print <prompt>` with a Forge-managed, temporary `write_file(<workspace>)` allow rule for headless writes | `--dangerously-skip-permissions` without `--sandbox`, only with explicit unsafe consent |
 
-ProjectForge now maps its provider-neutral modes as follows: `safe` uses Claude `acceptEdits`,
-Codex `workspace-write` with non-interactive denial, and Antigravity `accept-edits` plus terminal
-sandboxing; `plan` uses each provider's read-only mode; `unsafe` uses the provider bypass behavior
-and is rejected unless the caller also supplies explicit unsafe consent. The installed provider
-parsers accepted their generated safe/read-only command shapes without a model call on 2026-07-18.
+ProjectForge maps its provider-neutral modes as follows: `safe` uses Claude `safe-mode` plus
+`acceptEdits`, Codex `workspace-write` with the git-repo-check bypassed, ephemeral execution, and
+ambient user config ignored, and Antigravity `add-dir` plus `accept-edits` and terminal sandboxing; `plan` uses each provider's
+read-only mode; `unsafe` uses the provider bypass behavior and is rejected unless the caller also
+supplies explicit unsafe consent. Antigravity is the exception: safe workspace writes need a
+headless `write_file` allow rule, which Forge grants temporarily and scoped to the workspace for the
+duration of the run.
 
 ## Claude Code
 
 ### Official sources
 
-Retrieved 2026-07-18:
+Retrieved 2026-07-19:
 
-- <https://code.claude.com/docs/llms.txt>
+- <https://code.claude.com/docs/en/cli-usage>
 - <https://code.claude.com/docs/en/setup>
 - <https://code.claude.com/docs/en/authentication>
-- <https://code.claude.com/docs/en/cli-usage>
 - <https://code.claude.com/docs/en/permissions>
 
 ### Installation and authentication
@@ -70,8 +71,11 @@ boolean/unknown state and a non-identifying auth-method label.
   tools; bypass skips most prompts but retains limited provider circuit breakers.
 - `--allowedTools`, `--disallowedTools`, settings, and provider sandbox rules can further constrain
   execution. Forge must capability-detect the version it invokes.
+- `--safe-mode` disables ambient hooks, skills, plugins, MCP, memory, and project `CLAUDE.md`
+  discovery while preserving the provider's normal authentication path. Forge supplies its
+  effective conventions and project instructions in the prompt.
 - `--no-session-persistence` avoids saving print-mode sessions and is appropriate for Forge runs
-  unless resume behavior is deliberately implemented through provider sessions.
+  because Forge owns resume state separately.
 - The current runtime help describes failures through non-zero exits. Forge classifies captured
   output transiently and presents a bounded category and recovery step; it does not echo or
   persist the captured provider tail.
@@ -85,7 +89,7 @@ not explicitly authorized.
 
 ### Official sources
 
-Retrieved 2026-07-18:
+Retrieved 2026-07-19:
 
 - <https://developers.openai.com/codex/cli/reference>
 - <https://developers.openai.com/codex/auth>
@@ -105,15 +109,23 @@ present; Forge should use the exit code plus a non-identifying mode classificati
 ### Invocation, models, sandboxing, and exits
 
 - `codex exec` is the scripted/CI entry point and accepts a prompt argument or stdin.
-- `--cd` sets the workspace root. `--add-dir` expands write access and should be avoided unless a
-  user explicitly adds a required directory.
+- `--cd` sets the workspace root. Forge passes the target explicitly even though it also sets the
+  subprocess cwd.
 - `--sandbox` accepts `read-only`, `workspace-write`, or `danger-full-access`. Official guidance
   recommends `workspace-write` for unattended local work that remains inside the workspace.
 - Global `--ask-for-approval` values are `untrusted`, `on-request`, and `never`. Current
   non-interactive behavior needs runtime validation in combination with the selected sandbox.
-- `--json` emits JSONL progress and `--output-last-message` writes the final response. Forge's
-  current adapter does not persist those streams; it derives bounded activity and failure
-  categories from transient process output.
+- `--json` emits JSONL progress and `--output-last-message` writes the final response. Forge keeps
+  text output transient so it can derive bounded activity and failure categories without creating a
+  second durable transcript.
+- `--skip-git-repo-check` is required. Forge scaffolds into a fresh directory and only runs
+  `git init` as a post-scaffold step, so during generation the target is not a git repo. Without
+  this flag `codex exec` refuses to start with "not inside a trusted directory", which breaks every
+  safe and plan scaffold.
+- `--ephemeral` prevents Codex exec rollout/session files from being persisted. `--ignore-user-config`
+  keeps ambient user configuration and exec rules from changing Forge's explicit policy; official
+  docs state that authentication still uses `CODEX_HOME`.
+- `--color never` avoids terminal decoration in the transient stream Forge summarizes.
 - `--model` overrides the configured model. If no model is configured, the CLI uses a recommended
   model; Forge defaults to omission.
 - `--full-auto` is deprecated in current official docs in favor of explicit
@@ -121,19 +133,21 @@ present; Forge should use the exit code plus a non-identifying mode classificati
 - `--dangerously-bypass-approvals-and-sandbox` disables both boundaries and is documented only for
   an isolated/external sandbox. Forge must never select it implicitly.
 
-Known limitation: authentication evidence applies to the installed 0.144.0 runtime. The official
-latest npm package reported 0.144.5 and accepted the relevant version/help surface in an isolated
-probe, but it was not given access to host authentication and made no model call.
+The installed 0.144.6 runtime accepted the explicit workspace, git-repo-check bypass, ephemeral,
+ambient-config, color, sandbox, approval, model, and exec flags. A real bounded smoke call into a
+fresh non-git directory wrote the requested file and left no provider sidecar; the same call without
+`--skip-git-repo-check` aborts before any turn with "not inside a trusted directory".
 
 ## Google Antigravity CLI
 
 ### Official sources
 
-Retrieved 2026-07-18:
+Retrieved 2026-07-19:
 
 - <https://antigravity.google/docs/cli-overview>
 - <https://antigravity.google/docs/cli-install>
 - <https://antigravity.google/docs/cli-using>
+- <https://antigravity.google/docs/cli/projects>
 - <https://antigravity.google/docs/cli/modes>
 - <https://antigravity.google/docs/cli/permissions>
 - <https://github.com/google-antigravity/antigravity-cli>
@@ -152,38 +166,51 @@ catalog output, account identity, authorization codes, or credentials.
 
 ### Invocation, models, policies, and exits
 
+- `--add-dir <workspace>` binds the target to the Antigravity workspace. Without it, a print-mode
+  call can use the provider's own scratch project even when Forge sets the subprocess cwd.
 - `--print` / `-p` runs one prompt non-interactively. Keep it as the final flag immediately before
   the prompt because the Go parser treats it as value-taking.
 - `--model` overrides the session model. Forge omits it by default and lets Antigravity select its
   current default.
 - `--mode accept-edits` automatically approves file edits and creations. `--mode plan` uses
   read-only investigation tools and produces a plan.
-- `--sandbox` enables terminal restrictions. It is not the file-permission engine; workspace and
-  non-workspace file access remain governed by Antigravity permissions and settings.
-- Print mode cannot answer interactive permission prompts. Current versions deny unapproved tools
-  with guidance rather than granting them. Users can allow narrowly scoped commands in
-  `/permissions`; Forge does not edit the user's global settings.
+- `--sandbox` enables terminal restrictions. It is not the file-permission engine; file access is
+  governed by Antigravity's permission rules.
+- Print mode cannot answer interactive permission prompts. Official permissions documentation says
+  unconfigured actions default to Ask, so safe headless file writes require a narrow
+  `write_file(<workspace>)` entry under `~/.gemini/antigravity-cli/settings.json`. For the duration
+  of a safe-mode run Forge adds exactly that rule (merging non-destructively), then restores the
+  file to its prior state; see `src/projectforge/provider_permissions.py`.
 - `--dangerously-skip-permissions` auto-approves tool requests and is used only by Forge's explicit
   unsafe mode. Forge omits `--sandbox` in that mode so its risk is not disguised.
 
-Known limitation: a safe headless scaffold can write workspace files but may be unable to run a
-command that the user's Antigravity policy has not already allowed. Forge preserves the provider
-failure and independently verifies generated output rather than silently escalating permissions.
+Forge's scoped `write_file(<workspace>)` grant covers the common safe scaffold. As a safety net, if
+a write is still denied (for example a command the policy blocks, or a settings file Forge cannot
+write), Antigravity may report the denied tool as exit 0; Forge recognizes the headless permission
+message and fails the phase rather than advancing with no workspace change. Explicit unsafe mode is
+the only path that adds `--dangerously-skip-permissions`.
 
-## Runtime evidence, 2026-07-18
+## Runtime evidence, 2026-07-19
 
-- Claude Code 2.1.214 accepted the generated safe and plan command surfaces. Its provider-owned
-  status command reported authenticated through Claude.ai; Forge retained no identity.
-- The installed Codex CLI 0.144.0 accepted the generated safe and plan command surfaces. Its
-  provider-owned status command reported authenticated through ChatGPT; Forge retained no identity.
-- The official latest Codex npm package reported 0.144.5 and exposed the required `exec`, sandbox,
-  approval, model, JSON, and final-message options in a clean no-install probe.
-- Antigravity CLI 1.1.4 reported its version, exposed `--print`, `--model`, `--mode`, `--sandbox`,
-  and `--dangerously-skip-permissions`, and returned its model catalog through the saved Google
-  session. The same `agy models` command in a clean isolated home exited non-zero with provider-owned
-  sign-in guidance and did not open a browser.
-- All probes above were version/help/status-only. They made no model calls and recorded no account
-  identifier, credential, token, or provider response body.
+- Claude Code 2.1.215 reported an authenticated Claude.ai session. A real `run_ai` safe-mode smoke
+  call created the requested file in the target and did not create the ambient `.code-review-graph/`
+  sidecar observed with the uncontained command.
+- Codex CLI 0.144.6 reported an authenticated ChatGPT session. A real `run_ai` smoke call into a
+  fresh non-git target using explicit `--cd`, `--skip-git-repo-check`, `--ephemeral`,
+  `--ignore-user-config`, and `--color never` created the requested file and left no provider
+  sidecar. The identical call without `--skip-git-repo-check` aborts before any turn with "not
+  inside a trusted directory", which is the state every scaffold hits before Forge's post-scaffold
+  `git init`.
+- Antigravity CLI 1.1.4 reported an authenticated Google session. Without `--add-dir`, a print-mode
+  call wrote to the provider scratch project rather than the Forge target. With `--add-dir` but no
+  allow rule, safe print mode was denied because headless mode could not answer the missing
+  `write_file` permission; the provider still exited 0, and Forge converts that response into a
+  `permission` failure. With Forge's temporary workspace-scoped `write_file` rule, a real `run_ai`
+  safe-mode call wrote the target file and exited 0, and Forge restored the settings file to its
+  prior absence afterward.
+- These live probes used bounded smoke prompts in disposable temporary workspaces (fresh non-git
+  directories, matching real scaffolds). No provider account identifier, credential, token, or raw
+  response was recorded in Forge evidence.
 
 ## Readiness and execution failure vocabulary
 
@@ -207,11 +234,9 @@ failure category and must not be treated as successful readiness.
 
 ## Remaining live evidence
 
-- Run an isolated bounded-write probe with a current-stable authenticated provider.
-- Run a bounded Antigravity workspace-write scaffold and record which commands require explicit
-  scoped permission rules in print mode.
-- Run bounded Claude and Codex failure probes for permission/model/network classification where
-  they can be done without secrets or external side effects.
-- Complete at least one authenticated end-to-end Antigravity-capable Forge scaffold and
-  independently verify every generated check before publishing a release that claims this provider
-  set.
+- Repeat a bounded Antigravity safe smoke call through Forge's real `run_ai` path and confirm both
+  the target output and that Forge restored `~/.gemini/antigravity-cli/settings.json` to its prior
+  state afterward.
+- Complete one authenticated end-to-end scaffold per provider before publishing a release that
+  claims full generated-project compatibility; these probes validate CLI execution, not stack
+  quality or verification behavior.

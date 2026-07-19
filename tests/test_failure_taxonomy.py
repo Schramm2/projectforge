@@ -2,7 +2,10 @@
 
 import pytest
 
-from projectforge.failure_taxonomy import classify_provider_failure
+from projectforge.failure_taxonomy import (
+    classify_provider_failure,
+    is_headless_permission_failure,
+)
 
 
 @pytest.mark.parametrize(
@@ -30,6 +33,16 @@ def test_provider_failure_taxonomy(output, timed_out, category):
     assert failure.summary
     assert failure.remediation
     assert "--resume" in failure.remediation or category == "missing_binary"
+
+
+def test_headless_permission_failure_is_detected_even_when_provider_exits_zero():
+    output = (
+        'no output produced: a tool required the "write_file" permission '
+        "that headless mode cannot prompt for"
+    )
+
+    assert is_headless_permission_failure(output)
+    assert classify_provider_failure(output, returncode=0).category == "permission"
 
 
 def test_provider_failure_never_echoes_credentials():

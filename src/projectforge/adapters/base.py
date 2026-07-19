@@ -12,6 +12,10 @@ from queue import Empty, Queue
 from threading import Thread
 
 from projectforge.execution_policy import build_provider_command
+from projectforge.failure_taxonomy import (
+    classify_provider_failure,
+    is_headless_permission_failure,
+)
 from projectforge.protocol import (
     AgentResult,
     AgentTask,
@@ -19,6 +23,7 @@ from projectforge.protocol import (
     ProgressEvent,
     ProgressEventType,
 )
+from projectforge.provider_permissions import workspace_write_permission
 from projectforge.subprocess_utils import PHASE_TIMEOUT, sanitize_progress_line
 
 
@@ -150,6 +155,7 @@ class CLIAdapterBase:
         self.approval_mode = approval_mode
         self.allow_unsafe = allow_unsafe
         self.phase_brief: str = ""  # Full phase prompt — set by orchestrator
+        self.project_dir: Path | None = None
 
     def execute(
         self,
@@ -158,34 +164,37 @@ class CLIAdapterBase:
         on_progress: Callable[[ProgressEvent], None],
     ) -> AgentResult:
         """Run the backend CLI as a subprocess and stream progress events."""
+        self.project_dir = project_dir
         command = self.build_cmd(self.build_prompt(task), model=task.model)
         reporter = _TaskProgressReporter.for_task(task, on_progress)
         reporter.emit("started", "Working...")
         started_at = time.monotonic()
 
-        try:
-            process = subprocess.Popen(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                cwd=str(project_dir),
-                text=True,
-            )
-        except FileNotFoundError:
-            summary = (
-                "The selected AI tool could not start. Run `forge doctor`, fix the reported "
-                "setup issue, then retry with `--resume`."
-            )
-            reporter.emit("failed", summary)
-            return _agent_result(
-                task,
-                summary=summary,
-                success=False,
-                duration=time.monotonic() - started_at,
-                returncode=-1,
-            )
+        with workspace_write_permission(self.backend, self.approval_mode, project_dir):
+            try:
+                process = subprocess.Popen(
+                    command,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    cwd=str(project_dir),
+                    text=True,
+                )
+            except FileNotFoundError:
+                summary = (
+                    "The selected AI tool could not start. Run `forge doctor`, fix the reported "
+                    "setup issue, then retry with `--resume`."
+                )
+                reporter.emit("failed", summary)
+                return _agent_result(
+                    task,
+                    summary=summary,
+                    success=False,
+                    duration=time.monotonic() - started_at,
+                    returncode=-1,
+                )
 
-        outcome = _stream_process(process, started_at=started_at, reporter=reporter)
+            outcome = _stream_process(process, started_at=started_at, reporter=reporter)
         if outcome.timed_out:
             summary = (
                 "This task took longer than allowed. Your completed work is safe; "
@@ -200,11 +209,27 @@ class CLIAdapterBase:
                 returncode=outcome.returncode,
             )
 
+        failure_input = "\n".join(outcome.last_lines)
         success = outcome.returncode == 0
-        if success:
+        failure = classify_provider_failure(failure_input, returncode=outcome.returncode)
+        if (
+            success
+            and self.backend == "antigravity"
+            and is_headless_permission_failure(failure_input)
+        ):
+            # Antigravity print mode can report a denied tool as exit 0 because
+            # the assistant turn itself completed. Forge must not advance the
+            # phase when the requested workspace action was denied.
+            success = False
+            returncode = 1
+            summary = failure.summary
+            reporter.emit("failed", summary)
+        elif success:
+            returncode = outcome.returncode
             summary = outcome.last_lines[-1] if outcome.last_lines else "Completed"
             reporter.emit("completed", summary)
         else:
+            returncode = outcome.returncode
             summary = (
                 "This task stopped before it finished. Your completed work is safe; "
                 "run `forge doctor`, then retry with `--resume`."
@@ -216,7 +241,7 @@ class CLIAdapterBase:
             summary=summary,
             success=success,
             duration=outcome.duration,
-            returncode=outcome.returncode,
+            returncode=returncode,
         )
 
     def build_prompt(self, task: AgentTask) -> str:
@@ -235,4 +260,5 @@ class CLIAdapterBase:
             model,
             approval_mode=self.approval_mode,
             allow_unsafe=self.allow_unsafe,
+            project_dir=self.project_dir,
         )
