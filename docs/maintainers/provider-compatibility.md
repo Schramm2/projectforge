@@ -3,8 +3,8 @@
 Evidence date: 2026-07-18
 Forge baseline: v0.5.1 release source
 
-Current-source note: `main` contains unreleased changes after v0.6.0. The provider probes below
-remain dated evidence; only the failure-presentation notes describe the newer source behavior.
+Release note: ProjectForge v0.7.0 includes newer failure-presentation behavior than the provider
+probes below. The probes remain dated evidence rather than current provider guarantees.
 
 This ledger records what ProjectForge may safely assume about each supported AI CLI. Provider
 documentation changes independently of Forge, so runtime help/version/status output is evidence

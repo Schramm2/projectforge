@@ -1,12 +1,10 @@
 # Homebrew Release
 
 Homebrew is a supported public installation route. The release workflow keeps this repository's
-formula synchronized with `Schramm2/homebrew-tap`. The checked-in formula is the v0.6.0 release
-baseline; current `main` contains unreleased changes after v0.6.0 and must not be described as a
-new Homebrew release until the normal publication and clean-install checks pass.
-
-The release tag is created before the workflow regenerates and commits the matching formula. Do not
-claim Homebrew availability until that synchronization step and the clean checks complete.
+formula synchronized with `Schramm2/homebrew-tap`. During release preparation, the checked-in
+formula may still describe the previous release until automation creates the tag and regenerates
+it. Do not claim a new Homebrew version is available until formula synchronization and the clean
+installation checks pass.
 
 The public naming contract is:
 

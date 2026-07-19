@@ -30,7 +30,7 @@ This directory ties portfolio claims to reproducible commands and measured resul
 ## Claim boundary
 
 - Measured outputs are dated in the historical verification report; they are not claims about the
-  current unreleased source.
+  current release.
 - Live scaffold quality and runtime depend on the external AI CLI and its authentication.
 - `--demo` controls generated application credentials; it does not authenticate the AI CLI.
 - The historical v0.4.1 report predates the PyPI workflow and does not prove availability of any
