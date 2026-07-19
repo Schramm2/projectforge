@@ -101,6 +101,32 @@ warning did not describe the actual capability.
 
 ## Resolution record
 
-Status: **Open**
+Implementation status: **Resolved in current source**
 
-Implementation and verification evidence will be added here after the fixes pass.
+Distribution status: **Pending the next patch release**
+
+| Finding | Resolution |
+| --- | --- |
+| NU-01 | `MEDIA_DIR` now resolves from `FORGE_DIR`, so the default is `~/.forge/media` and isolated runs use `$FORGE_HOME/media`. The global pytest fixture also redirects media storage away from the developer's home. |
+| NU-02 | `doctor` now calls the same CLI-or-macOS-application detector used by setup. Its JSON `editors` object remains a stable command-to-boolean mapping. |
+| NU-03 | Troubleshooting and browsable docs now show how to leave a source virtual environment and refresh command lookup without disabling Homebrew checks. |
+| NU-04 | Getting-started and browsable docs recommend a dedicated playground and explain the difference between a saved project directory and current-directory behavior. |
+| NU-05 | Documentation now states that `doctor` is a subcommand. No compatibility alias was added. |
+| NU-06 | No product change. Homebrew trust warnings remain under Homebrew's control. |
+
+Verification completed on 2026-07-19:
+
+- The two focused regression tests failed against the v0.7.0 behavior, then passed after the fix.
+- 580 pytest tests passed.
+- Ruff, the public-safety scan, documentation-link checks, operator-skill validation, and bundled
+  convention validation passed.
+- The wheel and source distribution built successfully and passed artifact inspection.
+- An isolated install of the built wheel reported v0.7.0, completed a dry run, and resolved media
+  under the supplied `FORGE_HOME`.
+- A Homebrew-shaped Python 3.13.14 virtual environment loaded the built wheel, detected the VS Code
+  and Antigravity macOS applications, and kept media under the isolated Forge home.
+- Source `projectforge doctor` returned ready with the real saved config and reported both detected
+  macOS applications.
+
+The published v0.7.0 Homebrew package still contains the original behavior. These corrections need
+a patch release before the public installation changes.

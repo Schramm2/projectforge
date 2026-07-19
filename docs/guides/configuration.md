@@ -13,7 +13,7 @@ atomically with user-only permissions, and rejects unknown keys.
 | Key | Meaning |
 | --- | --- |
 | `config_version` | Current config schema version. |
-| `preferred_editor` | Editor command used for optional project opening. |
+| `preferred_editor` | Editor identifier used for optional CLI or macOS application opening. |
 | `available_backends` | Provider names detected during the last setup run; readiness is rechecked. |
 | `backend_models` | Optional advanced model overrides keyed by provider. Empty means provider default/auto. |
 | `docker_available` | Docker availability observed during setup. |
@@ -147,9 +147,15 @@ copied provider or model catalog when scripting options.
 
 ## Media assets
 
-Named collections live under the repository's `media/<collection>/` directory. `--media` accepts a
-collection name, not an arbitrary path. If exactly one collection exists, Forge can select it
-unless `--no-media` is present.
+Named collections live under `~/.forge/media/<collection>/`, or
+`$FORGE_HOME/media/<collection>/` when the user-data override is active. This keeps user assets
+outside package-manager directories so upgrades and uninstalls do not remove them. `--media`
+accepts a collection name, not an arbitrary path. If exactly one collection exists, Forge can
+select it unless `--no-media` is present.
+
+If an older source checkout stored collections under its repository-level `media/` directory, move
+each named collection into `~/.forge/media/` before removing that checkout. Do not keep user assets
+inside a Homebrew Cellar directory because package upgrades can remove it.
 
 Destination depends on stack: `public/` for Next.js, `static/` for FastAPI, `frontend/public/` for a
 monorepo, and `assets/` for CLI/package/worker stacks.

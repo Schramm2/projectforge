@@ -76,7 +76,7 @@ truth.
 ## Design & Media
 
 - [DONE] **Design templates**: Bundled, global (`~/.forge/design-templates/`), and project-local design template resolution. Includes Default Design Guide template. Templates are integrated into the scaffold prompt and selectable during the interactive flow.
-- [DONE] **Media assets & collections**: Media asset detection and copying from repo-local `media/` collections. Supports images, fonts, and vectors across all stacks with manifest generation and prompt integration via `media_assets.py`.
+- [DONE] **Media assets & collections**: Media asset detection and copying from user-owned `~/.forge/media/` collections. Supports images, fonts, and vectors across all stacks with manifest generation and prompt integration via `media_assets.py`.
 
 ---
 

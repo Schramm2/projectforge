@@ -15,7 +15,12 @@ from projectforge.config import (
     get_backend_statuses,
 )
 from projectforge.provider_capabilities import PROVIDER_CAPABILITIES
-from projectforge.setup import CONFIG_PATH, _normalize_forge_config
+from projectforge.setup import (
+    CONFIG_PATH,
+    SUPPORTED_EDITORS,
+    _check_editor_installed,
+    _normalize_forge_config,
+)
 
 _VERSION_COMMANDS = {
     "claude": ["claude", "--version"],
@@ -27,7 +32,6 @@ _READINESS_COMMANDS = {
     "antigravity": "agy --version; agy models",
     "codex": "codex login status",
 }
-_EDITOR_COMMANDS = ("cursor", "code", "antigravity", "windsurf", "zed")
 
 
 def get_backend_version(backend: str) -> str | None:
@@ -57,6 +61,10 @@ def _tool_diagnostic(command: str) -> dict[str, bool | str | None]:
 
 def build_environment_report() -> dict:
     """Return non-identifying local toolchain facts in stable key order."""
+    editors = {
+        command: any(_check_editor_installed(command, app_bundle))
+        for command, _label, app_bundle in SUPPORTED_EDITORS
+    }
     return {
         "python": {
             "version": platform.python_version(),
@@ -64,7 +72,7 @@ def build_environment_report() -> dict:
         },
         "git": _tool_diagnostic("git"),
         "docker": _tool_diagnostic("docker"),
-        "editors": {editor: shutil.which(editor) is not None for editor in _EDITOR_COMMANDS},
+        "editors": editors,
     }
 
 

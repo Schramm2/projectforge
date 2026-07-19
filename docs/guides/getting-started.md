@@ -1,6 +1,7 @@
 # Getting Started
 
-> This guide documents ProjectForge v0.7.0 with the Claude, Antigravity, and Codex provider set.
+> This guide documents current source after ProjectForge v0.7.0 with the Claude, Antigravity,
+> and Codex provider set.
 >
 > Current source installs `projectforge` as the preferred collision-free command and keeps `forge`
 > as a compatibility alias. Foundry also installs a command named `forge`; use `projectforge` when
@@ -37,6 +38,19 @@ uv tool install matt-projectforge
 PyPI required the distinct `matt-projectforge` distribution name because `projectforge` was too
 similar to an existing project. All installation routes provide the preferred `projectforge`
 command and the `forge` compatibility alias.
+
+For a clean first run, use a dedicated parent directory rather than the ProjectForge source
+checkout. Save this path during setup if every scaffold should use it; leave the setup value empty
+only when projects should follow the directory where you invoke Forge.
+
+```bash
+mkdir -p ~/Projects/forge-playground
+cd ~/Projects/forge-playground
+projectforge --setup
+projectforge doctor
+```
+
+`doctor` is a subcommand, so use `projectforge doctor`, not `projectforge --doctor`.
 
 ## 2. Install and authenticate one provider
 

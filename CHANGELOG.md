@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- A dated Homebrew new-user setup audit with install, setup, diagnostic, and packaging evidence.
+
+### Changed
+
+- Getting-started and troubleshooting guidance now covers dedicated playgrounds and packaged
+  commands shadowed by an active source virtual environment.
+
+### Fixed
+
+- User-owned media collections now live under `~/.forge/media/` (or `$FORGE_HOME/media/`) instead
+  of a source checkout or versioned package-manager directory.
+- `forge doctor` now recognizes supported macOS editor applications using the same availability
+  rule as first-run setup.
+
 ## [0.7.0] - 2026-07-19
 
 ### Added

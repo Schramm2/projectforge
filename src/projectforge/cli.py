@@ -246,7 +246,7 @@ def doctor(
         ]
         editor_label = ", ".join(installed_editors)
         if not editor_label:
-            editor_label = "no editor CLI on PATH — set one with `projectforge --setup`"
+            editor_label = "none found — install one or run `projectforge --setup`"
         console.print(status_line(f"Editors: {editor_label}", accent="violet"))
         for backend, provider in report["providers"].items():
             version = f" ({provider['version']})" if provider["version"] else ""
@@ -2127,7 +2127,7 @@ def main(
         str | None,
         typer.Option(
             "--media",
-            help="Media collection name from the media/ folder to import.",
+            help="Media collection name from the Forge media folder to import.",
         ),
     ] = None,
     no_media: Annotated[
