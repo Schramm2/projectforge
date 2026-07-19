@@ -12,13 +12,17 @@ A Python CLI that wraps AI coding tools (Claude Code, Google Antigravity CLI, Co
 
 ```
 src/projectforge/       Core package (src layout)
-  cli.py               Command surface and scaffold orchestration
+  cli.py               Typer command surface and top-level lifecycle composition
   config.py            Backend install + readiness checks (BackendStatus)
   prompts.py           Interactive questionnaire with review/edit screen
   router.py            Phase routing and claude -> antigravity -> codex fallback
   prompt_builder.py    Assembles prompt from answers + conventions
-  runner.py            Provider subprocess execution and phase windows
-  orchestrator.py      Multi-agent task planning and reconciliation
+  scaffold_request.py  Typed non-interactive input normalization and validation
+  scaffold_prompts.py  Per-phase prompt plan, previews, exports, and progress records
+  scaffold_execution.py Serial, parallel, and orchestrated phase lifecycle
+  scaffold_completion.py Manifest, verification, hook, dashboard, and editor lifecycle
+  runner.py            Provider subprocess and parallel process execution
+  orchestrator.py      Multi-agent task planning, task graphs, and reconciliation
   stacks.py            Stack metadata and cross-recipe defaults
   setup.py             First-run wizard (backends, editor, git, Docker)
   convention_*.py      Bundled convention registry, compiler, admin, and history
@@ -38,10 +42,11 @@ skills/forge-scaffold/ Shipped agent operator skill
 
 ## How it works
 
-User runs `forge` -> setup wizard on first live run -> answers interactive questions -> router picks
-backends per phase -> prompt builder assembles the brief -> runner executes provider CLI subprocesses
--> Forge records progress and manifests, initializes git, verifies the result, runs the configured
-hook, records quality/preferences, and renders the final project card/dashboard.
+User runs `forge` -> setup wizard on first live run -> request boundary resolves interactive or CLI
+answers -> router picks backends per phase -> prompt plan assembles phase briefs -> phase executor
+runs provider CLI subprocesses -> completion lifecycle records manifests and progress, initializes
+git, verifies the result, runs the configured hook, records quality/preferences, and renders the
+final project card/dashboard.
 
 ## Dev commands
 

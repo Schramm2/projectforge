@@ -16,8 +16,8 @@ Use this checklist when promoting a new scaffold type into Forge.
    Define the stack's phases and preferred backend routing.
 5. Update `src/projectforge/prompt_builder.py`.
    Add the human-readable stack label used in the generated prompt.
-6. Update `src/projectforge/cli.py`.
-   Add any shorthand aliases accepted by `--stack`.
+6. Update `src/projectforge/scaffold_request.py`.
+   Add any shorthand aliases accepted by `--stack` to `STACK_ALIASES`.
 7. Update `src/projectforge/scaffold_options.py`.
    Wire in CI actions and auth support when the stack needs them.
 8. Update [../../README.md](../../README.md) and [../guides/stacks.md](../guides/stacks.md).

@@ -5,10 +5,13 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+import threading
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TypedDict
 
 from rich.live import Live
 from rich.text import Text
@@ -240,8 +243,6 @@ def _get_plan(
     _console.print(ui.status_line(f"Planning decomposition for {phase}...", accent="violet"))
     start = time.monotonic()
 
-    import threading
-
     plan_result = {"plan": None, "error": None, "done": False}
 
     def _run_planning():
@@ -312,138 +313,143 @@ def _get_plan(
     return _make_single_task_plan(brief, phase, backend)
 
 
+_DEPENDENCY_FAILURE_SUMMARY = (
+    "Not run because an earlier task did not finish. Fix the earlier "
+    "issue, then retry with `--resume`."
+)
+
+
+@dataclass
+class _TaskGraphExecution:
+    """Own task dependency, filesystem attribution, and context bookkeeping."""
+
+    plan: DecompositionPlan
+    adapter: object
+    project_dir: Path
+    on_progress: Callable[[ProgressEvent], None]
+    task_map: dict[str, AgentTask] = field(init=False)
+    results: list[AgentResult] = field(default_factory=list)
+    failed_task_ids: set[str] = field(default_factory=set)
+    accumulated_context: str = ""
+
+    def __post_init__(self) -> None:
+        self.task_map = {task.id: task for task in self.plan.tasks}
+
+    def run(self) -> list[AgentResult]:
+        for planned_group in self.plan.execution_order:
+            task_ids = [task_id for task_id in planned_group if task_id in self.task_map]
+            if not task_ids:
+                continue
+            self._share_completed_work_with(task_ids)
+            if len(task_ids) == 1:
+                self._run_sequential_task(task_ids[0])
+            else:
+                self._run_parallel_group(task_ids)
+        return self.results
+
+    def _share_completed_work_with(self, task_ids: list[str]) -> None:
+        for task_id in task_ids:
+            self.task_map[task_id].context = self.accumulated_context
+
+    def _dependency_failed(self, task: AgentTask) -> bool:
+        return any(dependency in self.failed_task_ids for dependency in task.dependencies)
+
+    def _skipped_result(self, task_id: str) -> AgentResult:
+        return AgentResult(
+            task_id=task_id,
+            files_created=[],
+            files_modified=[],
+            summary=_DEPENDENCY_FAILURE_SUMMARY,
+            success=False,
+            duration=0.0,
+            returncode=-1,
+        )
+
+    def _execute_or_skip(self, task_id: str) -> AgentResult:
+        task = self.task_map[task_id]
+        if self._dependency_failed(task):
+            return self._skipped_result(task_id)
+        return self.adapter.execute(task, self.project_dir, self.on_progress)
+
+    def _record_quality_signal(self, result: AgentResult) -> None:
+        task = self.task_map[result.task_id]
+        append_agent_quality_signal(
+            log_path=QUALITY_LOG_PATH,
+            phase=task.phase,
+            backend=task.backend,
+            task_id=result.task_id,
+            task_description=task.description,
+            success=result.success,
+            duration=result.duration,
+        )
+
+    def _record_failure(self, result: AgentResult) -> None:
+        if not result.success:
+            self.failed_task_ids.add(result.task_id)
+
+    def _context_summary_for(
+        self,
+        result: AgentResult,
+        files_created: list[str],
+        files_modified: list[str],
+    ) -> str:
+        return build_context_summary(
+            self.task_map[result.task_id],
+            files_created,
+            files_modified,
+            self.project_dir,
+        )
+
+    def _run_sequential_task(self, task_id: str) -> None:
+        task = self.task_map[task_id]
+        if self._dependency_failed(task):
+            result = self._skipped_result(task_id)
+            self.results.append(result)
+            self.failed_task_ids.add(task_id)
+            return
+
+        before = snapshot_directory(self.project_dir)
+        result = self.adapter.execute(task, self.project_dir, self.on_progress)
+        created, modified = diff_snapshots(before, snapshot_directory(self.project_dir))
+        result.files_created = created
+        result.files_modified = modified
+
+        self._record_failure(result)
+        self._record_quality_signal(result)
+        summary = self._context_summary_for(result, created, modified)
+        self.accumulated_context = accumulate_context(self.accumulated_context, summary)
+        self.results.append(result)
+
+    def _run_parallel_group(self, task_ids: list[str]) -> None:
+        before = snapshot_directory(self.project_dir)
+        with ThreadPoolExecutor(max_workers=len(task_ids)) as pool:
+            group_results = list(pool.map(self._execute_or_skip, task_ids))
+        created, modified = diff_snapshots(before, snapshot_directory(self.project_dir))
+
+        summaries: list[str] = []
+        for result in group_results:
+            result.files_created = created
+            result.files_modified = modified
+            self._record_failure(result)
+            self._record_quality_signal(result)
+            summaries.append(self._context_summary_for(result, created, modified))
+
+        combined_summary = "\n\n".join(summaries)
+        self.accumulated_context = accumulate_context(
+            self.accumulated_context,
+            combined_summary,
+        )
+        self.results.extend(group_results)
+
+
 def _execute_task_graph(
     plan: DecompositionPlan,
     adapter,
     project_dir: Path,
     on_progress: Callable[[ProgressEvent], None],
 ) -> list[AgentResult]:
-    """Walk execution_order groups, executing tasks via *adapter*.
-
-    - Groups with a single task: snapshot per task (accurate attribution).
-    - Groups with multiple tasks: one snapshot before the group, one diff
-      after all complete. Each task gets the combined diff (known limitation).
-    - Tasks whose dependencies failed are skipped.
-    """
-    task_map: dict[str, AgentTask] = {t.id: t for t in plan.tasks}
-    results: list[AgentResult] = []
-    failed_ids: set[str] = set()
-    accumulated_context = ""
-
-    for group in plan.execution_order:
-        # Filter to valid task IDs only
-        group_ids = [tid for tid in group if tid in task_map]
-        if not group_ids:
-            continue
-
-        # Inject accumulated context into each task
-        for tid in group_ids:
-            task_map[tid].context = accumulated_context
-
-        is_parallel = len(group_ids) > 1
-
-        if is_parallel:
-            # --- parallel group: one snapshot for the whole group ---
-            before = snapshot_directory(project_dir)
-
-            def _run_task(tid: str) -> AgentResult:
-                task = task_map[tid]
-                # Check dependencies
-                if any(dep in failed_ids for dep in task.dependencies):
-                    return AgentResult(
-                        task_id=tid,
-                        files_created=[],
-                        files_modified=[],
-                        summary=(
-                            "Not run because an earlier task did not finish. Fix the earlier "
-                            "issue, then retry with `--resume`."
-                        ),
-                        success=False,
-                        duration=0.0,
-                        returncode=-1,
-                    )
-                return adapter.execute(task, project_dir, on_progress)
-
-            with ThreadPoolExecutor(max_workers=len(group_ids)) as pool:
-                group_results = list(pool.map(_run_task, group_ids))
-
-            # Diff once for the whole group
-            after = snapshot_directory(project_dir)
-            created, modified = diff_snapshots(before, after)
-
-            # Build ONE combined summary for the group
-            group_summaries: list[str] = []
-            for res in group_results:
-                res.files_created = created
-                res.files_modified = modified
-                if not res.success:
-                    failed_ids.add(res.task_id)
-                group_summaries.append(
-                    build_context_summary(task_map[res.task_id], created, modified, project_dir)
-                )
-                _task = task_map[res.task_id]
-                append_agent_quality_signal(
-                    log_path=QUALITY_LOG_PATH,
-                    phase=_task.phase,
-                    backend=_task.backend,
-                    task_id=res.task_id,
-                    task_description=_task.description,
-                    success=res.success,
-                    duration=res.duration,
-                )
-            combined_summary = "\n\n".join(group_summaries)
-            accumulated_context = accumulate_context(accumulated_context, combined_summary)
-            results.extend(group_results)
-
-        else:
-            # --- sequential (single-task) group: snapshot per task ---
-            for tid in group_ids:
-                task = task_map[tid]
-
-                # Check dependencies
-                if any(dep in failed_ids for dep in task.dependencies):
-                    skip_result = AgentResult(
-                        task_id=tid,
-                        files_created=[],
-                        files_modified=[],
-                        summary=(
-                            "Not run because an earlier task did not finish. Fix the earlier "
-                            "issue, then retry with `--resume`."
-                        ),
-                        success=False,
-                        duration=0.0,
-                        returncode=-1,
-                    )
-                    results.append(skip_result)
-                    failed_ids.add(tid)
-                    continue
-
-                before = snapshot_directory(project_dir)
-                result = adapter.execute(task, project_dir, on_progress)
-                after = snapshot_directory(project_dir)
-                created, modified = diff_snapshots(before, after)
-
-                result.files_created = created
-                result.files_modified = modified
-
-                if not result.success:
-                    failed_ids.add(tid)
-
-                append_agent_quality_signal(
-                    log_path=QUALITY_LOG_PATH,
-                    phase=task.phase,
-                    backend=task.backend,
-                    task_id=tid,
-                    task_description=task.description,
-                    success=result.success,
-                    duration=result.duration,
-                )
-
-                summary = build_context_summary(task, created, modified, project_dir)
-                accumulated_context = accumulate_context(accumulated_context, summary)
-                results.append(result)
-
-    return results
+    """Execute valid task groups, preserving group-level parallel attribution."""
+    return _TaskGraphExecution(plan, adapter, project_dir, on_progress).run()
 
 
 def _reconcile(
@@ -452,8 +458,6 @@ def _reconcile(
     model: str | None = None,
 ) -> int:
     """Lightweight cleanup CLI call after all tasks have finished."""
-    import threading
-
     prompt = (
         "Review the project directory for any conflicts, duplicated code, "
         "or inconsistencies introduced by parallel agents. Fix them."
@@ -563,6 +567,156 @@ def _render_decomposition_plan(plan: DecompositionPlan) -> None:
     console.print(panel)
 
 
+class _Activity(TypedDict):
+    summary: str
+    completed: bool
+
+
+class _AgentStats(TypedDict):
+    planned: int
+    completed: int
+    failed: int
+
+
+@dataclass
+class _ActivityFeed:
+    """Translate protocol events into the compact live activity history."""
+
+    activities: list[_Activity] = field(default_factory=list)
+    current: str = ""
+
+    def record(self, event: ProgressEvent) -> None:
+        text = map_progress_to_activity(event)
+        if event.event_type == "started":
+            if self.activities:
+                self.activities[-1]["completed"] = True
+            self.activities.append({"summary": text, "completed": False})
+        elif event.event_type in ("completed", "failed") and self.activities:
+            self.activities[-1]["completed"] = True
+            self.activities[-1]["summary"] = text
+        self.current = text
+
+    @property
+    def visible_activities(self) -> list[_Activity] | None:
+        return self.activities[-6:] or None
+
+
+def _stats_for(results: list[AgentResult]) -> _AgentStats:
+    completed = sum(1 for result in results if result.success)
+    return {
+        "planned": len(results),
+        "completed": completed,
+        "failed": len(results) - completed,
+    }
+
+
+def _run_single_planned_task(
+    task: AgentTask,
+    adapter,
+    project_dir: Path,
+    activity_feed: _ActivityFeed,
+    phase_context: str | None,
+) -> tuple[int, _AgentStats]:
+    if phase_context:
+        task.context = phase_context
+    result = adapter.execute(task, project_dir, activity_feed.record)
+    stats = _stats_for([result])
+    return (0 if result.success else 1, stats)
+
+
+def _run_task_graph_with_live_progress(
+    plan: DecompositionPlan,
+    adapter,
+    project_dir: Path,
+    phase: str,
+    activity_feed: _ActivityFeed,
+) -> tuple[list[AgentResult], float]:
+    execution_done = {"done": False}
+    results: list[AgentResult] = []
+
+    def _run_graph() -> None:
+        results.extend(
+            _execute_task_graph(
+                plan,
+                adapter,
+                project_dir,
+                on_progress=activity_feed.record,
+            )
+        )
+        execution_done["done"] = True
+
+    started_at = time.monotonic()
+    worker = threading.Thread(target=_run_graph, daemon=True)
+    worker.start()
+
+    with Live(console=_console, refresh_per_second=10) as live:
+        while not execution_done["done"]:
+            elapsed = time.monotonic() - started_at
+            live.update(
+                ui.make_loader_panel(
+                    f"{phase} agents",
+                    activity_feed.current or "Starting subagent tasks...",
+                    elapsed=elapsed,
+                    spinner_frame=spinner_frame(elapsed),
+                    spinner_style=spinner_style("violet", elapsed),
+                    accent="violet",
+                    activities=activity_feed.visible_activities,
+                )
+            )
+            time.sleep(0.1)
+
+    worker.join(timeout=5)
+    return results, time.monotonic() - started_at
+
+
+def _task_description(result: AgentResult, task_map: dict[str, AgentTask]) -> str:
+    task = task_map.get(result.task_id)
+    description = task.description if task else result.task_id
+    if len(description) <= 60:
+        return description
+    return description[:60].rstrip() + "..."
+
+
+def _render_agent_results(
+    plan: DecompositionPlan,
+    results: list[AgentResult],
+    elapsed: float,
+) -> _AgentStats:
+    stats = _stats_for(results)
+    task_map = {task.id: task for task in plan.tasks}
+    summary_lines: list[Text] = []
+
+    for result in results:
+        line = Text("  ")
+        description = _task_description(result, task_map)
+        if result.success:
+            line.append("✓ ", style=ui.ACCENTS["aqua"])
+            line.append(description, style=ui.TEXT_SECONDARY)
+            line.append(f"  {result.duration:.0f}s", style=ui.TEXT_MUTED)
+        else:
+            line.append("✗ ", style=ui.ACCENTS["plum"])
+            line.append(description, style=ui.TEXT_SECONDARY)
+            line.append(f"  {result.summary[:40]}", style=ui.TEXT_MUTED)
+        summary_lines.append(line)
+
+    header = Text()
+    header.append(f"  {stats['completed']}", style=f"bold {ui.ACCENTS['aqua']}")
+    header.append(" completed", style=ui.TEXT_SECONDARY)
+    if stats["failed"]:
+        header.append(f"  {stats['failed']}", style=f"bold {ui.ACCENTS['plum']}")
+        header.append(" failed", style=ui.TEXT_SECONDARY)
+    header.append(f"  ({elapsed:.0f}s total)", style=ui.TEXT_MUTED)
+
+    _console.print(
+        ui.make_panel(
+            ui.grouped_lines([header, Text()] + summary_lines),
+            title="Subagent Results",
+            accent="aqua" if stats["failed"] == 0 else "amber",
+        )
+    )
+    return stats
+
+
 def run_phase_orchestrated(
     phase: str,
     backend: str,
@@ -594,119 +748,32 @@ def run_phase_orchestrated(
     if len(plan.tasks) > 1:
         _render_decomposition_plan(plan)
 
-    # Activity tracking for subagent progress
-    _activities: list[dict] = []
-    _current_activity = ""
-
-    def _on_progress(event: ProgressEvent) -> None:
-        nonlocal _current_activity
-        text = map_progress_to_activity(event)
-        if event.event_type == "started":
-            # Mark previous as done, add new active entry
-            if _activities:
-                _activities[-1]["completed"] = True
-            _activities.append({"summary": text, "completed": False})
-        elif event.event_type in ("completed", "failed"):
-            # Mark current task as done
-            if _activities:
-                _activities[-1]["completed"] = True
-                _activities[-1]["summary"] = text
-        _current_activity = text
-
-    # Single task: execute directly (skip orchestration overhead)
+    activity_feed = _ActivityFeed()
     if len(plan.tasks) == 1:
-        task = plan.tasks[0]
-        if phase_context:
-            task.context = phase_context
-        result = adapter.execute(task, project_dir, _on_progress)
-        success = result.success
-        stats = {"planned": 1, "completed": 1 if success else 0, "failed": 0 if success else 1}
-        return (0 if success else 1, stats)
-
-    # Multi-task: execute the full task graph with live progress display
-    if phase_context:
-        for t in plan.tasks:
-            t.context = phase_context
-
-    import threading
-
-    exec_done = {"done": False}
-    exec_results: list[AgentResult] = []
-
-    def _run_graph():
-        result = _execute_task_graph(plan, adapter, project_dir, on_progress=_on_progress)
-        exec_results.extend(result)
-        exec_done["done"] = True
-
-    exec_start = time.monotonic()
-    worker = threading.Thread(target=_run_graph, daemon=True)
-    worker.start()
-
-    with Live(console=_console, refresh_per_second=10) as live:
-        while not exec_done["done"]:
-            elapsed = time.monotonic() - exec_start
-            visible = _activities[-6:] if _activities else []
-            loader = ui.make_loader_panel(
-                f"{phase} agents",
-                _current_activity or "Starting subagent tasks...",
-                elapsed=elapsed,
-                spinner_frame=spinner_frame(elapsed),
-                spinner_style=spinner_style("violet", elapsed),
-                accent="violet",
-                activities=visible if visible else None,
-            )
-            live.update(loader)
-            time.sleep(0.1)
-
-    worker.join(timeout=5)
-    elapsed = time.monotonic() - exec_start
-    results = exec_results
-
-    # Render subagent results panel
-    completed_count = sum(1 for r in results if r.success)
-    failed_count = len(results) - completed_count
-    task_map = {t.id: t for t in plan.tasks}
-
-    summary_lines: list[Text] = []
-    for r in results:
-        task = task_map.get(r.task_id)
-        desc = task.description[:60] if task else r.task_id
-        if len(desc) < len(task.description if task else r.task_id):
-            desc = desc.rstrip() + "..."
-        line = Text("  ")
-        if r.success:
-            line.append("✓ ", style=ui.ACCENTS["aqua"])
-            line.append(desc, style=ui.TEXT_SECONDARY)
-            line.append(f"  {r.duration:.0f}s", style=ui.TEXT_MUTED)
-        else:
-            line.append("✗ ", style=ui.ACCENTS["plum"])
-            line.append(desc, style=ui.TEXT_SECONDARY)
-            line.append(f"  {r.summary[:40]}", style=ui.TEXT_MUTED)
-        summary_lines.append(line)
-
-    # Header line
-    header = Text()
-    header.append(f"  {completed_count}", style=f"bold {ui.ACCENTS['aqua']}")
-    header.append(" completed", style=ui.TEXT_SECONDARY)
-    if failed_count:
-        header.append(f"  {failed_count}", style=f"bold {ui.ACCENTS['plum']}")
-        header.append(" failed", style=ui.TEXT_SECONDARY)
-    header.append(f"  ({elapsed:.0f}s total)", style=ui.TEXT_MUTED)
-
-    accent = "aqua" if failed_count == 0 else "amber"
-    _console.print(
-        ui.make_panel(
-            ui.grouped_lines([header, Text()] + summary_lines),
-            title="Subagent Results",
-            accent=accent,
+        return _run_single_planned_task(
+            plan.tasks[0],
+            adapter,
+            project_dir,
+            activity_feed,
+            phase_context,
         )
+
+    if phase_context:
+        for task in plan.tasks:
+            task.context = phase_context
+
+    results, elapsed = _run_task_graph_with_live_progress(
+        plan,
+        adapter,
+        project_dir,
+        phase,
+        activity_feed,
     )
+    stats = _render_agent_results(plan, results, elapsed)
 
     # Reconcile (non-fatal)
     rc = _reconcile(adapter, project_dir, model)
     if rc != 0:
         log.warning("Reconciliation exited with code %d (non-fatal)", rc)
 
-    planned = len(results)
-    stats = {"planned": planned, "completed": completed_count, "failed": failed_count}
     return (0 if all(r.success for r in results) else 1, stats)

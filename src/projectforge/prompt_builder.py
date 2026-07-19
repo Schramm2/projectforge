@@ -8,6 +8,11 @@ Each phase has two prompt variants:
   - best: used when the ideal/specialist backend handles the phase
 """
 
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+
 from projectforge.project_context import build_project_context_block
 from projectforge.router import PHASE_IDEAL_BACKEND
 from projectforge.scaffold_options import AUTH_PROVIDER_OPTIONS, CI_ACTION_OPTIONS
@@ -1812,9 +1817,115 @@ instead, or add a skip with a clear reason.
 </extra_instructions>"""
 
 
-# ---------------------------------------------------------------------------
-# Dispatcher
-# ---------------------------------------------------------------------------
+SimplePhaseBuilder = Callable[[dict], str]
+
+
+@dataclass(frozen=True)
+class _PhasePromptVariants:
+    """Fallback, specialist, and optional Codex-specific wording for one phase."""
+
+    fallback: SimplePhaseBuilder
+    specialist: SimplePhaseBuilder
+    codex: SimplePhaseBuilder | None = None
+
+    def select(self, *, phase: str, backend: str) -> SimplePhaseBuilder:
+        if backend == "codex" and self.codex is not None:
+            return self.codex
+        if _is_ideal_backend(phase, backend):
+            return self.specialist
+        return self.fallback
+
+
+_TARGETED_PHASE_PRIORITY = ("frontend", "tests", "verify")
+_TARGETED_PHASE_BUILDERS = {
+    "frontend": _PhasePromptVariants(
+        fallback=build_frontend_prompt,
+        specialist=build_frontend_prompt_best,
+        codex=build_frontend_prompt_codex,
+    ),
+    "tests": _PhasePromptVariants(
+        fallback=build_tests_prompt,
+        specialist=build_tests_prompt_best,
+    ),
+    "verify": _PhasePromptVariants(
+        fallback=build_verify_prompt,
+        specialist=build_verify_prompt_best,
+        codex=build_verify_prompt_codex,
+    ),
+}
+
+
+@dataclass(frozen=True)
+class _PhasePromptRequest:
+    """Normalized phase ownership used to select one prompt contract."""
+
+    phases: frozenset[str]
+    all_phases: frozenset[str]
+    backend: str
+
+    @classmethod
+    def from_lists(
+        cls,
+        phases: list[str],
+        all_phases: list[str],
+        backend: str,
+    ) -> _PhasePromptRequest:
+        return cls(frozenset(phases), frozenset(all_phases), backend)
+
+    @property
+    def owns_complete_scaffold(self) -> bool:
+        return self.phases == self.all_phases
+
+    @property
+    def targeted_phase(self) -> str | None:
+        return next(
+            (phase for phase in _TARGETED_PHASE_PRIORITY if phase in self.phases),
+            None,
+        )
+
+
+def _build_full_phase_prompt(
+    request: _PhasePromptRequest,
+    answers: dict,
+    conventions: str,
+    claude_md_template: str | None,
+) -> str:
+    builder = build_prompt_codex if request.backend == "codex" else build_prompt
+    return builder(answers, conventions, claude_md_template)
+
+
+def _build_architecture_phase_prompt(
+    request: _PhasePromptRequest,
+    answers: dict,
+    conventions: str,
+    claude_md_template: str | None,
+) -> str:
+    exclude_frontend = "frontend" in request.all_phases and "frontend" not in request.phases
+    exclude_tests = "tests" in request.all_phases and "tests" not in request.phases
+    if request.backend == "codex":
+        builder = build_architecture_prompt_codex
+    elif _is_ideal_backend("architecture", request.backend):
+        builder = build_architecture_prompt_best
+    else:
+        builder = build_architecture_prompt
+    return builder(
+        answers,
+        conventions,
+        claude_md_template,
+        exclude_frontend,
+        exclude_tests,
+    )
+
+
+def _build_targeted_phase_prompt(
+    request: _PhasePromptRequest,
+    answers: dict,
+) -> str | None:
+    phase = request.targeted_phase
+    if phase is None:
+        return None
+    variants = _TARGETED_PHASE_BUILDERS[phase]
+    return variants.select(phase=phase, backend=request.backend)(answers)
 
 
 def build_phase_prompt(
@@ -1841,67 +1952,19 @@ def build_phase_prompt(
         backend: The backend that will execute this prompt.
         claude_md_template: Optional CLAUDE.md template.
     """
-    phase_set = set(phases)
-    all_set = set(all_phases)
-
-    # All phases merged → standard full prompt (identical to pre-multi-backend behavior)
-    if phase_set == all_set:
-        if backend == "codex":
-            prompt = build_prompt_codex(answers, conventions, claude_md_template)
-        else:
-            prompt = build_prompt(answers, conventions, claude_md_template)
-    elif "architecture" in phase_set:
-        # Architecture phase (possibly merged with others)
-        exclude_frontend = "frontend" in all_set and "frontend" not in phase_set
-        exclude_tests = "tests" in all_set and "tests" not in phase_set
-        if backend == "codex":
-            prompt = build_architecture_prompt_codex(
-                answers,
-                conventions,
-                claude_md_template,
-                exclude_frontend,
-                exclude_tests,
-            )
-        elif _is_ideal_backend("architecture", backend):
-            prompt = build_architecture_prompt_best(
-                answers,
-                conventions,
-                claude_md_template,
-                exclude_frontend,
-                exclude_tests,
-            )
-        else:
-            prompt = build_architecture_prompt(
-                answers,
-                conventions,
-                claude_md_template,
-                exclude_frontend,
-                exclude_tests,
-            )
-    elif "frontend" in phase_set:
-        # Standalone frontend phase
-        if backend == "codex":
-            prompt = build_frontend_prompt_codex(answers)
-        elif _is_ideal_backend("frontend", backend):
-            prompt = build_frontend_prompt_best(answers)
-        else:
-            prompt = build_frontend_prompt(answers)
-    elif "tests" in phase_set:
-        # Standalone tests phase
-        if _is_ideal_backend("tests", backend):
-            prompt = build_tests_prompt_best(answers)
-        else:
-            prompt = build_tests_prompt(answers)
-    elif "verify" in phase_set:
-        # Standalone verify phase
-        if backend == "codex":
-            prompt = build_verify_prompt_codex(answers)
-        elif _is_ideal_backend("verify", backend):
-            prompt = build_verify_prompt_best(answers)
-        else:
-            prompt = build_verify_prompt(answers)
+    request = _PhasePromptRequest.from_lists(phases, all_phases, backend)
+    if request.owns_complete_scaffold:
+        prompt = _build_full_phase_prompt(request, answers, conventions, claude_md_template)
+    elif "architecture" in request.phases:
+        prompt = _build_architecture_phase_prompt(
+            request,
+            answers,
+            conventions,
+            claude_md_template,
+        )
     else:
-        # Shouldn't happen, but fallback to full prompt
-        prompt = build_prompt(answers, conventions, claude_md_template)
+        prompt = _build_targeted_phase_prompt(request, answers)
+        if prompt is None:
+            prompt = build_prompt(answers, conventions, claude_md_template)
 
     return _with_project_context(prompt, answers)

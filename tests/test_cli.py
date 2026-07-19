@@ -599,6 +599,50 @@ def test_dry_run_integration_includes_auth_ci_and_extra_sections(monkeypatch):
     assert "DEMO MODE" in result.stdout
 
 
+@pytest.mark.parametrize(
+    ("extra_args", "expected_message"),
+    [
+        (["--stack", "unknown"], "That stack is not available"),
+        (["--auth-provider", "unknown"], "authentication option is not available"),
+        (
+            ["--stack", "fastapi", "--auth-provider", "clerk"],
+            "does not support an authentication option",
+        ),
+        (["--design-template", "unknown"], "design template is not available"),
+        (
+            ["--stack", "fastapi", "--design-template", "default-design-guide"],
+            "does not support a design template",
+        ),
+        (["--ci-template", "unknown"], "CI template is not available"),
+        (["--ci-actions", "unknown"], "CI checks do not work with this stack"),
+    ],
+)
+def test_non_interactive_option_validation_keeps_actionable_errors(
+    monkeypatch,
+    extra_args,
+    expected_message,
+):
+    setup_called = [False]
+    _patch_prompt_only_dependencies(monkeypatch, setup_called=setup_called)
+    command = [
+        "--dry-run",
+        "--name",
+        "studio",
+        "--stack",
+        "nextjs",
+        "--description",
+        "A branded client portal",
+        "--no-open",
+        "--no-verify",
+        *extra_args,
+    ]
+
+    result = runner.invoke(app, command)
+
+    assert result.exit_code == 1
+    assert expected_message in result.stdout
+
+
 def test_dry_run_loads_compiled_conventions_for_requested_stack(monkeypatch):
     setup_called = [False]
     _patch_prompt_only_dependencies(monkeypatch, setup_called=setup_called)

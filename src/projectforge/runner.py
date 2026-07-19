@@ -120,6 +120,172 @@ def _initial_phase_summary(label: str, backend: str) -> str:
     return f"Working through the scaffold with {backend}"
 
 
+class _ProviderOutput:
+    """Sanitized provider output shared by the reader thread and live display."""
+
+    def __init__(self, display_label: str, backend: str) -> None:
+        self.tracker = ActivityTracker()
+        self.tracker.update(_initial_phase_summary(display_label, backend))
+        self.tail: list[str] = []
+        self.lock = threading.Lock()
+
+    def stream(self, pipe: io.BufferedReader, live: Live, *, verbose: bool) -> None:
+        try:
+            for raw_line in iter(pipe.readline, b""):
+                line = raw_line.decode("utf-8", errors="replace").rstrip("\n")
+                if not line:
+                    continue
+                clean = sanitize_progress_line(line)
+                if not clean:
+                    continue
+                with self.lock:
+                    self.tail.append(clean)
+                    if len(self.tail) > 50:
+                        del self.tail[0]
+                    new_summary = summarize_output_line(clean)
+                    if new_summary and new_summary != self.tracker.current:
+                        self.tracker.update(new_summary)
+                if verbose and new_summary:
+                    live.console.print(new_summary)
+        except ValueError:
+            return
+
+    def display_state(self) -> tuple[str, list[dict]]:
+        with self.lock:
+            return self.tracker.current, self.tracker.visible_steps()
+
+    @property
+    def failure_input(self) -> str:
+        return "\n".join(self.tail)
+
+
+def _render_provider_command(command: list[str], prompt: str, project_dir: Path) -> None:
+    display_command = [part if part != prompt else "<prompt>" for part in command]
+    console.print(
+        make_panel(
+            grouped_lines(
+                [
+                    subtle(f"Command: {' '.join(display_command)}"),
+                    subtle(f"Working directory: {project_dir}"),
+                ]
+            ),
+            title="Execution",
+            accent="violet",
+        )
+    )
+
+
+def _render_provider_timeout() -> ProviderExit:
+    failure = classify_provider_failure("", returncode=None, timed_out=True)
+    console.print(
+        make_panel(
+            grouped_lines(
+                [
+                    Text.assemble(
+                        badge("timeout", "warning"),
+                        Text("  "),
+                        subtle("Project generation took longer than the allowed time."),
+                    ),
+                    muted(failure.summary),
+                    muted(failure.remediation),
+                ]
+            ),
+            title="Execution",
+            accent="amber",
+        )
+    )
+    return ProviderExit(124, failure.category)
+
+
+def _monitor_provider(
+    process: subprocess.Popen,
+    output: _ProviderOutput,
+    *,
+    display_label: str,
+    accent: str,
+    phase_context: list[dict] | None,
+    started_at: float,
+    verbose: bool,
+) -> ProviderExit | None:
+    with Live(console=console, refresh_per_second=12) as live:
+        reader = threading.Thread(
+            target=output.stream,
+            args=(process.stdout, live),
+            kwargs={"verbose": verbose},
+            daemon=True,
+        )
+        reader.start()
+
+        while process.poll() is None:
+            elapsed = time.monotonic() - started_at
+            if elapsed > PHASE_TIMEOUT:
+                process.kill()
+                process.wait()
+                reader.join(timeout=5)
+                return _render_provider_timeout()
+            summary, activities = output.display_state()
+            loader = make_loader_panel(
+                display_label,
+                summary,
+                elapsed=elapsed,
+                spinner_frame=spinner_frame(elapsed),
+                spinner_style=spinner_style(accent, elapsed),
+                accent=accent,
+                detail=None,
+                activities=activities,
+            )
+            if phase_context:
+                from rich.console import Group as RichGroup
+
+                live.update(RichGroup(make_phase_timeline(phase_context), Text(), loader))
+            else:
+                live.update(loader)
+            time.sleep(0.2)
+
+        reader.join(timeout=5)
+    return None
+
+
+def _render_provider_completion(
+    *,
+    display_label: str,
+    elapsed: float,
+    returncode: int,
+    accent: str,
+    verbose: bool,
+    failure_input: str,
+) -> ProviderExit:
+    failure = (
+        classify_provider_failure(failure_input, returncode=returncode) if returncode != 0 else None
+    )
+    if failure is not None and not verbose:
+        console.print(
+            make_panel(
+                grouped_lines(
+                    [
+                        Text.assemble(
+                            badge("failed", "error"),
+                            Text("  "),
+                            subtle("Project generation stopped before this step finished."),
+                        ),
+                        muted(failure.summary),
+                        muted(failure.remediation),
+                    ]
+                ),
+                title="Execution",
+                accent="plum",
+            )
+        )
+
+    if verbose:
+        console.print(
+            status_line(f"{display_label} completed in {elapsed:.1f}s (exit {returncode})")
+        )
+    else:
+        console.print(status_line(f"{display_label} finished in {elapsed:.0f}s", accent=accent))
+    return ProviderExit(returncode, failure.category if failure is not None else None)
+
+
 def run_ai(
     backend: str,
     prompt: str,
@@ -168,50 +334,11 @@ def run_ai(
         return 1
 
     if verbose:
-        display_cmd = [c if c != prompt else "<prompt>" for c in cmd]
-        console.print(
-            make_panel(
-                grouped_lines(
-                    [
-                        subtle(f"Command: {' '.join(display_cmd)}"),
-                        subtle(f"Working directory: {project_dir}"),
-                    ]
-                ),
-                title="Execution",
-                accent="violet",
-            )
-        )
+        _render_provider_command(cmd, prompt, project_dir)
 
-    start = time.monotonic()
+    started_at = time.monotonic()
     accent = _phase_accent(backend)
-    tracker = ActivityTracker()
-    tracker.update(_initial_phase_summary(display_label, backend))
-    last_line = ""
-    provider_tail: list[str] = []
-    lock = threading.Lock()
-
-    def _stream_stdout(pipe: io.BufferedReader, live: Live) -> None:
-        """Read stdout line-by-line and update the polished loader state."""
-        nonlocal last_line
-        try:
-            for raw_line in iter(pipe.readline, b""):
-                line = raw_line.decode("utf-8", errors="replace").rstrip("\n")
-                if line:
-                    clean = sanitize_progress_line(line)
-                    if not clean:
-                        continue
-                    with lock:
-                        last_line = clean
-                        provider_tail.append(clean)
-                        if len(provider_tail) > 50:
-                            del provider_tail[0]
-                        new_summary = summarize_output_line(clean)
-                        if new_summary and new_summary != tracker.current:
-                            tracker.update(new_summary)
-                    if verbose and new_summary:
-                        live.console.print(new_summary)
-        except ValueError:
-            pass  # pipe closed
+    output = _ProviderOutput(display_label, backend)
 
     try:
         proc = subprocess.Popen(
@@ -220,99 +347,61 @@ def run_ai(
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
         )
-
-        with Live(console=console, refresh_per_second=12) as live:
-            reader = threading.Thread(target=_stream_stdout, args=(proc.stdout, live), daemon=True)
-            reader.start()
-
-            while proc.poll() is None:
-                elapsed = time.monotonic() - start
-                if elapsed > PHASE_TIMEOUT:
-                    proc.kill()
-                    proc.wait()
-                    reader.join(timeout=5)
-                    failure = classify_provider_failure("", returncode=None, timed_out=True)
-                    console.print(
-                        make_panel(
-                            grouped_lines(
-                                [
-                                    Text.assemble(
-                                        badge("timeout", "warning"),
-                                        Text("  "),
-                                        subtle(
-                                            "Project generation took longer than the allowed time."
-                                        ),
-                                    ),
-                                    muted(failure.summary),
-                                    muted(failure.remediation),
-                                ]
-                            ),
-                            title="Execution",
-                            accent="amber",
-                        )
-                    )
-                    return ProviderExit(124, failure.category)
-                with lock:
-                    current_activities = tracker.visible_steps()
-                loader = make_loader_panel(
-                    display_label,
-                    tracker.current,
-                    elapsed=elapsed,
-                    spinner_frame=spinner_frame(elapsed),
-                    spinner_style=spinner_style(accent, elapsed),
-                    accent=accent,
-                    detail=None,
-                    activities=current_activities,
-                )
-                if phase_context:
-                    from rich.console import Group as RichGroup
-
-                    live.update(RichGroup(make_phase_timeline(phase_context), Text(), loader))
-                else:
-                    live.update(loader)
-                time.sleep(0.2)
-
-            reader.join(timeout=5)
-
     except FileNotFoundError:
         failure = classify_provider_failure("command not found", returncode=None)
         console.print(status_line(failure.summary, accent="amber"))
         console.print(muted(failure.remediation))
         return ProviderExit(127, failure.category)
 
-    elapsed = time.monotonic() - start
+    timeout_exit = _monitor_provider(
+        proc,
+        output,
+        display_label=display_label,
+        accent=accent,
+        phase_context=phase_context,
+        started_at=started_at,
+        verbose=verbose,
+    )
+    if timeout_exit is not None:
+        return timeout_exit
 
-    if proc.returncode != 0 and not verbose:
-        failure = classify_provider_failure("\n".join(provider_tail), returncode=proc.returncode)
-        failure_lines: list[Text] = [
-            Text.assemble(
-                badge("failed", "error"),
-                Text("  "),
-                subtle("Project generation stopped before this step finished."),
-            )
-        ]
-        failure_lines.extend([muted(failure.summary), muted(failure.remediation)])
-        console.print(make_panel(grouped_lines(failure_lines), title="Execution", accent="plum"))
+    assert proc.returncode is not None
+    return _render_provider_completion(
+        display_label=display_label,
+        elapsed=time.monotonic() - started_at,
+        returncode=proc.returncode,
+        accent=accent,
+        verbose=verbose,
+        failure_input=output.failure_input,
+    )
 
-    if verbose:
-        console.print(
-            status_line(f"{display_label} completed in {elapsed:.1f}s (exit {proc.returncode})")
+
+@dataclass(frozen=True)
+class _ParallelPhase:
+    """Normalized input for one member of a parallel execution window."""
+
+    label: str
+    backend: str
+    prompt: str
+    model: str | None
+    approval_mode: str
+    allow_unsafe: bool
+
+    @classmethod
+    def from_mapping(cls, phase: dict) -> "_ParallelPhase":
+        return cls(
+            label=phase["label"],
+            backend=phase["backend"],
+            prompt=phase["prompt"],
+            model=phase.get("model"),
+            approval_mode=phase.get("approval_mode", "safe"),
+            allow_unsafe=phase.get("allow_unsafe", False),
         )
-    else:
-        console.print(status_line(f"{display_label} finished in {elapsed:.0f}s", accent=accent))
-
-    failure_category = None
-    if proc.returncode != 0:
-        failure_category = classify_provider_failure(
-            "\n".join(provider_tail),
-            returncode=proc.returncode,
-        ).category
-    return ProviderExit(proc.returncode, failure_category)
 
 
 @dataclass
 class _PhaseProgress:
-    """Tracks live progress and final state for a running phase."""
+    """Live and terminal display state for one parallel phase."""
 
     label: str
     backend: str
@@ -324,30 +413,38 @@ class _PhaseProgress:
     failure_category: str | None = None
 
 
-def run_ai_parallel(
-    phases: list[dict],
-    project_dir: Path,
-    verbose: bool = False,
-) -> list[tuple[str, int]]:
-    """Run multiple AI phases concurrently with a shared status display.
+class _ParallelExecution:
+    """Own concurrent provider processes and their shared Rich display."""
 
-    Args:
-        phases: List of dicts with keys: label, backend, prompt, model.
-        project_dir: Shared project directory.
-        verbose: Show detailed output.
+    def __init__(self, phases: list[dict], project_dir: Path, *, verbose: bool) -> None:
+        self.phases = [_ParallelPhase.from_mapping(phase) for phase in phases]
+        self.project_dir = project_dir
+        self.verbose = verbose
+        self.lock = threading.Lock()
+        self.trackers = {
+            phase.label: _PhaseProgress(
+                label=phase.label,
+                backend=phase.backend,
+                summary=_initial_phase_summary(phase.label, phase.backend),
+            )
+            for phase in self.phases
+        }
 
-    Returns:
-        List of (label, returncode) tuples.
-    """
-    project_dir.mkdir(parents=True, exist_ok=True)
+    def execute(self) -> list[tuple[str, int]]:
+        with ThreadPoolExecutor(max_workers=len(self.phases)) as pool:
+            futures = [pool.submit(self._run_phase, phase) for phase in self.phases]
+            with Live(self._status_table(), console=console, refresh_per_second=4) as live:
+                while not all(future.done() for future in futures):
+                    live.update(self._status_table())
+                    time.sleep(0.25)
+                live.update(self._status_table())
+            results = [future.result() for future in futures]
 
-    trackers: dict[str, _PhaseProgress] = {}
-    procs: dict[str, subprocess.Popen] = {}
-    readers: dict[str, threading.Thread] = {}
-    lock = threading.Lock()
+        if self.verbose:
+            self._render_verbose_output()
+        return results
 
-    def _build_status_table():
-        """Build a Rich table showing all parallel phase statuses."""
+    def _status_table(self):
         table = make_table(
             title="Parallel Phases",
             accent="amber",
@@ -360,158 +457,135 @@ def run_ai_parallel(
         table.add_column("Backend")
         table.add_column("Activity")
         table.add_column("State")
-        for t in trackers.values():
-            elapsed = time.monotonic() - t.start if t.start else 0
-            if t.returncode is not None:
-                if t.returncode == 0:
-                    icon = badge("done", "success")
-                    status = f"finished in {elapsed:.0f}s"
-                else:
-                    icon = badge("failed", "error")
-                    status = t.failure_category or f"exit {t.returncode}"
+        for tracker in self.trackers.values():
+            elapsed = time.monotonic() - tracker.start if tracker.start else 0
+            if tracker.returncode == 0:
+                icon = badge("done", "success")
+                status = f"finished in {elapsed:.0f}s"
+            elif tracker.returncode is not None:
+                icon = badge("failed", "error")
+                status = tracker.failure_category or f"exit {tracker.returncode}"
             else:
                 icon = badge("live", "info")
                 status = f"working... {elapsed:.0f}s"
             table.add_row(
                 icon,
-                t.label,
-                t.backend,
-                subtle(format_activity(t.summary)),
+                tracker.label,
+                tracker.backend,
+                subtle(format_activity(tracker.summary)),
                 subtle(status),
             )
         return table
 
-    def _reader_fn(label: str, pipe: io.BufferedReader) -> None:
+    def _read_output(self, label: str, pipe: io.BufferedReader) -> None:
         try:
             for raw_line in iter(pipe.readline, b""):
                 line = raw_line.decode("utf-8", errors="replace").rstrip("\n")
-                if line:
-                    clean = sanitize_progress_line(line)
-                    if not clean:
-                        continue
-                    with lock:
-                        trackers[label].last_line = clean
-                        safe_summary = progress_summary_for_line(clean, trackers[label].summary)
-                        if safe_summary != trackers[label].summary:
-                            trackers[label].summary = safe_summary
-                            trackers[label].lines.append(safe_summary)
-                            if len(trackers[label].lines) > 200:
-                                del trackers[label].lines[0]
+                if not line:
+                    continue
+                clean = sanitize_progress_line(line)
+                if not clean:
+                    continue
+                with self.lock:
+                    tracker = self.trackers[label]
+                    tracker.last_line = clean
+                    safe_summary = progress_summary_for_line(clean, tracker.summary)
+                    if safe_summary != tracker.summary:
+                        tracker.summary = safe_summary
+                        tracker.lines.append(safe_summary)
+                        if len(tracker.lines) > 200:
+                            del tracker.lines[0]
         except ValueError:
-            pass
+            return
 
-    def _run_one(phase: dict) -> tuple[str, int]:
-        label = phase["label"]
-        backend = phase["backend"]
-        prompt = phase["prompt"]
-        model = phase.get("model")
-        approval_mode = phase.get("approval_mode", "safe")
-        allow_unsafe = phase.get("allow_unsafe", False)
-
-        cmd = _build_cmd(
-            backend,
-            prompt,
-            model,
-            approval_mode=approval_mode,
-            allow_unsafe=allow_unsafe,
+    def _run_phase(self, phase: _ParallelPhase) -> tuple[str, int]:
+        command = _build_cmd(
+            phase.backend,
+            phase.prompt,
+            phase.model,
+            approval_mode=phase.approval_mode,
+            allow_unsafe=phase.allow_unsafe,
         )
-        if not cmd:
-            with lock:
-                trackers[label].returncode = 1
-            return label, ProviderExit(1, "unknown")
+        if not command:
+            with self.lock:
+                self.trackers[phase.label].returncode = 1
+            return phase.label, ProviderExit(1, "unknown")
 
-        start = time.monotonic()
-        with lock:
-            trackers[label].start = start
-
+        started_at = time.monotonic()
+        with self.lock:
+            self.trackers[phase.label].start = started_at
         try:
-            proc = subprocess.Popen(
-                cmd,
-                cwd=project_dir,
+            process = subprocess.Popen(
+                command,
+                cwd=self.project_dir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
             )
         except FileNotFoundError:
-            with lock:
-                trackers[label].returncode = 1
-                trackers[
-                    label
-                ].summary = "The selected AI tool could not start. Run `forge doctor`, then retry."
-            return label, ProviderExit(127, "missing_binary")
+            with self.lock:
+                tracker = self.trackers[phase.label]
+                tracker.returncode = 1
+                tracker.summary = (
+                    "The selected AI tool could not start. Run `forge doctor`, then retry."
+                )
+            return phase.label, ProviderExit(127, "missing_binary")
 
-        with lock:
-            procs[label] = proc
-
-        reader = threading.Thread(target=_reader_fn, args=(label, proc.stdout), daemon=True)
+        reader = threading.Thread(
+            target=self._read_output,
+            args=(phase.label, process.stdout),
+            daemon=True,
+        )
         reader.start()
-        with lock:
-            readers[label] = reader
-
-        while proc.poll() is None:
-            elapsed = time.monotonic() - start
-            if elapsed > PHASE_TIMEOUT:
-                proc.kill()
-                proc.wait()
+        while process.poll() is None:
+            if time.monotonic() - started_at > PHASE_TIMEOUT:
+                process.kill()
+                process.wait()
                 reader.join(timeout=5)
-                with lock:
-                    trackers[label].returncode = 1
-                    trackers[label].failure_category = "timeout"
-                return label, ProviderExit(124, "timeout")
+                with self.lock:
+                    tracker = self.trackers[phase.label]
+                    tracker.returncode = 1
+                    tracker.failure_category = "timeout"
+                return phase.label, ProviderExit(124, "timeout")
             time.sleep(0.5)
 
         reader.join(timeout=5)
-        with lock:
-            trackers[label].returncode = proc.returncode
-            if proc.returncode != 0:
-                failure = classify_provider_failure(
-                    trackers[label].last_line,
-                    returncode=proc.returncode,
+        assert process.returncode is not None
+        with self.lock:
+            tracker = self.trackers[phase.label]
+            tracker.returncode = process.returncode
+            if process.returncode != 0:
+                tracker.failure_category = classify_provider_failure(
+                    tracker.last_line,
+                    returncode=process.returncode,
+                ).category
+            failure_category = tracker.failure_category
+        return phase.label, ProviderExit(process.returncode, failure_category)
+
+    def _render_verbose_output(self) -> None:
+        for phase in self.phases:
+            tracker = self.trackers[phase.label]
+            if not tracker.lines:
+                continue
+            console.print()
+            console.print(
+                make_panel(
+                    Text(phase.label, style="bold #F7F9FF"),
+                    title="Phase Output",
+                    accent="plum",
                 )
-                trackers[label].failure_category = failure.category
+            )
+            for line in tracker.lines:
+                console.print(line)
 
-        return label, ProviderExit(proc.returncode, trackers[label].failure_category)
 
-    # Initialize trackers
-    for phase in phases:
-        trackers[phase["label"]] = _PhaseProgress(
-            label=phase["label"],
-            backend=phase["backend"],
-            summary=_initial_phase_summary(phase["label"], phase["backend"]),
-        )
-
-    results: list[tuple[str, int]] = []
-
-    with ThreadPoolExecutor(max_workers=len(phases)) as pool:
-        futures = {pool.submit(_run_one, p): p["label"] for p in phases}
-
-        with Live(_build_status_table(), console=console, refresh_per_second=4) as live:
-            while not all(f.done() for f in futures):
-                live.update(_build_status_table())
-                time.sleep(0.25)
-            # Final update
-            live.update(_build_status_table())
-
-        for future in futures:
-            label, rc = future.result()
-            results.append((label, rc))
-
-    if verbose:
-        for phase in phases:
-            label = phase["label"]
-            t = trackers[label]
-            if t.lines:
-                console.print()
-                console.print(
-                    make_panel(
-                        Text(label, style="bold #F7F9FF"),
-                        title="Phase Output",
-                        accent="plum",
-                    )
-                )
-                for line in t.lines:
-                    console.print(line)
-
-    return results
+def run_ai_parallel(
+    phases: list[dict],
+    project_dir: Path,
+    verbose: bool = False,
+) -> list[tuple[str, int]]:
+    """Run provider phases concurrently with one shared status display."""
+    project_dir.mkdir(parents=True, exist_ok=True)
+    return _ParallelExecution(phases, project_dir, verbose=verbose).execute()
 
 
 def reset_project_dir(project_dir: Path) -> None:
