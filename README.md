@@ -20,7 +20,7 @@ requested, which conventions and providers were used, and whether verification a
 > `forge` as a compatibility alias. Use `projectforge` if Foundry's Ethereum `forge` is already on
 > your PATH; shell command names cannot disambiguate the two tools.
 
-> **Release status:** this README documents ProjectForge v0.7.1. Use the documentation bundled
+> **Release status:** this README documents ProjectForge v0.7.2. Use the documentation bundled
 > with an immutable release for that release's exact behavior.
 
 ## What you get
@@ -66,7 +66,7 @@ See [the stack guide](docs/guides/stacks.md) for generated structures and comman
 
 ## Use the current source
 
-The v0.7.1 behavior documented below is available from the current repository checkout:
+The v0.7.2 behavior documented below is available from the current repository checkout:
 
 ```bash
 git clone https://github.com/Schramm2/projectforge.git
