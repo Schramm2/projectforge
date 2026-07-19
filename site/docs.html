@@ -457,7 +457,7 @@
   <section class="doc-section" id="verification" data-title="Verification and evidence" data-search="verification project ready project created evidence forge files progress scaffold snapshot context verification json health endpoints report">
     <div class="eyebrow mono">// Trust the result</div>
     <h2>Verification and evidence</h2>
-    <p class="section-intro">A successful provider exit means files were generated. It does not mean the project works. ProjectForge reports <strong>Project Ready</strong> only when all required checks pass; skipped or incomplete verification yields the honest <strong>Project Created</strong>.</p>
+    <p class="section-intro">A successful provider exit means files were generated. It does not mean the project works. ProjectForge reports <strong>Project Ready</strong> only when all required checks pass; Python verification includes required handoff files, tracked <code>uv.lock</code> behavior, and bounded console-entry-point smoke checks. Live runs start inside an unborn <code>main</code> repository while local Forge and graph state remain excluded from provider commits. Skipped or incomplete verification yields the honest <strong>Project Created</strong>.</p>
     <div class="table-wrap"><table>
       <thead><tr><th>Generated record</th><th>What it proves</th><th>Sensitivity</th></tr></thead>
       <tbody>
@@ -468,7 +468,7 @@
         <tr><td><code>.forge/verification.json</code></td><td>Commands, relative working directories, timeouts, exits, health endpoints, and remediation.</td><td>Redacted durable evidence.</td></tr>
       </tbody>
     </table></div>
-    <p>For high-confidence delivery, rerun the recorded project commands independently. Python projects can declare bounded localhost health settings:</p>
+    <p>For high-confidence delivery, rerun the recorded project commands independently. Python projects should commit <code>uv.lock</code>, include the required pre-commit configuration, and can declare bounded localhost health settings:</p>
     <div class="code-block"><div class="code-head"><span>pyproject.toml</span><button class="copy-btn" data-copy="[tool.forge.verification]&#10;health_endpoints = [&quot;/healthz&quot;, &quot;/readyz&quot;]&#10;health_startup_timeout = 20&#10;health_request_timeout = 4">copy</button></div><pre>[tool.forge.verification]
 health_endpoints = ["/healthz", "/readyz"]
 health_startup_timeout = 20

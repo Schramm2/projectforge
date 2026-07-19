@@ -289,6 +289,12 @@ def _patch_prompt_only_dependencies(monkeypatch, *, setup_called: list[bool]) ->
         lambda stack=None: ("Use strict typing.", []),
     )
     monkeypatch.setattr("projectforge.cli.load_claude_md_template", lambda: None)
+    monkeypatch.setattr(
+        "projectforge.cli.initialize_git_repository",
+        lambda project_dir: (_ for _ in ()).throw(
+            AssertionError("prompt-only commands must not initialize Git")
+        ),
+    )
 
     def _fake_run_setup(console) -> None:
         setup_called[0] = True
@@ -316,6 +322,7 @@ def _patch_live_scaffold_dependencies(monkeypatch, tmp_path: Path) -> None:
         lambda stack=None: ("Use strict typing.", []),
     )
     monkeypatch.setattr("projectforge.cli.load_claude_md_template", lambda: None)
+    monkeypatch.setattr("projectforge.cli.initialize_git_repository", lambda project_dir: True)
     monkeypatch.setattr("projectforge.cli.ensure_git_init", lambda project_dir: True)
     monkeypatch.setattr(
         "projectforge.cli.run_ai",
@@ -329,6 +336,47 @@ def _patch_live_scaffold_dependencies(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr("projectforge.cli.run_post_scaffold_hook", lambda *args: None)
     monkeypatch.setattr("projectforge.cli.write_card", lambda *args, **kwargs: None)
     monkeypatch.setattr("projectforge.cli.inject_badge_into_readme", lambda project_dir: None)
+
+
+def test_live_scaffold_initializes_git_before_provider_work(monkeypatch, tmp_path):
+    _patch_live_scaffold_dependencies(monkeypatch, tmp_path)
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        "projectforge.cli.initialize_git_repository",
+        lambda project_dir: calls.append("git") or True,
+    )
+
+    def run_after_git(backend, prompt, project_dir, **kwargs):
+        assert calls[0] == "git"
+        calls.append("provider")
+        return 0
+
+    monkeypatch.setattr("projectforge.cli.run_ai", run_after_git)
+
+    result = runner.invoke(app, _live_scaffold_command("git-first"))
+
+    assert result.exit_code == 0
+    assert calls[0] == "git"
+    assert "provider" in calls
+
+
+def test_live_scaffold_stops_before_provider_when_git_cannot_start(monkeypatch, tmp_path):
+    _patch_live_scaffold_dependencies(monkeypatch, tmp_path)
+    provider_called = [False]
+    monkeypatch.setattr(
+        "projectforge.cli.initialize_git_repository",
+        lambda project_dir: False,
+    )
+    monkeypatch.setattr(
+        "projectforge.cli.run_ai",
+        lambda *args, **kwargs: provider_called.__setitem__(0, True) or 0,
+    )
+
+    result = runner.invoke(app, _live_scaffold_command("git-required"))
+
+    assert result.exit_code == 1
+    assert provider_called[0] is False
 
 
 def _live_scaffold_command(name: str) -> list[str]:

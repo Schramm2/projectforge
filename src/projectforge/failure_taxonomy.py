@@ -44,7 +44,11 @@ _RULES = (
     ),
     (
         "permission",
-        re.compile(r"permission denied|not permitted|sandbox|workspace.*denied|approval", re.I),
+        re.compile(
+            r"permission denied|not permitted|sandbox|workspace.*denied|approval|"
+            r"not inside a trusted directory|skip-git-repo-check",
+            re.I,
+        ),
         "A workspace permission blocked this step.",
         "Keep safe mode, review the selected tool's workspace access, then retry with `--resume`.",
     ),

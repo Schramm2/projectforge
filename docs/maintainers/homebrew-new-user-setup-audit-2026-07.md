@@ -136,3 +136,41 @@ Post-publication verification confirmed:
   applications.
 - The public Homebrew tap matched the repository formula. Upgrading from v0.7.0 to v0.7.1,
   `brew test`, version checks, user-owned media resolution, and editor diagnostics all passed.
+
+## Live scaffold follow-up
+
+A provider-backed `python-cli` scaffold was run from a dedicated playground through the
+Homebrew-installed v0.7.1 command. This closed the original audit boundary that intentionally
+stopped before provider execution.
+
+The architecture phase completed through Claude. Codex then exited in 0.612 seconds because the
+fresh target was not yet a Git repository and `codex exec` requires a trusted repository unless its
+skip flag is supplied. `projectforge doctor --json` remained ready for all providers. Initializing
+Git manually preserved the completed phase and allowed `--resume` to complete Codex tests and the
+final Claude verification phase.
+
+Forge reported `Project Ready`, and independent checks confirmed Ruff, formatting, strict MyPy,
+20 passing tests with one intentional xfail, 97% coverage, and a working generated console command.
+The independent handoff review also found that the README badge was added after the initial commit,
+`uv.lock` was ignored, a documented pre-commit file was absent, and Forge's verification report did
+not exercise the generated console entry point.
+
+| ID | Severity | Follow-up finding | Correction in current source |
+| --- | --- | --- | --- |
+| NU-07 | High | Codex cannot enter a fresh target before Git exists. | Initialize an unborn `main` repository before any live provider phase; stop before model calls if Git cannot start. |
+| NU-08 | Medium | Completion may commit before hooks, cards, and README badge injection, leaving a dirty handoff. | Write final artifacts first, then commit all outstanding generated changes even when a provider already committed. |
+| NU-09 | Medium | Python verification can report ready without exercising the generated console command. | Derive bounded `uv run <script> --help` checks from `[project.scripts]` and record them as smoke evidence. |
+| NU-10 | Medium | Required Python handoff files can be absent or ignored while lint, typecheck, and tests pass. | Fail readiness when required pre-commit configuration is missing, `uv.lock` is absent, or direct lockfile ignore rules prevent committing it. |
+| NU-11 | Low | The original Codex failure was classified as unknown. | Classify trusted-directory and `--skip-git-repo-check` failures as workspace permission failures. |
+
+Follow-up implementation status: **Implemented in current source; release pending**
+
+Current-source verification completed with 591 passing tests, Ruff, public-safety and documentation
+checks, skill and convention validation, D2 rendering, and successful wheel/source artifact
+inspection. A zero-model-call installed-wheel journey used a deterministic provider shim to confirm
+that the provider entered an unborn `main` repository, local Forge state was excluded, all phases
+completed, the README badge was committed, and the final working tree was clean.
+
+The final Claude phase took 1,072 seconds but exited successfully within Forge's documented
+30-minute phase timeout and preflight's 6–45 minute planning range. This is latency evidence, not a
+correctness failure; no shorter timeout was introduced from one successful sample.

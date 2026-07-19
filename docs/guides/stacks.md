@@ -9,7 +9,7 @@ For Python projects, Forge derives install and available lint/type/test checks f
 
 All Python-oriented stacks share these broad defaults:
 
-- `uv` for package management
+- `uv` for package management with a committed `uv.lock`
 - Ruff for linting and formatting
 - MyPy `--strict` for type checking
 - pytest-based test suites

@@ -84,6 +84,7 @@ from projectforge.router import (
 )
 from projectforge.runner import (
     ensure_git_init,
+    initialize_git_repository,
     open_in_editor,
     reset_project_dir,
     run_ai,
@@ -2394,6 +2395,9 @@ def main(
             console.print(status_line(f"Prompt exported to {export_path}", accent="aqua"))
 
         raise typer.Exit()
+
+    if not initialize_git_repository(project_dir):
+        raise typer.Exit(1)
 
     try:
         progress_state = initialize_progress(

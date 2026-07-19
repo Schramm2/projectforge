@@ -189,9 +189,11 @@ Forge writes these project-local records:
 | `.forge/context-snapshot.md` | User-approved project brief and selected nearby context; potentially private |
 | `.forge/verification.json` | Redacted commands, working directories, timeouts, exits, endpoints, and remediation |
 
-The dashboard reports `Project Ready` only when required verification passes. If verification was
-disabled or skipped, the honest result is `Project Created`; a failed check requires attention.
-For high-confidence delivery, rerun the generated project's recorded commands independently.
+The dashboard reports `Project Ready` only when required verification passes. Python verification
+also checks required handoff files, tracked `uv.lock` behavior, and generated console entry points.
+If verification was disabled or skipped, the honest result is `Project Created`; a failed check
+requires attention. For high-confidence delivery, rerun the generated project's recorded commands
+independently.
 
 A generated Python project can declare bounded health settings:
 

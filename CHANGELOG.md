@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Live scaffolds initialize a `main` Git repository before provider execution, and completion now
+  commits hook, verification, card, and README badge changes before reporting the handoff.
+- Python verification checks required handoff files, keeps `uv.lock` reproducible, and runs each
+  generated console entry point with `--help`.
+- Verify prompts require documented files to exist and forbid verification scripts that mask
+  failing command exits.
+
+### Fixed
+
+- Codex no longer rejects a fresh scaffold because the target is outside a trusted Git repository.
+- A provider commit no longer causes ProjectForge's final badge or hook changes to remain dirty.
+- Codex's trusted-directory error is classified as a workspace permission failure instead of an
+  unknown provider error.
+
 ## [0.7.1] - 2026-07-19
 
 ### Added

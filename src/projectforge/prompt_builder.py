@@ -1472,12 +1472,28 @@ Before finalizing:
 </extra_instructions>"""
 
 
+def _handoff_integrity_requirements(stack: str) -> str:
+    requirements = [
+        "- Verify all files named in CLAUDE.md or README project-structure sections exist; "
+        "remove stale claims when a file is intentionally absent.",
+        "- Do not mask failing commands with `set +e`, `|| true`, or a final successful echo; "
+        "each required check must return zero.",
+    ]
+    if stack in {"fastapi", "fastapi-ai", "both", "python-cli", "python-worker"}:
+        requirements.append(
+            "- Keep uv.lock tracked for reproducible installs, and include the required "
+            ".pre-commit-config.yaml instead of only documenting it."
+        )
+    return "\n".join(requirements)
+
+
 def build_verify_prompt_codex(answers: dict) -> str:
     """Build a Codex-aligned verify/fix prompt."""
     stack_label = STACK_LABELS.get(answers["stack"], answers["stack"])
     extra = answers.get("extra", "").strip() or "None"
     demo = answers.get("demo_mode", False)
     frontend_capable = answers["stack"] in {"nextjs", "both"}
+    handoff_requirements = _handoff_integrity_requirements(answers["stack"])
     project_parts = (
         "architecture, frontend, tests, and configuration"
         if frontend_capable
@@ -1572,6 +1588,7 @@ Before finalizing:
 - Confirm lint passes with zero errors.
 - Confirm typecheck passes with zero errors.
 - Confirm there are no orphaned imports, unresolved references, or missing dependencies.
+{handoff_requirements}
 </verification_loop>
 
 <terminal_tool_hygiene>
@@ -1601,6 +1618,7 @@ def build_verify_prompt(answers: dict) -> str:
     extra = answers.get("extra", "").strip() or "None"
     demo = answers.get("demo_mode", False)
     frontend_capable = answers["stack"] in {"nextjs", "both"}
+    handoff_requirements = _handoff_integrity_requirements(answers["stack"])
 
     if demo and frontend_capable:
         goal = (
@@ -1680,6 +1698,7 @@ The project is not done until ALL of these pass:
 - The test suite passes (or failures are documented with clear reasons)
 - Lint and typecheck pass
 - No orphaned imports or missing dependencies
+{handoff_requirements}
 </quality_gate>
 
 <extra_instructions>
@@ -1696,6 +1715,7 @@ def build_verify_prompt_best(answers: dict) -> str:
     extra = answers.get("extra", "").strip() or "None"
     demo = answers.get("demo_mode", False)
     frontend_capable = answers["stack"] in {"nextjs", "both"}
+    handoff_requirements = _handoff_integrity_requirements(answers["stack"])
     project_parts = (
         "architecture, frontend, and tests"
         if frontend_capable
@@ -1802,6 +1822,7 @@ Before finishing, verify ALL of these pass:
 - Typecheck passes with zero errors
 - No orphaned imports, missing dependencies, or unresolved references
 - .env.example is complete and accurate
+{handoff_requirements}
 </quality_criteria>
 
 <avoid>
