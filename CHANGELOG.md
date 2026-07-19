@@ -4,8 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-These entries describe changes on `main` after v0.6.0. The package version remains `0.6.0` until
-the next release is prepared.
+## [0.7.0] - 2026-07-19
 
 ### Added
 
@@ -249,7 +248,8 @@ See [the migration guide](docs/guides/migrating-from-0.4.1.md) for details.
 - pipx support for isolated global installs.
 - MIT license.
 
-[Unreleased]: https://github.com/Schramm2/projectforge/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Schramm2/projectforge/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.7.0
 [0.6.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.6.0
 [0.5.1]: https://github.com/Schramm2/projectforge/releases/tag/v0.5.1
 [0.5.0]: https://github.com/Schramm2/projectforge/releases/tag/v0.5.0

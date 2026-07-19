@@ -2,8 +2,7 @@
 
 Live roadmap for expanding Forge into a production-grade project scaffolder. Organized by theme, not strict priority.
 
-Current source status: unreleased changes after v0.6.0. The source version remains `0.6.0` until
-the next release is prepared.
+Current release baseline: ProjectForge v0.7.0.
 
 Items marked with [DONE] are implemented in the current repository. Planned items are intentionally
 aspirational; example commands below describe direction, not guaranteed current CLI flags. Use
@@ -218,9 +217,9 @@ truth.
 ## Deployment & Distribution
 
 ProjectForge v0.6.0 added trusted-publishing automation under the `matt-projectforge` distribution
-name and a collision-free `projectforge` command while retaining the public Homebrew tap. Current
-unreleased source after v0.6.0 also aligns the Python namespace to `projectforge`; channel
-availability remains a per-release verification fact.
+name and a collision-free `projectforge` command while retaining the public Homebrew tap.
+ProjectForge v0.7.0 aligns the Python namespace to `projectforge`; channel availability remains a
+per-release verification fact.
 
 The current workflow:
 1. User runs `uv tool install matt-projectforge`, `pipx install matt-projectforge`, or

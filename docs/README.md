@@ -7,10 +7,9 @@ the code under `src/projectforge/`. Dated evidence, completed release plans, cha
 provider prompt captures remain intentionally historical. Each historical document should state
 its evidence or release boundary rather than being rewritten to match current source.
 
-Current `main` contains unreleased changes after v0.6.0. It uses the `projectforge` Python
-namespace, privacy-safe recovery guidance across user-visible failure paths, and the product
-diagram/site surfaces listed below. The source version remains `0.6.0` until release preparation.
-Older tags and their bundled documentation remain the authority for those immutable releases.
+ProjectForge v0.7.0 uses the `projectforge` Python namespace, privacy-safe recovery guidance
+across user-visible failure paths, and the product diagram/site surfaces listed below. Older tags
+and their bundled documentation remain the authority for those immutable releases.
 
 ## User documentation
 
