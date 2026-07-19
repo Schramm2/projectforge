@@ -87,6 +87,10 @@ the user-profile interface.
 
 ## Project evidence
 
+Live scaffolds initialize an unborn `main` Git repository before provider work. Forge adds
+`.forge/` and `.code-review-graph/` to the repository-local `.git/info/exclude` so provider commits
+do not capture private evidence or local graph runtime data.
+
 ### `.forge/progress.json`
 
 Written before the first provider phase. It stores schema version, project name and stack, approval
@@ -117,7 +121,9 @@ private.
 
 Records each generated-project check with command, project-relative working directory, startup and
 request timeouts, exit, skip reason, attempted localhost health endpoints, duration, redacted
-detail, and remediation. Its `all_passed` value drives dashboard readiness.
+detail, and remediation. Python checks also validate required project files, tracked `uv.lock`
+behavior, and generated console entry points through bounded `--help` smoke commands. Its
+`all_passed` value drives dashboard readiness.
 
 ## Generated health settings
 

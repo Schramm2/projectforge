@@ -83,7 +83,6 @@ def complete_scaffold(
     except OSError as exc:
         raise ScaffoldRecordError from exc
 
-    git_initialized = dependencies.ensure_git(settings.project_dir)
     verification_report, evidence_saved = _run_verification(settings, dependencies)
 
     try:
@@ -111,6 +110,9 @@ def complete_scaffold(
     except OSError:
         evidence_saved = False
 
+    evidence_saved = _write_project_card(settings, dependencies) and evidence_saved
+    git_initialized = dependencies.ensure_git(settings.project_dir)
+
     dependencies.render_dashboard(
         console=console,
         answers=settings.answers,
@@ -120,7 +122,6 @@ def complete_scaffold(
         elapsed=elapsed,
         agent_stats=settings.agent_stats,
     )
-    evidence_saved = _write_project_card(settings, dependencies) and evidence_saved
 
     if not evidence_saved:
         console.print(

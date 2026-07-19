@@ -126,6 +126,12 @@ saved Google session without sending a prompt or printing account identity. If s
 run `agy`, complete the provider-owned browser flow, exit with `/exit`, and rerun `forge doctor`.
 Remote SSH sessions display an authorization URL and code flow instead of opening a browser.
 
+Antigravity's print mode cannot answer an `Ask` permission prompt, so a safe headless write would
+otherwise be auto-denied. For the duration of a safe-mode run, Forge adds a narrow
+`write_file(<project>)` rule scoped to the current project in `~/.gemini/antigravity-cli/settings.json`
+(merging with any existing settings), then restores the file to its prior state when the run ends.
+If a write is still denied, Forge turns the provider's exit-0 permission denial into a failed phase.
+
 ## Preview first
 
 This command creates no project, starts no provider process, and makes no model call:
@@ -169,10 +175,18 @@ install dependencies, run commands, use allowed network access, and consume quot
 `--approval-mode unsafe --allow-unsafe` disables provider approval or sandbox boundaries and should
 only be used inside an external isolation boundary you control.
 
-For Antigravity specifically, safe mode uses headless `--print`, `accept-edits`, and its terminal
-sandbox. Workspace file edits can proceed, while commands that are not allowed by Antigravity's
-permission policy may be denied in non-interactive print mode. Forge uses
-`--dangerously-skip-permissions` only for the explicitly consented unsafe mode.
+For Antigravity specifically, safe mode binds the target with `--add-dir` and uses headless
+`--print`, `accept-edits`, and its terminal sandbox. Its permission engine is separate from the
+sandbox: safe headless file writes require a narrow `write_file(<workspace>)` allow rule, which
+Forge grants temporarily and scoped to the workspace, then removes when the run ends; unapproved
+commands may still be denied. Forge uses `--dangerously-skip-permissions` only for the explicitly
+consented unsafe mode.
+
+Forge also uses Claude's official `--safe-mode` to prevent ambient hooks/plugins/MCP/memory from
+changing a scaffold, and Codex's official `--ephemeral --ignore-user-config` so provider session
+artifacts and ambient user exec rules do not become part of a run. Codex also runs with
+`--skip-git-repo-check` because Forge scaffolds into a fresh directory and only runs `git init`
+afterward, so `codex exec` would otherwise refuse to start.
 
 Demo mode is enabled by default so generated startup should not require real service credentials.
 It does not remove the provider CLI's own authentication requirement.
@@ -189,9 +203,11 @@ Forge writes these project-local records:
 | `.forge/context-snapshot.md` | User-approved project brief and selected nearby context; potentially private |
 | `.forge/verification.json` | Redacted commands, working directories, timeouts, exits, endpoints, and remediation |
 
-The dashboard reports `Project Ready` only when required verification passes. If verification was
-disabled or skipped, the honest result is `Project Created`; a failed check requires attention.
-For high-confidence delivery, rerun the generated project's recorded commands independently.
+The dashboard reports `Project Ready` only when required verification passes. Python verification
+also checks required handoff files, tracked `uv.lock` behavior, and generated console entry points.
+If verification was disabled or skipped, the honest result is `Project Created`; a failed check
+requires attention. For high-confidence delivery, rerun the generated project's recorded commands
+independently.
 
 A generated Python project can declare bounded health settings:
 

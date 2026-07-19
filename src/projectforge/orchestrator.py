@@ -742,6 +742,7 @@ def run_phase_orchestrated(
         approval_mode=approval_mode,
         allow_unsafe=allow_unsafe,
     )
+    adapter.project_dir = project_dir
     adapter.phase_brief = prompt
     plan = _get_plan(adapter, prompt, phase, stack, backend, project_dir, model)
 

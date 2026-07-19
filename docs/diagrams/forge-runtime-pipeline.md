@@ -8,11 +8,16 @@ This view starts after CLI entry and follows a live scaffold through preparation
 
 ## Runtime stages
 
-1. **Prepare:** complete setup when needed, collect answers, route phases, load context, scan user-controlled text, and build prompts.
-2. **Execute:** copy selected media, initialize resumable progress, and run provider phases.
-3. **Verify and hand off:** write the manifest and convention snapshot, initialize Git, run generated-project checks, record results, run the optional hook, and render the final handoff.
+1. **Prepare:** complete setup when needed, collect answers, route phases, load context, scan
+   user-controlled text, build prompts, and initialize a `main` Git repository for live provider
+   work.
+2. **Execute:** initialize resumable progress, copy selected media, and run provider phases.
+3. **Verify and hand off:** write the manifest and convention snapshot, run generated-project
+   checks, record results, run the optional hook, write the card and README badge, commit all final
+   changes, and render the handoff.
 
-Scaffold history, answer preferences, and provider quality signals stay under `~/.forge/` and inform later runs. Generated-project evidence stays under the target project's `.forge/` directory.
+Scaffold history, answer preferences, and provider quality signals stay under `~/.forge/` and
+inform later runs. Generated-project evidence stays under the target project's `.forge/` directory.
 
 ## Implementation boundaries
 
