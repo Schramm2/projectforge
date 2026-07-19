@@ -12,14 +12,19 @@ namespace, privacy-safe recovery guidance across user-visible failure paths, and
 diagram/site surfaces listed below. The source version remains `0.6.0` until release preparation.
 Older tags and their bundled documentation remain the authority for those immutable releases.
 
-## Guides
+## User documentation
 
+- [site/docs.html](../site/docs.html) — browsable user guide for installation, scaffolding,
+  configuration, verification, recovery, CLI reference, and support
 - [guides/getting-started.md](guides/getting-started.md) — install Forge and run the first scaffold
 - [guides/configuration.md](guides/configuration.md) — user config, conventions, hooks, and manifests
 - [guides/security-privacy.md](guides/security-privacy.md) — provider, workspace, local-data, and unsafe-mode boundaries
 - [guides/migrating-from-0.4.1.md](guides/migrating-from-0.4.1.md) — compatibility and migration notes
 - [guides/stacks.md](guides/stacks.md) — supported stack catalog and defaults
 - [guides/troubleshooting.md](guides/troubleshooting.md) — common issues and fixes
+
+## Showcase
+
 - [showcase/README.md](showcase/README.md) — measured portfolio evidence and terminal demo flow
 
 ## Maintainers

@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentation — ProjectForge</title>
+<meta name="description" content="Learn how to install, configure, run, verify, and troubleshoot ProjectForge.">
+<meta property="og:title" content="ProjectForge Documentation">
+<meta property="og:description" content="The complete user guide for scaffolding verified projects with ProjectForge.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://github.com/Schramm2/projectforge">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2375DCE6'/%3E%3Ctext x='16' y='23' font-family='monospace' font-size='22' font-weight='700' text-anchor='middle' fill='%230B0F1D'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0B0F1D; --bg-alt:#0D1224; --panel:#12172B; --panel-strong:#171D35;
+    --ink:#F7F9FF; --muted:#C6CEE6; --dim:#8893B3; --line:#1B2240;
+    --border:#2D365C; --accent:#75DCE6; --violet:#A16EFA; --amber:#F3BB58;
+    --topbar:64px; --sidebar:284px; --toc:196px;
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:96px; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Space Grotesk', system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  body.menu-open { overflow:hidden; }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { color:var(--ink); }
+  button, input { font:inherit; }
+  ::selection { background:rgba(161,110,250,.35); }
+  .mono, code, pre { font-family:'JetBrains Mono', ui-monospace, monospace; }
+  .skip-link { position:fixed; top:-100px; left:16px; z-index:100; padding:10px 14px; background:var(--accent); color:var(--bg); font-weight:700; }
+  .skip-link:focus { top:12px; }
+
+  /* Top bar */
+  .topbar {
+    position:fixed; inset:0 0 auto 0; height:var(--topbar); z-index:60;
+    display:flex; align-items:center; justify-content:space-between; gap:24px;
+    padding:0 28px; background:rgba(11,15,29,.9); backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line);
+  }
+  .brand { display:flex; align-items:center; gap:11px; color:var(--ink); min-width:max-content; }
+  .brand:hover { color:var(--ink); }
+  .brand-mark { width:28px; height:28px; display:grid; place-items:center; background:var(--accent); color:var(--bg); font-weight:700; }
+  .brand-name { font-size:17px; font-weight:700; }
+  .brand-divider { width:1px; height:20px; background:var(--border); margin-left:5px; }
+  .brand-area { color:var(--muted); font-size:14px; }
+  .top-actions { display:flex; align-items:center; gap:10px; }
+  .search-trigger {
+    width:min(360px, 34vw); display:flex; align-items:center; gap:10px;
+    padding:9px 12px; border:1px solid var(--border); border-radius:8px;
+    background:var(--panel); color:var(--dim); cursor:pointer; text-align:left;
+  }
+  .search-trigger:hover { border-color:var(--accent); color:var(--muted); }
+  .search-trigger span:nth-child(2) { flex:1; }
+  .key { border:1px solid var(--border); border-bottom-width:2px; border-radius:5px; padding:1px 6px; color:var(--dim); font-size:11px; }
+  .top-link { color:var(--muted); font-size:13px; font-weight:600; padding:9px 10px; }
+  .top-link:hover { color:var(--ink); }
+  .menu-button { display:none; width:38px; height:38px; border:1px solid var(--border); border-radius:8px; background:var(--panel); color:var(--ink); cursor:pointer; }
+
+  /* Sidebar */
+  .sidebar {
+    position:fixed; top:var(--topbar); bottom:0; left:0; z-index:40;
+    width:var(--sidebar); padding:24px 20px 40px 28px; overflow-y:auto;
+    background:var(--bg-alt); border-right:1px solid var(--line);
+  }
+  .release-note { padding:13px 14px; margin-bottom:24px; border:1px solid var(--border); border-radius:9px; background:var(--panel); }
+  .release-note strong { display:block; color:var(--accent); font-size:12px; margin-bottom:5px; }
+  .release-note span { display:block; color:var(--dim); font-size:11px; line-height:1.5; }
+  .nav-group { margin:0 0 25px; }
+  .nav-label { margin:0 0 8px 10px; color:var(--dim); font-size:10px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; }
+  .side-link { display:block; padding:7px 10px; border-radius:6px; color:var(--muted); font-size:13.5px; line-height:1.4; }
+  .side-link:hover { color:var(--ink); background:rgba(117,220,230,.06); }
+  .side-link.active { color:var(--accent); background:rgba(117,220,230,.09); font-weight:600; }
+
+  /* Main docs layout */
+  .docs-shell { min-height:100vh; padding:var(--topbar) var(--toc) 0 var(--sidebar); }
+  .docs-main { width:min(840px, calc(100vw - var(--sidebar) - var(--toc))); margin:0 auto; padding:64px 56px 120px; }
+  .hero { padding-bottom:56px; border-bottom:1px solid var(--line); }
+  .eyebrow { margin-bottom:14px; color:var(--accent); font-size:11px; letter-spacing:.16em; text-transform:uppercase; }
+  h1 { margin:0 0 20px; max-width:720px; font-size:48px; line-height:1.08; letter-spacing:-.035em; text-wrap:balance; }
+  .lead { max-width:700px; margin:0; color:var(--muted); font-size:18px; line-height:1.7; }
+  .hero-actions { display:flex; gap:12px; flex-wrap:wrap; margin-top:30px; }
+  .button-primary, .button-secondary { display:inline-flex; align-items:center; gap:8px; padding:11px 16px; border-radius:8px; font-size:14px; font-weight:700; }
+  .button-primary { background:var(--accent); color:var(--bg); }
+  .button-primary:hover { color:var(--bg); filter:brightness(1.08); }
+  .button-secondary { border:1px solid var(--border); color:var(--ink); }
+  .button-secondary:hover { border-color:var(--accent); }
+  .pathway { display:grid; grid-template-columns:repeat(3, 1fr); gap:1px; margin-top:38px; overflow:hidden; border:1px solid var(--border); border-radius:10px; background:var(--border); }
+  .pathway-step { min-height:128px; padding:18px; background:var(--panel); }
+  .pathway-step span { display:block; margin-bottom:18px; color:var(--accent); font-size:11px; }
+  .pathway-step strong { display:block; margin-bottom:6px; font-size:14px; }
+  .pathway-step p { margin:0; color:var(--dim); font-size:12px; line-height:1.5; }
+
+  .doc-section { padding:64px 0 8px; border-bottom:1px solid var(--line); }
+  .doc-section:last-child { border-bottom:0; }
+  h2 { margin:0 0 18px; font-size:32px; line-height:1.18; letter-spacing:-.025em; }
+  h3 { margin:38px 0 12px; font-size:20px; line-height:1.3; }
+  h4 { margin:26px 0 8px; font-size:15px; }
+  p { margin:0 0 18px; color:var(--muted); font-size:15.5px; line-height:1.75; }
+  ul, ol { margin:0 0 22px; padding-left:22px; color:var(--muted); }
+  li { margin:8px 0; line-height:1.65; font-size:15px; }
+  strong { color:var(--ink); }
+  code { padding:2px 5px; border-radius:4px; background:var(--panel-strong); color:var(--accent); font-size:.88em; }
+  .section-intro { color:var(--muted); font-size:16.5px; }
+  .note, .warning, .success { margin:24px 0; padding:16px 18px; border-left:3px solid var(--violet); background:var(--panel); color:var(--muted); font-size:14px; line-height:1.65; }
+  .note strong, .warning strong, .success strong { display:block; margin-bottom:4px; }
+  .warning { border-color:var(--amber); }
+  .success { border-color:var(--accent); }
+
+  .code-block { margin:20px 0 28px; overflow:hidden; border:1px solid var(--border); border-radius:10px; background:#080B16; }
+  .code-head { display:flex; align-items:center; justify-content:space-between; padding:9px 12px 9px 16px; border-bottom:1px solid var(--line); color:var(--dim); font-size:11px; }
+  pre { margin:0; padding:18px; overflow-x:auto; color:var(--muted); font-size:12.5px; line-height:1.75; }
+  .prompt { color:var(--accent); }
+  .copy-btn { border:1px solid var(--border); border-radius:5px; padding:4px 8px; background:transparent; color:var(--dim); font-family:'JetBrains Mono', monospace; font-size:10px; cursor:pointer; }
+  .copy-btn:hover { border-color:var(--accent); color:var(--ink); }
+
+  .table-wrap { margin:22px 0 28px; overflow-x:auto; border:1px solid var(--border); border-radius:10px; }
+  table { width:100%; border-collapse:collapse; min-width:600px; }
+  th { padding:11px 14px; background:var(--panel-strong); color:var(--dim); font-size:11px; letter-spacing:.08em; text-align:left; text-transform:uppercase; }
+  td { padding:13px 14px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; line-height:1.5; vertical-align:top; }
+  td code { white-space:nowrap; }
+  .command-list { margin:22px 0 30px; border-top:1px solid var(--border); }
+  .command-row { display:grid; grid-template-columns:minmax(190px, .8fr) 1.2fr; gap:24px; padding:14px 0; border-bottom:1px solid var(--line); }
+  .command-row code { justify-self:start; }
+  .command-row span { color:var(--muted); font-size:13.5px; line-height:1.55; }
+  .stack-list { margin:24px 0 30px; border-top:1px solid var(--border); }
+  details { border-bottom:1px solid var(--line); }
+  summary { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:17px 4px; cursor:pointer; list-style:none; }
+  summary::-webkit-details-marker { display:none; }
+  summary:hover strong { color:var(--accent); }
+  summary .stack-id { margin-left:auto; color:var(--accent); font-size:11px; }
+  summary .chevron { color:var(--dim); transition:transform .2s; }
+  details[open] .chevron { transform:rotate(90deg); }
+  .details-body { padding:0 4px 22px; }
+  .details-body p, .details-body li { font-size:14px; }
+  .mini-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:22px 0; }
+  .mini-panel { padding:16px; border:1px solid var(--border); border-radius:8px; background:var(--panel); }
+  .mini-panel strong { display:block; margin-bottom:6px; font-size:14px; }
+  .mini-panel p { margin:0; color:var(--dim); font-size:12.5px; line-height:1.55; }
+
+  /* On this page */
+  .page-toc { position:fixed; top:var(--topbar); right:0; bottom:0; width:var(--toc); padding:30px 20px; border-left:1px solid var(--line); }
+  .page-toc-label { display:block; margin-bottom:12px; color:var(--dim); font-size:10px; letter-spacing:.13em; text-transform:uppercase; }
+  .page-toc a { display:block; margin:9px 0; color:var(--dim); font-size:11.5px; line-height:1.45; }
+  .page-toc a:hover { color:var(--accent); }
+  .help-box { position:absolute; left:20px; right:20px; bottom:30px; padding-top:18px; border-top:1px solid var(--line); }
+  .help-box span { display:block; margin-bottom:7px; color:var(--dim); font-size:11px; }
+  .help-box a { font-size:12px; }
+
+  /* Search dialog */
+  .search-dialog { width:min(680px, calc(100vw - 32px)); padding:0; border:1px solid var(--border); border-radius:12px; background:var(--panel); color:var(--ink); box-shadow:0 32px 90px rgba(0,0,0,.65); }
+  .search-dialog::backdrop { background:rgba(5,7,15,.78); backdrop-filter:blur(3px); }
+  .search-form { display:flex; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid var(--line); }
+  .search-form input { flex:1; border:0; outline:0; background:transparent; color:var(--ink); font-size:16px; }
+  .search-form input::placeholder { color:var(--dim); }
+  .dialog-close { border:0; background:transparent; color:var(--dim); cursor:pointer; }
+  .search-results { max-height:min(58vh, 520px); overflow:auto; padding:8px; }
+  .search-result { display:block; padding:12px; border-radius:7px; color:var(--muted); }
+  .search-result:hover, .search-result:focus { background:rgba(117,220,230,.08); color:var(--ink); outline:0; }
+  .search-result strong { display:block; margin-bottom:4px; font-size:14px; }
+  .search-result span { display:block; overflow:hidden; color:var(--dim); font-size:12px; line-height:1.45; text-overflow:ellipsis; white-space:nowrap; }
+  .search-empty { padding:30px; color:var(--dim); font-size:13px; text-align:center; }
+
+  @media (max-width:1120px) {
+    :root { --toc:0px; }
+    .page-toc { display:none; }
+    .docs-main { width:min(840px, calc(100vw - var(--sidebar))); }
+  }
+  @media (max-width:760px) {
+    :root { --sidebar:0px; }
+    .topbar { height:58px; padding:0 14px; gap:10px; }
+    .brand-divider, .brand-area, .brand-name { display:none; }
+    .top-actions { flex:1; justify-content:flex-end; }
+    .top-link { display:none; }
+    .search-trigger { width:min(280px, calc(100vw - 112px)); }
+    .search-trigger .key { display:none; }
+    .menu-button { display:block; }
+    .sidebar { top:58px; width:min(330px, 88vw); transform:translateX(-105%); transition:transform .25s ease; box-shadow:24px 0 60px rgba(0,0,0,.5); }
+    .menu-open .sidebar { transform:translateX(0); }
+    .docs-shell { padding-top:58px; padding-left:0; }
+    .docs-main { width:100%; padding:44px 20px 80px; }
+    h1 { font-size:38px; }
+    h2 { font-size:28px; }
+    .lead { font-size:16px; }
+    .pathway { grid-template-columns:1fr; }
+    .pathway-step { min-height:auto; }
+    .pathway-step span { margin-bottom:10px; }
+    .doc-section { padding-top:50px; }
+    .command-row { grid-template-columns:1fr; gap:8px; }
+    .mini-grid { grid-template-columns:1fr; }
+    .table-wrap { margin-left:-20px; margin-right:-20px; border-left:0; border-right:0; border-radius:0; }
+  }
+  @media (prefers-reduced-motion:reduce) {
+    html { scroll-behavior:auto; }
+    .sidebar, .chevron { transition:none; }
+  }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to documentation</a>
+
+<header class="topbar">
+  <a class="brand" href="index.html" aria-label="ProjectForge home">
+    <span class="brand-mark mono">F</span>
+    <span class="brand-name">ProjectForge</span>
+    <span class="brand-divider"></span>
+    <span class="brand-area">Documentation</span>
+  </a>
+  <div class="top-actions">
+    <button class="search-trigger" id="open-search" type="button" aria-label="Search documentation">
+      <span aria-hidden="true">⌕</span><span>Search documentation</span><span class="key mono">/</span>
+    </button>
+    <a class="top-link" href="index.html">Product</a>
+    <a class="top-link" href="https://github.com/Schramm2/projectforge">GitHub ↗</a>
+    <button class="menu-button" id="menu-button" type="button" aria-label="Open documentation navigation" aria-expanded="false">☰</button>
+  </div>
+</header>
+
+<aside class="sidebar" id="sidebar" aria-label="Documentation navigation">
+  <div class="release-note">
+    <strong class="mono">main · after v0.6.0</strong>
+    <span>Current source documentation. Published releases keep their own immutable docs.</span>
+  </div>
+  <nav>
+    <div class="nav-group">
+      <div class="nav-label">Start here</div>
+      <a class="side-link active" href="#overview">Overview</a>
+      <a class="side-link" href="#install">Install</a>
+      <a class="side-link" href="#providers">Connect a provider</a>
+      <a class="side-link" href="#first-project">Your first project</a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Build</div>
+      <a class="side-link" href="#stacks">Choose a stack</a>
+      <a class="side-link" href="#customize">Customize a scaffold</a>
+      <a class="side-link" href="#conventions">Conventions</a>
+      <a class="side-link" href="#execution">Execution modes</a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Operate</div>
+      <a class="side-link" href="#verification">Verification & evidence</a>
+      <a class="side-link" href="#recovery">Resume & recovery</a>
+      <a class="side-link" href="#existing-projects">Existing projects</a>
+      <a class="side-link" href="#configuration">Configuration</a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Reference</div>
+      <a class="side-link" href="#cli-reference">CLI reference</a>
+      <a class="side-link" href="#security">Security & privacy</a>
+      <a class="side-link" href="#troubleshooting">Troubleshooting</a>
+      <a class="side-link" href="#upgrade">Upgrade & uninstall</a>
+      <a class="side-link" href="#support">Support</a>
+    </div>
+  </nav>
+</aside>
+
+<div class="docs-shell">
+<main class="docs-main" id="content">
+  <section class="hero doc-section" id="overview" data-title="ProjectForge documentation" data-search="overview introduction scaffold verified project quick start">
+    <div class="eyebrow mono">// Learn ProjectForge</div>
+    <h1>From an idea to a verified starter repository.</h1>
+    <p class="lead">ProjectForge turns a project brief and your engineering conventions into a working Python or TypeScript repository. It coordinates Claude Code, Codex CLI, or Google Antigravity, runs the generated project’s checks, and leaves inspectable evidence behind.</p>
+    <div class="hero-actions">
+      <a class="button-primary" href="#install">Install ProjectForge ↓</a>
+      <a class="button-secondary" href="#first-project">Run your first scaffold</a>
+    </div>
+    <div class="pathway" aria-label="ProjectForge workflow">
+      <div class="pathway-step"><span class="mono">01 / PREVIEW</span><strong>See the complete plan</strong><p><code>--dry-run</code> makes no provider call and creates no project.</p></div>
+      <div class="pathway-step"><span class="mono">02 / SCAFFOLD</span><strong>Generate inside a bounded workspace</strong><p>Safe mode is the default and your provider credentials stay with its CLI.</p></div>
+      <div class="pathway-step"><span class="mono">03 / PROVE</span><strong>Read the local evidence</strong><p>“Project Ready” appears only after required verification passes.</p></div>
+    </div>
+    <div class="note"><strong>Command name</strong>Use <code>projectforge</code> if Foundry’s Ethereum <code>forge</code> already owns that command on your PATH. Both names run ProjectForge.</div>
+  </section>
+
+  <section class="doc-section" id="install" data-title="Install ProjectForge" data-search="install requirements homebrew brew uv pipx source python macos linux pypi">
+    <div class="eyebrow mono">// Start here</div>
+    <h2>Install ProjectForge</h2>
+    <p class="section-intro">ProjectForge supports Python 3.12 and 3.13 on macOS and Linux. Install the current published release through Homebrew or as an isolated Python tool.</p>
+
+    <h3>Homebrew</h3>
+    <p>The supported tap installs ProjectForge with pinned dependencies.</p>
+    <div class="code-block"><div class="code-head"><span>Terminal</span><button class="copy-btn" data-copy="brew install schramm2/tap/projectforge">copy</button></div><pre><span class="prompt">$</span> brew install schramm2/tap/projectforge
+<span class="prompt">$</span> projectforge --version</pre></div>
+
+    <h3>uv or pipx</h3>
+    <p>The PyPI distribution is named <code>matt-projectforge</code>. It installs both executable names.</p>
+    <div class="code-block"><div class="code-head"><span>Terminal</span><button class="copy-btn" data-copy="uv tool install matt-projectforge&#10;projectforge --version">copy</button></div><pre><span class="prompt">$</span> uv tool install matt-projectforge
+<span class="prompt">$</span> projectforge --version
+
+<span style="color:var(--dim)"># alternative</span>
+<span class="prompt">$</span> pipx install matt-projectforge</pre></div>
+
+    <h3>Current source</h3>
+    <p>Use this route when you want the unreleased behavior documented on this page.</p>
+    <div class="code-block"><div class="code-head"><span>Terminal</span><button class="copy-btn" data-copy="git clone https://github.com/Schramm2/projectforge.git&#10;cd projectforge&#10;uv sync --dev&#10;./forge --version">copy</button></div><pre><span class="prompt">$</span> git clone https://github.com/Schramm2/projectforge.git
+<span class="prompt">$</span> cd projectforge
+<span class="prompt">$</span> uv sync --dev
+<span class="prompt">$</span> ./forge --version</pre></div>
+    <div class="note"><strong>Release boundary</strong>This page follows current <code>main</code> after v0.6.0. The source version still reports 0.6.0 until the next release is prepared. For an installed release, its bundled documentation is the exact contract.</div>
+  </section>
+
+  <section class="doc-section" id="providers" data-title="Connect an AI provider" data-search="provider claude codex antigravity authentication login doctor readiness models agy">
+    <div class="eyebrow mono">// Setup</div>
+    <h2>Connect an AI provider</h2>
+    <p class="section-intro">A live scaffold needs at least one installed and authenticated provider CLI. Forge never collects your token or account identity; authentication stays inside the provider’s own tool.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Provider</th><th>Install</th><th>Provider-owned login</th><th>Forge check</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Claude Code</strong></td><td><a href="https://code.claude.com/docs/en/setup">Official setup ↗</a></td><td><code>claude auth login</code></td><td>Deterministic status check</td></tr>
+        <tr><td><strong>Codex CLI</strong></td><td><a href="https://github.com/openai/codex">Official repository ↗</a></td><td><code>codex login</code></td><td>Deterministic status check</td></tr>
+        <tr><td><strong>Google Antigravity</strong></td><td><a href="https://antigravity.google/docs/cli-install">Official setup ↗</a></td><td>Run <code>agy</code> and follow Google Sign-In</td><td><code>agy models</code>; no inference prompt</td></tr>
+      </tbody>
+    </table></div>
+    <div class="code-block"><div class="code-head"><span>Readiness check</span><button class="copy-btn" data-copy="forge doctor&#10;forge doctor --json">copy</button></div><pre><span class="prompt">$</span> forge doctor
+<span class="prompt">$</span> forge doctor --json</pre></div>
+    <p>One provider reported as <code>ready</code> is enough. Missing optional providers do not block a run. The JSON form is deterministic for automation and exits successfully only when config is valid and at least one provider is verifiably ready.</p>
+    <div class="note"><strong>Antigravity over SSH</strong>Run <code>agy</code>, open the displayed authorization URL on a local device, and paste the returned code into the remote terminal. Exit the TUI with <code>/exit</code>, then rerun <code>forge doctor</code>.</div>
+  </section>
+
+  <section class="doc-section" id="first-project" data-title="Create your first project" data-search="first scaffold dry run preview live command safe verify demo interactive questionnaire">
+    <div class="eyebrow mono">// Quickstart</div>
+    <h2>Create your first project</h2>
+    <h3>1. Preview with zero provider calls</h3>
+    <div class="code-block"><div class="code-head"><span>Preview</span><button class="copy-btn" data-copy="forge --dry-run \
+  --name hello-forge \
+  --stack python-cli \
+  --description &quot;A tiny greeting CLI&quot; \
+  --no-docker \
+  --no-open">copy</button></div><pre><span class="prompt">$</span> forge --dry-run \
+    --name hello-forge \
+    --stack python-cli \
+    --description "A tiny greeting CLI" \
+    --no-docker \
+    --no-open</pre></div>
+    <p>Review the target, stack, options, routing, model behavior, approval mode, convention sources, warnings, and complete prompt. Add <code>--verbose</code> to display full convention source paths and hashes. Preview does not prove provider readiness or generated-project behavior.</p>
+
+    <h3>2. Run the same scaffold safely</h3>
+    <div class="code-block"><div class="code-head"><span>Live scaffold</span><button class="copy-btn" data-copy="forge \
+  --name hello-forge \
+  --stack python-cli \
+  --description &quot;A tiny greeting CLI&quot; \
+  --no-docker \
+  --approval-mode safe \
+  --no-open \
+  --verify">copy</button></div><pre><span class="prompt">$</span> forge \
+    --name hello-forge \
+    --stack python-cli \
+    --description "A tiny greeting CLI" \
+    --no-docker \
+    --approval-mode safe \
+    --no-open \
+    --verify</pre></div>
+    <p>Before the first provider call, Forge shows the workspace, routing, model behavior, provider invocation estimate, duration range, quota and cost context, execution strategy, and verification limits.</p>
+
+    <h3>3. Or use the interactive flow</h3>
+    <div class="code-block"><div class="code-head"><span>Guided setup</span><button class="copy-btn" data-copy="forge">copy</button></div><pre><span class="prompt">$</span> forge</pre></div>
+    <p>The first run opens setup. You can use bundled conventions, import nearby <code>AGENTS.md</code>, <code>CLAUDE.md</code>, or Copilot instructions, or create a reusable profile through a short interview. The project questionnaire keeps reusable conventions separate from the current project brief and lets you review every choice before execution.</p>
+    <div class="success"><strong>Demo mode is on by default</strong>Generated startup should not require real service credentials. Your provider CLI still requires its own authentication.</div>
+  </section>
+
+  <section class="doc-section" id="stacks" data-title="Choose a stack" data-search="stacks nextjs react fastapi ai llm monorepo python cli typescript package worker structures defaults docker commands">
+    <div class="eyebrow mono">// Recipes</div>
+    <h2>Choose a stack</h2>
+    <p class="section-intro">Use the identifier or any alias with <code>--stack</code>. Recipes guide structure, libraries, commands, and Docker defaults; generated project metadata and <code>.forge/verification.json</code> remain authoritative.</p>
+    <div class="stack-list">
+      <details><summary><strong>Next.js + React</strong><span class="stack-id mono">nextjs · next · react</span><span class="chevron">›</span></summary><div class="details-body"><p><strong>npm · Docker off.</strong> App Router project with <code>src/app</code>, <code>src/components</code>, <code>src/lib</code>, <code>public</code>, and <code>agent_docs</code>. Tailwind is included in the common guidance.</p><p>Typical checks: <code>npm run build</code>, <code>npm run lint</code>, and <code>npx tsc --noEmit</code>. Supports auth, CI, design templates, and media import.</p></div></details>
+      <details><summary><strong>FastAPI</strong><span class="stack-id mono">fastapi · api</span><span class="chevron">›</span></summary><div class="details-body"><p><strong>uv · Docker on.</strong> Layered API, domain, application, infrastructure, shared, unit/integration test, and <code>agent_docs</code> structure.</p><p>Common guidance includes Pydantic, asyncpg, structlog, httpx, Ruff, strict MyPy, and pytest. Optional services include PostgreSQL with pgvector, OpenAI, and AWS.</p></div></details>
+      <details><summary><strong>FastAPI + AI/LLM</strong><span class="stack-id mono">fastapi-ai · ai · llm</span><span class="chevron">›</span></summary><div class="details-body"><p><strong>uv · Docker on.</strong> FastAPI structure extended with retrieval and extraction use cases, vector persistence, and external LLM/embedding integrations.</p><p>Adds guidance for pgvector, OpenAI, tiktoken, rank-bm25, tenacity, and numpy. Uses the FastAPI development command family.</p></div></details>
+      <details><summary><strong>Next.js + FastAPI monorepo</strong><span class="stack-id mono">both · fullstack · monorepo</span><span class="chevron">›</span></summary><div class="details-body"><p><strong>uv + npm · Docker on.</strong> FastAPI backend with a <code>frontend</code> Next.js app, shared domain/application layers, tests, Docker files, and agent docs.</p><p>Supports auth, CI, design templates, and media import. Typical local ports are API on 8000 and frontend on the Next.js default.</p></div></details>
+      <details><summary><strong>Python CLI</strong><span class="stack-id mono">python-cli · cli · typer</span><span class="chevron">›</span></summary><div class="details-body"><p><strong>uv · Docker off.</strong> A src-layout package with CLI entry point, pytest suite, <code>pyproject.toml</code>, and agent docs. Common guidance includes Typer, Rich, Questionary, Ruff, strict MyPy, and pytest.</p></div></details>
+      <details><summary><strong>TypeScript package</strong><span class="stack-id mono">ts-package · npm-package · library</span><span class="chevron">›</span></summary><div class="details-body"><p><strong>npm · Docker off.</strong> ESM-first package with TypeScript source, public entry point, unit/integration tests, compiled output, strict <code>tsconfig.json</code>, and Vitest.</p></div></details>
+      <details><summary><strong>Python worker</strong><span class="stack-id mono">python-worker · worker · service</span><span class="chevron">›</span></summary><div class="details-body"><p><strong>uv · Docker on.</strong> Service structure with CLI dispatcher, models, storage, business services, config, infrastructure, tests, and agent docs.</p><p>Common guidance includes boto3, requests, structlog, dotenv, pytest, and a Docker build. Typical services include DynamoDB, ECS Fargate, EventBridge, and Slack.</p></div></details>
+    </div>
+    <p>All Python recipes broadly favor <code>uv</code>, Ruff, strict MyPy, pytest, and pre-commit. TypeScript recipes favor strict TypeScript, ESM-first setup, and Vitest-oriented testing.</p>
+  </section>
+
+  <section class="doc-section" id="customize" data-title="Customize a scaffold" data-search="options docker services auth ci demo design media agents model routing extra export open verify">
+    <div class="eyebrow mono">// Shape the output</div>
+    <h2>Customize a scaffold</h2>
+    <p class="section-intro">The interactive questionnaire exposes the same structured choices as the command line. Use flags when you need a repeatable, scriptable request.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Need</th><th>Flags</th><th>Behavior</th></tr></thead>
+      <tbody>
+        <tr><td>Project facts</td><td><code>--name</code> <code>--stack</code> <code>--description</code></td><td>Core non-interactive request.</td></tr>
+        <tr><td>Integrations</td><td><code>--services</code> <code>--auth-provider</code></td><td>Comma-separated services; auth is available for Next.js and fullstack.</td></tr>
+        <tr><td>CI</td><td><code>--ci</code> <code>--ci-template</code> <code>--ci-actions</code></td><td>Questionnaire or blank template with selected checks.</td></tr>
+        <tr><td>Design and assets</td><td><code>--design-template</code> <code>--media</code> <code>--no-media</code></td><td>Frontend guide and named local media collection.</td></tr>
+        <tr><td>Runtime shape</td><td><code>--docker</code> <code>--demo</code></td><td>Container setup and credential-free demo behavior.</td></tr>
+        <tr><td>Execution</td><td><code>--use</code> <code>--model</code> <code>--agents</code></td><td>Provider override, advanced model override, or multi-agent orchestration.</td></tr>
+        <tr><td>Completion</td><td><code>--open</code> <code>--verify</code></td><td>Editor launch and generated-project checks; both default on.</td></tr>
+        <tr><td>Extra context</td><td><code>--extra</code> <code>--export</code></td><td>Additional instructions or prompt export. Treat exports as sensitive.</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Auth providers</h3>
+    <p>Next.js and fullstack recipes support <code>clerk</code>, <code>supabase-auth</code>, <code>authjs</code>, and <code>better-auth</code>. Demo mode should use placeholders rather than real credentials.</p>
+    <h3>CI actions</h3>
+    <p>Available actions include <code>lint</code>, <code>format-check</code>, <code>typecheck</code>, <code>build</code>, <code>unit-tests</code>, <code>integration-tests</code>, and <code>docker-build</code>. Forge limits choices to actions appropriate for the selected stack.</p>
+  </section>
+
+  <section class="doc-section" id="conventions" data-title="Teach Forge your conventions" data-search="conventions profiles init import select inspect preview validate edit precedence AGENTS CLAUDE team instructions">
+    <div class="eyebrow mono">// Reusable guidance</div>
+    <h2>Teach Forge how you work</h2>
+    <p class="section-intro">Conventions are durable engineering rules reused across scaffolds. A project brief describes only the current product. Keeping them separate makes both easier to inspect and maintain.</p>
+    <h3>Precedence</h3>
+    <ol>
+      <li>Bundled ProjectForge defaults.</li>
+      <li>Selected profile at <code>~/.forge/profiles/&lt;name&gt;.md</code>.</li>
+      <li>Legacy-compatible <code>~/.forge/conventions.md</code>.</li>
+      <li>Project-local <code>.forge/conventions.md</code>.</li>
+    </ol>
+    <p>Later layers have higher precedence. Empty placeholders and known generated legacy mirrors are ignored with a warning. Credential-shaped content is rejected before a provider call.</p>
+    <div class="command-list">
+      <div class="command-row"><code>forge conventions init team</code><span>Create a starter profile without overwriting an existing one.</span></div>
+      <div class="command-row"><code>forge conventions import ./AGENTS.md --name team</code><span>Import a Markdown instruction file into a new profile.</span></div>
+      <div class="command-row"><code>forge conventions list</code><span>List profiles and show the selected profile.</span></div>
+      <div class="command-row"><code>forge conventions select team</code><span>Use a profile for future scaffolds.</span></div>
+      <div class="command-row"><code>forge conventions inspect --stack fastapi --json</code><span>Show exact source order, paths, warnings, and SHA-256 hashes.</span></div>
+      <div class="command-row"><code>forge conventions preview --stack fastapi</code><span>Print effective content without starting a provider.</span></div>
+      <div class="command-row"><code>forge conventions validate --stack fastapi</code><span>Validate the selected profile and effective bundle.</span></div>
+      <div class="command-row"><code>forge conventions edit team</code><span>Open a profile in the configured editor.</span></div>
+    </div>
+    <div class="warning"><strong>Private instructions</strong>Imports are Markdown-only and size-bounded, but profiles and exported prompts can still contain private organization guidance. Review them before sharing.</div>
+  </section>
+
+  <section class="doc-section" id="execution" data-title="Execution modes and provider routing" data-search="safe plan unsafe allow unsafe routing fallback multi agent provider workspace sandbox model cost quota parallel">
+    <div class="eyebrow mono">// Control the run</div>
+    <h2>Execution modes and routing</h2>
+    <div class="mini-grid">
+      <div class="mini-panel"><strong><code>safe</code> · default</strong><p>Provider workspace-write mode with bounded execution controls. Normal scaffolding belongs here.</p></div>
+      <div class="mini-panel"><strong><code>plan</code></strong><p>Read-only provider planning. It still makes provider calls and can consume quota.</p></div>
+      <div class="mini-panel"><strong><code>unsafe --allow-unsafe</code></strong><p>Removes approval or sandbox boundaries. Use only inside external isolation you control.</p></div>
+      <div class="mini-panel"><strong><code>--dry-run</code></strong><p>No project, provider process, or model call. Best first step for every repeatable scaffold.</p></div>
+    </div>
+    <p>Safe mode still permits the provider to edit the target workspace, run allowed commands, install dependencies, use allowed network access, and consume quota. Inspect preflight before continuing.</p>
+    <h3>Automatic routing</h3>
+    <p>Forge can route specialist phases across ready providers and falls back in the declared order Claude → Antigravity → Codex. Use <code>--use claude</code>, <code>--use antigravity</code>, or <code>--use codex</code> to force one provider for a run.</p>
+    <p>Provider defaults control model selection unless you deliberately pass <code>--model</code>. Forge avoids maintaining a volatile model catalog; consult live provider help for accepted values.</p>
+    <h3>Standard versus multi-agent</h3>
+    <p>Standard execution normally uses one provider invocation per phase. <code>--agents</code> decomposes phases into several focused tasks and can improve complex output, but it is slower and typically uses substantially more provider calls. Preflight quantifies the expected invocation range.</p>
+  </section>
+
+  <section class="doc-section" id="verification" data-title="Verification and evidence" data-search="verification project ready project created evidence forge files progress scaffold snapshot context verification json health endpoints report">
+    <div class="eyebrow mono">// Trust the result</div>
+    <h2>Verification and evidence</h2>
+    <p class="section-intro">A successful provider exit means files were generated. It does not mean the project works. ProjectForge reports <strong>Project Ready</strong> only when all required checks pass; skipped or incomplete verification yields the honest <strong>Project Created</strong>.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Generated record</th><th>What it proves</th><th>Sensitivity</th></tr></thead>
+      <tbody>
+        <tr><td><code>.forge/progress.json</code></td><td>Prompt hashes, phase status, attempts, duration, failure class, and resume contract.</td><td>No prompt or provider output.</td></tr>
+        <tr><td><code>.forge/scaffold.json</code></td><td>Requested facts, routing, model behavior, approval mode, and convention/context provenance.</td><td>Metadata only; inspect before sharing.</td></tr>
+        <tr><td><code>.forge/conventions-snapshot.md</code></td><td>Exact convention input used for replay.</td><td>Potentially private.</td></tr>
+        <tr><td><code>.forge/context-snapshot.md</code></td><td>Approved project brief and selected nearby content, when supplied.</td><td>Potentially private.</td></tr>
+        <tr><td><code>.forge/verification.json</code></td><td>Commands, relative working directories, timeouts, exits, health endpoints, and remediation.</td><td>Redacted durable evidence.</td></tr>
+      </tbody>
+    </table></div>
+    <p>For high-confidence delivery, rerun the recorded project commands independently. Python projects can declare bounded localhost health settings:</p>
+    <div class="code-block"><div class="code-head"><span>pyproject.toml</span><button class="copy-btn" data-copy="[tool.forge.verification]&#10;health_endpoints = [&quot;/healthz&quot;, &quot;/readyz&quot;]&#10;health_startup_timeout = 20&#10;health_request_timeout = 4">copy</button></div><pre>[tool.forge.verification]
+health_endpoints = ["/healthz", "/readyz"]
+health_startup_timeout = 20
+health_request_timeout = 4</pre></div>
+    <p>Forge accepts 1–8 local path-only endpoints, a 1–120 second startup timeout, and a 1–30 second request timeout. Invalid metadata falls back to safe defaults, and host/port remain derived from the generated local run command.</p>
+  </section>
+
+  <section class="doc-section" id="recovery" data-title="Resume and recover a failed scaffold" data-search="resume recovery failed provider verification partial project contract drift timeout permission quota network model login">
+    <div class="eyebrow mono">// Preserve completed work</div>
+    <h2>Resume and recover</h2>
+    <p class="section-intro">Do not delete a partial project or pay to rerun completed phases. Fix the classified problem, preserve <code>.forge/progress.json</code>, and repeat the original command with <code>--resume</code>.</p>
+    <div class="code-block"><div class="code-head"><span>Resume</span><button class="copy-btn" data-copy="forge \
+  --name hello-forge \
+  --stack python-cli \
+  --description &quot;A tiny greeting CLI&quot; \
+  --no-docker \
+  --approval-mode safe \
+  --no-open \
+  --verify \
+  --resume">copy</button></div><pre><span class="prompt">$</span> forge \
+    --name hello-forge \
+    --stack python-cli \
+    --description "A tiny greeting CLI" \
+    --no-docker \
+    --approval-mode safe \
+    --no-open \
+    --verify \
+    --resume</pre></div>
+    <p>Resume validates project name, stack, provider routing, prompt hashes, approval mode, and effective conventions. It skips completed phases and rejects drift instead of mixing two scaffold contracts.</p>
+    <h3>Provider failure</h3>
+    <ol><li>Read the bounded failure category and remediation.</li><li>Run <code>forge doctor</code> for install, login, or connectivity readiness.</li><li>For an explicit model error, remove <code>--model</code> or choose a provider-supported value.</li><li>Repeat the original request with <code>--resume</code>.</li></ol>
+    <h3>Verification failure</h3>
+    <p>Open <code>.forge/verification.json</code> and run the first failed command from its recorded project-relative directory. Fix the generated project; do not regenerate it just to hide a failed check.</p>
+  </section>
+
+  <section class="doc-section" id="existing-projects" data-title="Work with existing projects" data-search="evolve check replay diff stats repair convention audit existing projects capability history analytics">
+    <div class="eyebrow mono">// After scaffolding</div>
+    <h2>Work with existing projects</h2>
+    <div class="command-list">
+      <div class="command-row"><code>forge check</code><span>Audit the current project against effective organization conventions.</span></div>
+      <div class="command-row"><code>forge check --fix</code><span>Add supported missing convention files. Review the generated changes.</span></div>
+      <div class="command-row"><code>forge check --export report.md</code><span>Export the audit as Markdown.</span></div>
+      <div class="command-row"><code>forge evolve auth --dry-run</code><span>Preview a capability addition without provider execution.</span></div>
+      <div class="command-row"><code>forge evolve auth</code><span>Add a capability to an existing Forge project in safe mode.</span></div>
+      <div class="command-row"><code>forge replay --dry-run</code><span>Reconstruct the original prompt from recorded scaffold inputs.</span></div>
+      <div class="command-row"><code>forge replay --diff</code><span>Replay in safe mode and compare output with the current project.</span></div>
+      <div class="command-row"><code>forge stats</code><span>Show local scaffold analytics and provider performance.</span></div>
+      <div class="command-row"><code>forge stats --repair</code><span>Quarantine recognizable legacy pytest artifacts, then recalculate stats.</span></div>
+    </div>
+    <div class="note"><strong>Live help is the runtime contract</strong>Run root or subcommand <code>--help</code> immediately before scripting a command. Provider/model catalogs and available capabilities can change faster than copied documentation.</div>
+  </section>
+
+  <section class="doc-section" id="configuration" data-title="Configuration and local data" data-search="config forge home settings json editor backends models docker projects agents sound profiles hooks media design templates local history">
+    <div class="eyebrow mono">// Local settings</div>
+    <h2>Configuration and local data</h2>
+    <p class="section-intro">User-owned settings live under <code>~/.forge/</code>. Set <code>FORGE_HOME</code> to another directory for isolated automation or ephemeral environments.</p>
+    <h3>User config</h3>
+    <p><code>~/.forge/config.json</code> is created by <code>forge --setup</code>, schema-validated, atomically written, and restricted to user permissions. Change ordinary preferences by rerunning setup rather than hand-editing JSON.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Key</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>preferred_editor</code></td><td>Editor command used for optional project opening.</td></tr>
+        <tr><td><code>available_backends</code></td><td>Providers seen during setup; readiness is always rechecked.</td></tr>
+        <tr><td><code>backend_models</code></td><td>Optional advanced model overrides. Empty means provider default.</td></tr>
+        <tr><td><code>docker_available</code></td><td>Docker availability observed during setup.</td></tr>
+        <tr><td><code>projects_dir</code></td><td>Default parent directory for generated projects.</td></tr>
+        <tr><td><code>agents</code></td><td>Standard or multi-agent execution preference.</td></tr>
+        <tr><td><code>sound</code></td><td>Whether successful scaffolds play a local completion sound.</td></tr>
+        <tr><td><code>conventions_profile</code></td><td>Selected reusable convention profile.</td></tr>
+      </tbody>
+    </table></div>
+    <p>If config is invalid, Forge moves it to <code>config.json.corrupt-&lt;timestamp&gt;</code> when possible, uses safe defaults, and asks you to rerun setup. Review the recovery copy locally before removing it.</p>
+    <h3>Design templates and media</h3>
+    <p>Frontend-capable stacks can use the bundled <code>default-design-guide</code>, a user override under <code>~/.forge/design-templates/</code>, or a project override under <code>.forge/design-templates/</code>. Named media collections come from the repository’s <code>media/&lt;collection&gt;/</code>; arbitrary paths are not accepted.</p>
+    <h3>Post-scaffold hook</h3>
+    <p>An executable <code>~/.forge/hooks/post-scaffold.sh</code> runs after verification with a 60-second limit. It receives <code>FORGE_PROJECT_DIR</code>, <code>FORGE_PROJECT_NAME</code>, <code>FORGE_STACK</code>, and <code>FORGE_DEMO_MODE</code>. It is user-authored shell code running with your account’s permissions—review it before use.</p>
+    <h3>Local history</h3>
+    <p><code>scaffold.log</code>, <code>quality.jsonl</code>, and <code>preferences.json</code> stay local and help Forge report history, improve routing, and select interactive defaults. Forge does not transmit these analytics.</p>
+  </section>
+
+  <section class="doc-section" id="cli-reference" data-title="CLI reference" data-search="command flags options use dry run version model approval name stack description docker services auth ci demo media setup agents verbose open verify resume export completion">
+    <div class="eyebrow mono">// Current command surface</div>
+    <h2>CLI reference</h2>
+    <h3>Scaffold options</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Option</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>--use</code></td><td>Override routing with <code>claude</code>, <code>antigravity</code>, or <code>codex</code>.</td></tr>
+        <tr><td><code>--dry-run</code></td><td>Print the assembled prompt without executing a provider.</td></tr>
+        <tr><td><code>--model</code> / <code>-m</code></td><td>Pass an advanced model override to the provider CLI.</td></tr>
+        <tr><td><code>--approval-mode</code></td><td>Select <code>safe</code>, <code>plan</code>, or <code>unsafe</code>; defaults to safe.</td></tr>
+        <tr><td><code>--allow-unsafe</code></td><td>Second explicit confirmation required for unsafe provider bypass.</td></tr>
+        <tr><td><code>--name</code> / <code>-n</code></td><td>Project name; starts non-interactive mode when combined with required facts.</td></tr>
+        <tr><td><code>--stack</code> / <code>-s</code></td><td>One of the seven supported stack identifiers or aliases.</td></tr>
+        <tr><td><code>--description</code> / <code>-d</code></td><td>Plain-language project description.</td></tr>
+        <tr><td><code>--design-template</code></td><td>Design or brand guide for frontend-capable stacks.</td></tr>
+        <tr><td><code>--docker / --no-docker</code></td><td>Include or omit Docker setup.</td></tr>
+        <tr><td><code>--extra</code> / <code>-e</code></td><td>Additional provider instructions; secret-scanned.</td></tr>
+        <tr><td><code>--services</code></td><td>Comma-separated integrations, for example <code>Clerk,PostgreSQL</code>.</td></tr>
+        <tr><td><code>--auth-provider</code></td><td>Auth choice for Next.js and fullstack stacks.</td></tr>
+        <tr><td><code>--ci / --no-ci</code></td><td>Include or omit GitHub Actions CI.</td></tr>
+        <tr><td><code>--ci-template</code></td><td><code>questionnaire</code> or <code>blank-template</code>.</td></tr>
+        <tr><td><code>--ci-actions</code></td><td>Comma-separated stack-compatible CI actions.</td></tr>
+        <tr><td><code>--demo / --no-demo</code></td><td>Credential-free demo behavior; defaults to demo.</td></tr>
+        <tr><td><code>--media</code> / <code>--no-media</code></td><td>Import a named media collection or skip media.</td></tr>
+        <tr><td><code>--setup</code></td><td>Run the setup wizard.</td></tr>
+        <tr><td><code>--agents / --no-agents</code></td><td>Enable or disable multi-agent orchestration.</td></tr>
+        <tr><td><code>--verbose / --quiet</code></td><td>Show detailed execution information and convention source hashes.</td></tr>
+        <tr><td><code>--open / --no-open</code></td><td>Open the project after scaffolding; defaults to open.</td></tr>
+        <tr><td><code>--verify / --no-verify</code></td><td>Run generated-project checks; defaults to verify.</td></tr>
+        <tr><td><code>--resume</code></td><td>Resume a failed matching contract and preserve completed phases.</td></tr>
+        <tr><td><code>--export</code></td><td>Write the assembled prompt to a file without provider execution.</td></tr>
+        <tr><td><code>--install-completion</code></td><td>Install shell completion.</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Top-level commands</h3>
+    <div class="command-list">
+      <div class="command-row"><code>forge doctor</code><span>Check config, provider installation, and authentication without model calls.</span></div>
+      <div class="command-row"><code>forge conventions</code><span>Manage user-owned convention profiles.</span></div>
+      <div class="command-row"><code>forge check</code><span>Audit a project against conventions.</span></div>
+      <div class="command-row"><code>forge evolve</code><span>Add a capability to an existing Forge project.</span></div>
+      <div class="command-row"><code>forge replay</code><span>Reconstruct a scaffold from its original records.</span></div>
+      <div class="command-row"><code>forge stats</code><span>Read local scaffold analytics and provider performance.</span></div>
+    </div>
+  </section>
+
+  <section class="doc-section" id="security" data-title="Security and privacy" data-search="security privacy data provider credentials secrets context prompt unsafe local hook workspace selected files redaction">
+    <div class="eyebrow mono">// Know the boundary</div>
+    <h2>Security and privacy</h2>
+    <h3>What leaves your machine</h3>
+    <p>During a live run, Forge sends the assembled project brief, effective conventions, explicitly selected nearby Markdown, design or media context, and phase instructions through the chosen provider CLI. The provider’s terms, retention policy, account settings, and billing apply.</p>
+    <p>Nearby context discovery checks only known filenames in the current directory and includes no file content until you select it. Selected files are limited to 32 KB each and 64 KB total, then secret-scanned before prompt assembly.</p>
+    <h3>What Forge does not collect</h3>
+    <ul><li>Provider credentials, tokens, or account identity.</li><li>Raw provider output in progress records or durable failure evidence.</li><li>Absolute target paths in local scaffold history.</li><li>Local quality and preference analytics.</li></ul>
+    <h3>Your responsibility</h3>
+    <ul><li>Never put credentials in descriptions, extra instructions, conventions, selected context, exported prompts, or generated fixtures.</li><li>Treat convention and context snapshots as potentially private.</li><li>Review generated code as untrusted until checks pass.</li><li>Use unsafe mode only inside an isolation boundary you control.</li><li>Review post-scaffold hooks as normal shell code with your user permissions.</li></ul>
+    <div class="warning"><strong>Reporting safely</strong>Do not attach <code>.env</code> content, raw prompts, provider identity, convention snapshots, context snapshots, credentials, or unredacted local output to a public issue.</div>
+  </section>
+
+  <section class="doc-section" id="troubleshooting" data-title="Troubleshooting" data-search="command not found needs login antigravity config corrupt provider phase permission sandbox resume verification existing directory hook shell completion blocked">
+    <div class="eyebrow mono">// Diagnose before retrying</div>
+    <h2>Troubleshooting</h2>
+    <h3><code>forge: command not found</code></h3>
+    <p>For source installs run <code>uv sync --dev</code> and use <code>./forge</code>. For uv or pipx inspect <code>uv tool list</code> or <code>pipx list</code>. For Homebrew inspect <code>brew info schramm2/tap/projectforge</code>. If Foundry owns <code>forge</code>, run <code>projectforge</code>.</p>
+    <h3>Provider is missing or needs login</h3>
+    <p>Install and authenticate through the provider’s official CLI, then run <code>forge doctor</code>. Forge never asks you to paste a credential.</p>
+    <h3>Antigravity says <code>needs_login</code></h3>
+    <p>Run <code>agy</code>, complete Google Sign-In, exit with <code>/exit</code>, then rerun doctor. For <code>check_inconclusive</code>, verify connectivity and keyring access and run <code>agy models</code> directly.</p>
+    <h3>Config is corrupted</h3>
+    <p>Forge preserves a timestamped recovery copy when possible. Run <code>forge --setup</code>, then <code>forge doctor</code>. Review the local recovery file before deleting it.</p>
+    <h3>Permission or sandbox failure</h3>
+    <p>Keep safe mode. Confirm the target workspace and adjust only the provider’s scoped policy. Do not use unsafe mode as routine recovery.</p>
+    <h3>Existing target directory</h3>
+    <p>Interactive Forge offers rename, confirmed overwrite, or cancel. Use <code>--resume</code> only when the directory contains matching <code>.forge/progress.json</code> evidence.</p>
+    <h3>Post-scaffold hook fails</h3>
+    <p>Confirm <code>~/.forge/hooks/post-scaffold.sh</code> exists, is executable, and finishes within 60 seconds. Review it before running manually.</p>
+    <h3>Shell completion is stale</h3>
+    <div class="code-block"><div class="code-head"><span>Refresh completion</span><button class="copy-btn" data-copy="forge --install-completion">copy</button></div><pre><span class="prompt">$</span> forge --install-completion</pre></div>
+  </section>
+
+  <section class="doc-section" id="upgrade" data-title="Upgrade migrate and uninstall" data-search="upgrade update migrate 0.4.1 gemini antigravity uninstall uv homebrew config namespace">
+    <div class="eyebrow mono">// Lifecycle</div>
+    <h2>Upgrade and uninstall</h2>
+    <h3>Upgrade a published installation</h3>
+    <div class="code-block"><div class="code-head"><span>Upgrade</span><button class="copy-btn" data-copy="uv tool upgrade matt-projectforge&#10;# or&#10;brew upgrade schramm2/tap/projectforge">copy</button></div><pre><span class="prompt">$</span> uv tool upgrade matt-projectforge
+<span style="color:var(--dim)"># or</span>
+<span class="prompt">$</span> brew upgrade schramm2/tap/projectforge</pre></div>
+    <h3>Migrating older installations</h3>
+    <p>The current source uses <code>projectforge</code> as the canonical Python namespace and preferred command, while retaining <code>forge</code> as a compatibility command. The PyPI distribution remains <code>matt-projectforge</code>.</p>
+    <p>Legacy 0.4.1 config is normalized in memory. Existing model overrides for supported providers remain; retired Gemini backend selections become Antigravity while incompatible Gemini model overrides are discarded. Run <code>forge doctor</code> and <code>forge --setup</code> after upgrading. Scaffolds created before phase ledgers cannot be resumed retroactively.</p>
+    <h3>Uninstall</h3>
+    <div class="code-block"><div class="code-head"><span>Uninstall</span><button class="copy-btn" data-copy="uv tool uninstall matt-projectforge&#10;# or&#10;brew uninstall projectforge">copy</button></div><pre><span class="prompt">$</span> uv tool uninstall matt-projectforge
+<span style="color:var(--dim)"># or</span>
+<span class="prompt">$</span> brew uninstall projectforge</pre></div>
+    <p>Removing the application does not delete user-owned profiles, configuration, snapshots, or history under <code>~/.forge/</code>. Back up or move that directory separately if you no longer need it.</p>
+  </section>
+
+  <section class="doc-section" id="support" data-title="Get support" data-search="support issue bug security vulnerability help github report">
+    <div class="eyebrow mono">// Still blocked?</div>
+    <h2>Get support</h2>
+    <p>For ordinary bugs, open a <a href="https://github.com/Schramm2/projectforge/issues">GitHub issue ↗</a> with the ProjectForge and provider versions, operating system, approval mode, minimal reproduction, and redacted evidence.</p>
+    <p>For a vulnerability, use the repository’s <a href="https://github.com/Schramm2/projectforge/security/advisories/new">private vulnerability report ↗</a>. Do not open a public issue containing an exploit, credentials, private conventions, or provider account details.</p>
+    <div class="hero-actions"><a class="button-primary" href="https://github.com/Schramm2/projectforge/issues">Open GitHub Issues ↗</a><a class="button-secondary" href="index.html">Back to ProjectForge</a></div>
+  </section>
+</main>
+</div>
+
+<aside class="page-toc" aria-label="On this page">
+  <span class="page-toc-label mono">On this page</span>
+  <a href="#overview">Overview</a>
+  <a href="#install">Install</a>
+  <a href="#providers">Providers</a>
+  <a href="#first-project">First project</a>
+  <a href="#stacks">Stacks</a>
+  <a href="#verification">Verification</a>
+  <a href="#security">Security</a>
+  <div class="help-box"><span>Need the source?</span><a href="https://github.com/Schramm2/projectforge/tree/main/docs">Markdown guides ↗</a></div>
+</aside>
+
+<dialog class="search-dialog" id="search-dialog" aria-label="Search documentation">
+  <div class="search-form"><span aria-hidden="true">⌕</span><input id="search-input" type="search" autocomplete="off" placeholder="Search commands, workflows, and concepts…"><button class="dialog-close" id="close-search" type="button" aria-label="Close search">Esc</button></div>
+  <div class="search-results" id="search-results" role="listbox"><div class="search-empty">Start typing to search the complete user guide.</div></div>
+</dialog>
+
+<script>
+(function () {
+  var body = document.body;
+  var menuButton = document.getElementById('menu-button');
+  var sidebar = document.getElementById('sidebar');
+  var sideLinks = Array.prototype.slice.call(document.querySelectorAll('.side-link'));
+  var sections = Array.prototype.slice.call(document.querySelectorAll('.doc-section'));
+
+  function closeMenu() {
+    body.classList.remove('menu-open');
+    menuButton.setAttribute('aria-expanded', 'false');
+    menuButton.setAttribute('aria-label', 'Open documentation navigation');
+  }
+  menuButton.addEventListener('click', function () {
+    var open = body.classList.toggle('menu-open');
+    menuButton.setAttribute('aria-expanded', String(open));
+    menuButton.setAttribute('aria-label', open ? 'Close documentation navigation' : 'Open documentation navigation');
+  });
+  sideLinks.forEach(function (link) { link.addEventListener('click', closeMenu); });
+  document.addEventListener('click', function (event) {
+    if (body.classList.contains('menu-open') && !sidebar.contains(event.target) && !menuButton.contains(event.target)) closeMenu();
+  });
+
+  if ('IntersectionObserver' in window) {
+    var observer = new IntersectionObserver(function (entries) {
+      var visible = entries.filter(function (entry) { return entry.isIntersecting; }).sort(function (a, b) { return b.intersectionRatio - a.intersectionRatio; });
+      if (!visible.length) return;
+      var id = visible[0].target.id;
+      sideLinks.forEach(function (link) { link.classList.toggle('active', link.getAttribute('href') === '#' + id); });
+    }, { rootMargin: '-20% 0px -65% 0px', threshold: [0, .25, .5] });
+    sections.forEach(function (section) { observer.observe(section); });
+  }
+
+  document.querySelectorAll('.copy-btn[data-copy]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var text = button.getAttribute('data-copy');
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(function () {});
+      var previous = button.textContent;
+      button.textContent = 'copied';
+      clearTimeout(button._copyTimer);
+      button._copyTimer = setTimeout(function () { button.textContent = previous; }, 1400);
+    });
+  });
+
+  var dialog = document.getElementById('search-dialog');
+  var openSearch = document.getElementById('open-search');
+  var closeSearch = document.getElementById('close-search');
+  var input = document.getElementById('search-input');
+  var results = document.getElementById('search-results');
+
+  function openDialog() {
+    if (!dialog.open) dialog.showModal();
+    input.focus();
+  }
+  function closeDialog() { dialog.close(); input.value = ''; renderResults(''); }
+  openSearch.addEventListener('click', openDialog);
+  closeSearch.addEventListener('click', closeDialog);
+  dialog.addEventListener('click', function (event) { if (event.target === dialog) closeDialog(); });
+
+  function excerpt(section, query) {
+    var text = section.querySelector('.section-intro, .lead, p');
+    var value = text ? text.textContent.trim() : section.textContent.trim();
+    var lower = value.toLowerCase();
+    var index = lower.indexOf(query);
+    var start = index > 55 ? index - 55 : 0;
+    return (start ? '…' : '') + value.slice(start, start + 145) + (value.length > start + 145 ? '…' : '');
+  }
+  function renderResults(value) {
+    var query = value.trim().toLowerCase();
+    if (!query) { results.innerHTML = '<div class="search-empty">Start typing to search the complete user guide.</div>'; return; }
+    var matches = sections.filter(function (section) {
+      return ((section.getAttribute('data-title') || '') + ' ' + (section.getAttribute('data-search') || '') + ' ' + section.textContent).toLowerCase().indexOf(query) !== -1;
+    }).slice(0, 8);
+    if (!matches.length) { results.innerHTML = '<div class="search-empty">No documentation matched “' + query.replace(/[<>&]/g, '') + '”. Try a command name or workflow.</div>'; return; }
+    results.innerHTML = matches.map(function (section) {
+      var title = section.getAttribute('data-title');
+      return '<a class="search-result" role="option" href="#' + section.id + '"><strong>' + title + '</strong><span>' + excerpt(section, query).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span></a>';
+    }).join('');
+    results.querySelectorAll('.search-result').forEach(function (link) { link.addEventListener('click', closeDialog); });
+  }
+  input.addEventListener('input', function () { renderResults(input.value); });
+  input.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter') { var first = results.querySelector('.search-result'); if (first) first.click(); }
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === '/' && !dialog.open && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { event.preventDefault(); openDialog(); }
+  });
+})();
+</script>
+</body>
+</html>
