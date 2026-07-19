@@ -103,7 +103,7 @@ warning did not describe the actual capability.
 
 Implementation status: **Resolved in ProjectForge v0.7.1**
 
-Distribution status: **Pending channel publication and clean-install verification**
+Distribution status: **Published and clean-install verified on 2026-07-19**
 
 | Finding | Resolution |
 | --- | --- |
@@ -128,5 +128,11 @@ Verification completed on 2026-07-19:
 - Source `projectforge doctor` returned ready with the real saved config and reported both detected
   macOS applications.
 
-ProjectForge v0.7.1 carries these corrections. GitHub, PyPI, and Homebrew availability remain
-release-time verification facts until each channel's clean installation passes.
+Post-publication verification confirmed:
+
+- GitHub published the immutable `v0.7.1` tag and release.
+- PyPI published both v0.7.1 artifacts; clean uv and pipx installs exposed both command aliases.
+- The published PyPI wheel kept media under `FORGE_HOME/media` and detected the supported macOS
+  applications.
+- The public Homebrew tap matched the repository formula. Upgrading from v0.7.0 to v0.7.1,
+  `brew test`, version checks, user-owned media resolution, and editor diagnostics all passed.
