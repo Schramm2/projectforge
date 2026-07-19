@@ -2,7 +2,7 @@
 
 Live roadmap for expanding Forge into a production-grade project scaffolder. Organized by theme, not strict priority.
 
-Current release baseline: ProjectForge v0.7.0.
+Current release baseline: ProjectForge v0.7.1.
 
 Items marked with [DONE] are implemented in the current repository. Planned items are intentionally
 aspirational; example commands below describe direction, not guaranteed current CLI flags. Use

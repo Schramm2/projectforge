@@ -1,8 +1,7 @@
 # Troubleshooting
 
-This guide documents current source after ProjectForge v0.7.0, including the Antigravity provider
-and privacy-safe failure handling. Older releases retain their own bundled troubleshooting
-guidance.
+This guide documents ProjectForge v0.7.1, including the Antigravity provider and privacy-safe
+failure handling. Older releases retain their own bundled troubleshooting guidance.
 
 Start with the credential-free diagnostic:
 
