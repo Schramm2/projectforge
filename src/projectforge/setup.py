@@ -433,9 +433,7 @@ def _configure_conventions_onboarding(console: Console, current_profile: str) ->
     return path.stem
 
 
-def run_setup(console: Console) -> dict:
-    """Run the interactive setup wizard. Returns the saved config dict."""
-    existing_config = load_forge_config()
+def _render_setup_intro(console: Console) -> None:
     console.print()
     console.print(
         make_panel(
@@ -450,7 +448,9 @@ def run_setup(console: Console) -> dict:
         )
     )
 
-    # --- Step 1: Detect AI CLI tools ---
+
+def _detect_available_backends(console: Console) -> list[str]:
+    """Render provider readiness and return backends safe for routing."""
     console.print()
     console.print(make_step_panel(1, 8, "Checking AI coding assistants", accent="aqua"))
 
@@ -546,12 +546,15 @@ def run_setup(console: Console) -> dict:
             )
         )
         console.print(make_panel(grouped_lines(lines), title="AI Tool Checks", accent="amber"))
+    return available
 
-    # --- Step 2: Routing summary ---
-    console.print(make_step_panel(2, 8, "Backend routing", accent="violet"))
-    _routing_summary(available, console)
 
-    # --- Step 3: Model selection per backend ---
+def _configure_backend_models(
+    console: Console,
+    available: list[str],
+    existing_config: dict,
+) -> dict[str, str]:
+    """Collect optional model overrides for each ready backend."""
     console.print(make_step_panel(3, 8, "Model preferences", accent="plum"))
 
     existing_models = existing_config.get("backend_models", {})
@@ -613,8 +616,11 @@ def run_setup(console: Console) -> dict:
         else:
             console.print(status_line("Using default models for all backends.", accent="plum"))
         console.print()
+    return backend_models
 
-    # --- Step 4: Pick preferred editor ---
+
+def _choose_preferred_editor(console: Console) -> str:
+    """Detect editors and return the user's preferred command."""
     console.print(make_step_panel(4, 8, "Detecting editors", accent="amber"))
 
     editor_table = make_table(title="Editors", accent="amber")
@@ -664,8 +670,11 @@ def run_setup(console: Console) -> dict:
         if preferred_editor is None:
             raise SystemExit(0)
         console.print()
+    return preferred_editor
 
-    # --- Step 5: Git check ---
+
+def _configure_git_identity(console: Console) -> None:
+    """Report Git readiness and optionally configure a missing global identity."""
     console.print(make_step_panel(5, 8, "Checking git", accent="aqua"))
 
     git_table = make_table(title="Git", accent="aqua")
@@ -751,7 +760,9 @@ def run_setup(console: Console) -> dict:
                     )
                 )
 
-    # --- Step 6: Docker check ---
+
+def _detect_docker(console: Console) -> bool:
+    """Report Docker availability and return whether verification can use it."""
     console.print(make_step_panel(6, 8, "Checking Docker", accent="violet"))
 
     docker_installed = shutil.which("docker") is not None
@@ -771,8 +782,11 @@ def run_setup(console: Console) -> dict:
                 accent="violet",
             )
         )
+    return docker_installed
 
-    # --- Step 7: Default project directory ---
+
+def _choose_projects_directory(console: Console, existing_config: dict) -> str:
+    """Resolve the optional default directory for future scaffolds."""
     console.print(make_step_panel(7, 8, "Default project directory", accent="plum"))
 
     existing_dir = existing_config.get("projects_dir", "")
@@ -823,8 +837,11 @@ def run_setup(console: Console) -> dict:
                 accent="plum",
             )
         )
+    return projects_dir
 
-    # --- Step 8: Conventions & media ---
+
+def _configure_conventions_and_media(console: Console, existing_config: dict) -> str:
+    """Select the active convention profile and report local media collections."""
     console.print(make_step_panel(8, 8, "Conventions & media", accent="aqua"))
 
     console.print(
@@ -874,8 +891,26 @@ def run_setup(console: Console) -> dict:
                 accent="aqua",
             )
         )
+    return conventions_profile
 
-    # --- Save config ---
+
+def run_setup(console: Console) -> dict:
+    """Run the interactive setup wizard and persist the selected defaults."""
+    existing_config = load_forge_config()
+    _render_setup_intro(console)
+
+    available = _detect_available_backends(console)
+
+    console.print(make_step_panel(2, 8, "Backend routing", accent="violet"))
+    _routing_summary(available, console)
+
+    backend_models = _configure_backend_models(console, available, existing_config)
+    preferred_editor = _choose_preferred_editor(console)
+    _configure_git_identity(console)
+    docker_installed = _detect_docker(console)
+    projects_dir = _choose_projects_directory(console, existing_config)
+    conventions_profile = _configure_conventions_and_media(console, existing_config)
+
     config = {
         "preferred_editor": preferred_editor,
         "available_backends": available,
@@ -901,5 +936,4 @@ def run_setup(console: Console) -> dict:
             accent="aqua",
         )
     )
-
     return config

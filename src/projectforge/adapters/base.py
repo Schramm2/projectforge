@@ -6,13 +6,126 @@ import subprocess
 import time
 from collections import deque
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from queue import Empty, Queue
 from threading import Thread
 
 from projectforge.execution_policy import build_provider_command
-from projectforge.protocol import AgentResult, AgentTask, DecompositionPlan, ProgressEvent
+from projectforge.protocol import (
+    AgentResult,
+    AgentTask,
+    DecompositionPlan,
+    ProgressEvent,
+    ProgressEventType,
+)
 from projectforge.subprocess_utils import PHASE_TIMEOUT, sanitize_progress_line
+
+
+@dataclass(frozen=True)
+class _TaskProgressReporter:
+    """Emit timestamped lifecycle events for one agent task."""
+
+    task_id: str
+    agent_label: str
+    callback: Callable[[ProgressEvent], None]
+
+    @classmethod
+    def for_task(
+        cls,
+        task: AgentTask,
+        callback: Callable[[ProgressEvent], None],
+    ) -> _TaskProgressReporter:
+        description = task.description
+        if len(description) > 60:
+            description = description[:57].rstrip() + "..."
+        return cls(task.id, f"{task.id}: {description}", callback)
+
+    def emit(self, event_type: ProgressEventType, message: str) -> None:
+        self.callback(
+            ProgressEvent(
+                task_id=self.task_id,
+                agent_label=self.agent_label,
+                event_type=event_type,
+                message=message,
+                timestamp=time.time(),
+            )
+        )
+
+
+@dataclass(frozen=True)
+class _ProcessOutcome:
+    """Terminal state collected from one streamed provider subprocess."""
+
+    returncode: int
+    duration: float
+    timed_out: bool
+    last_lines: tuple[str, ...]
+
+
+def _stream_process(
+    process: subprocess.Popen,
+    *,
+    started_at: float,
+    reporter: _TaskProgressReporter,
+) -> _ProcessOutcome:
+    line_queue: Queue[str | None] = Queue()
+
+    def read_stdout() -> None:
+        assert process.stdout is not None
+        for raw in process.stdout:
+            line_queue.put(raw)
+        line_queue.put(None)
+
+    reader = Thread(target=read_stdout, daemon=True)
+    reader.start()
+    last_lines: deque[str] = deque(maxlen=20)
+    timed_out = False
+    deadline = started_at + PHASE_TIMEOUT
+
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            timed_out = True
+            process.kill()
+            break
+        try:
+            item = line_queue.get(timeout=min(remaining, 1.0))
+        except Empty:
+            continue
+        if item is None:
+            break
+        clean = sanitize_progress_line(item)
+        if clean:
+            last_lines.append(clean)
+            reporter.emit("progress", clean)
+
+    reader.join(timeout=5)
+    return _ProcessOutcome(
+        returncode=process.wait(),
+        duration=time.monotonic() - started_at,
+        timed_out=timed_out,
+        last_lines=tuple(last_lines),
+    )
+
+
+def _agent_result(
+    task: AgentTask,
+    *,
+    summary: str,
+    success: bool,
+    duration: float,
+    returncode: int,
+) -> AgentResult:
+    return AgentResult(
+        task_id=task.id,
+        files_created=[],
+        files_modified=[],
+        summary=summary,
+        success=success,
+        duration=duration,
+        returncode=returncode,
+    )
 
 
 class CLIAdapterBase:
@@ -38,10 +151,6 @@ class CLIAdapterBase:
         self.allow_unsafe = allow_unsafe
         self.phase_brief: str = ""  # Full phase prompt — set by orchestrator
 
-    # ------------------------------------------------------------------
-    # ForgeAgent.execute
-    # ------------------------------------------------------------------
-
     def execute(
         self,
         task: AgentTask,
@@ -49,131 +158,66 @@ class CLIAdapterBase:
         on_progress: Callable[[ProgressEvent], None],
     ) -> AgentResult:
         """Run the backend CLI as a subprocess and stream progress events."""
-        prompt = self.build_prompt(task)
-        cmd = self.build_cmd(prompt, model=task.model)
-        # Use a short human-readable label: truncate description to ~60 chars
-        desc = task.description
-        if len(desc) > 60:
-            desc = desc[:57].rstrip() + "..."
-        label = f"{task.id}: {desc}"
-
-        def emit(event_type: str, message: str) -> None:
-            on_progress(
-                ProgressEvent(
-                    task_id=task.id,
-                    agent_label=label,
-                    event_type=event_type,
-                    message=message,
-                    timestamp=time.time(),
-                )
-            )
-
-        emit("started", "Working...")
-
-        start = time.monotonic()
-        last_lines: deque[str] = deque(maxlen=20)
+        command = self.build_cmd(self.build_prompt(task), model=task.model)
+        reporter = _TaskProgressReporter.for_task(task, on_progress)
+        reporter.emit("started", "Working...")
+        started_at = time.monotonic()
 
         try:
-            proc = subprocess.Popen(
-                cmd,
+            process = subprocess.Popen(
+                command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 cwd=str(project_dir),
                 text=True,
             )
         except FileNotFoundError:
-            duration = time.monotonic() - start
             summary = (
                 "The selected AI tool could not start. Run `forge doctor`, fix the reported "
                 "setup issue, then retry with `--resume`."
             )
-            emit("failed", summary)
-            return AgentResult(
-                task_id=task.id,
-                files_created=[],
-                files_modified=[],
+            reporter.emit("failed", summary)
+            return _agent_result(
+                task,
                 summary=summary,
                 success=False,
-                duration=duration,
+                duration=time.monotonic() - started_at,
                 returncode=-1,
             )
 
-        # Stream stdout on a reader thread so we can enforce PHASE_TIMEOUT.
-        line_queue: Queue[str | None] = Queue()
-
-        def _reader() -> None:
-            assert proc.stdout is not None
-            for raw in proc.stdout:
-                line_queue.put(raw)
-            line_queue.put(None)  # sentinel
-
-        reader = Thread(target=_reader, daemon=True)
-        reader.start()
-
-        timed_out = False
-        deadline = start + PHASE_TIMEOUT
-
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                timed_out = True
-                proc.kill()
-                break
-            try:
-                item = line_queue.get(timeout=min(remaining, 1.0))
-            except Empty:
-                continue
-            if item is None:
-                break
-            clean = sanitize_progress_line(item)
-            if clean:
-                last_lines.append(clean)
-                emit("progress", clean)
-
-        reader.join(timeout=5)
-        returncode = proc.wait()
-        duration = time.monotonic() - start
-
-        if timed_out:
+        outcome = _stream_process(process, started_at=started_at, reporter=reporter)
+        if outcome.timed_out:
             summary = (
                 "This task took longer than allowed. Your completed work is safe; "
                 "retry with `--resume`."
             )
-            emit("failed", summary)
-            return AgentResult(
-                task_id=task.id,
-                files_created=[],
-                files_modified=[],
+            reporter.emit("failed", summary)
+            return _agent_result(
+                task,
                 summary=summary,
                 success=False,
-                duration=duration,
-                returncode=returncode,
+                duration=outcome.duration,
+                returncode=outcome.returncode,
             )
 
-        success = returncode == 0
+        success = outcome.returncode == 0
         if success:
-            summary = last_lines[-1] if last_lines else "Completed"
-            emit("completed", summary)
+            summary = outcome.last_lines[-1] if outcome.last_lines else "Completed"
+            reporter.emit("completed", summary)
         else:
             summary = (
                 "This task stopped before it finished. Your completed work is safe; "
                 "run `forge doctor`, then retry with `--resume`."
             )
-            emit("failed", summary)
+            reporter.emit("failed", summary)
 
-        return AgentResult(
-            task_id=task.id,
-            files_created=[],
-            files_modified=[],
+        return _agent_result(
+            task,
             summary=summary,
             success=success,
-            duration=duration,
-            returncode=returncode,
+            duration=outcome.duration,
+            returncode=outcome.returncode,
         )
-
-    # ------------------------------------------------------------------
-    # Subclass interface
-    # ------------------------------------------------------------------
 
     def build_prompt(self, task: AgentTask) -> str:
         raise NotImplementedError

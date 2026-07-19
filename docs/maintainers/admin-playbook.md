@@ -124,8 +124,8 @@ In practice, a new stack usually requires changes in all of these places:
   Add the stack's scaffold phases.
 - `src/projectforge/prompt_builder.py`
   Add the human-readable stack label.
-- `src/projectforge/cli.py`
-  Add CLI aliases.
+- `src/projectforge/scaffold_request.py`
+  Add CLI aliases to `STACK_ALIASES`.
 - `src/projectforge/scaffold_options.py`
   Add CI support and optional auth support if applicable.
 - `tests/`
