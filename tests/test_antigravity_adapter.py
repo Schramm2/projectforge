@@ -46,6 +46,13 @@ class TestAntigravityAdapterBuildCmd:
         cmd = adapter.build_cmd("my test prompt")
         assert "my test prompt" in cmd
 
+    def test_workspace_is_bound_for_live_execution(self, tmp_path):
+        adapter = AntigravityAdapter()
+        adapter.project_dir = tmp_path
+        cmd = adapter.build_cmd("my test prompt")
+        assert cmd[cmd.index("--add-dir") + 1] == str(tmp_path.resolve())
+        assert cmd[-2:] == ["--print", "my test prompt"]
+
     def test_without_model(self):
         adapter = AntigravityAdapter()
         cmd = adapter.build_cmd("some prompt", model=None)

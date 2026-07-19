@@ -44,6 +44,11 @@ class TestCodexAdapterBuildCmd:
         cmd = adapter.build_cmd("irrelevant")
         assert "--dangerously-bypass-approvals-and-sandbox" not in cmd
         assert cmd[cmd.index("--sandbox") + 1] == "workspace-write"
+        assert "--ephemeral" in cmd
+        assert "--ignore-user-config" in cmd
+        # Forge scaffolds into fresh, non-git directories; without this flag
+        # `codex exec` refuses to start.
+        assert "--skip-git-repo-check" in cmd
 
     def test_prompt_is_included(self):
         adapter = CodexAdapter()

@@ -24,6 +24,7 @@ def test_claude_cmd_basic():
     cmd = _build_cmd("claude", "do stuff")
     assert cmd == [
         "claude",
+        "--safe-mode",
         "-p",
         "--permission-mode",
         "acceptEdits",
@@ -36,6 +37,7 @@ def test_claude_cmd_with_model():
     cmd = _build_cmd("claude", "do stuff", model="opus")
     assert cmd == [
         "claude",
+        "--safe-mode",
         "-p",
         "--permission-mode",
         "acceptEdits",
@@ -81,6 +83,11 @@ def test_codex_cmd_basic():
         "--sandbox",
         "workspace-write",
         "exec",
+        "--skip-git-repo-check",
+        "--ephemeral",
+        "--ignore-user-config",
+        "--color",
+        "never",
         "do stuff",
     ]
 
@@ -94,10 +101,27 @@ def test_codex_cmd_with_model():
         "--sandbox",
         "workspace-write",
         "exec",
+        "--skip-git-repo-check",
+        "--ephemeral",
+        "--ignore-user-config",
+        "--color",
+        "never",
         "--model",
         "o3",
         "do stuff",
     ]
+
+
+def test_provider_commands_bind_an_explicit_workspace(tmp_path):
+    claude = _build_cmd("claude", "do stuff", project_dir=tmp_path)
+    assert "--safe-mode" in claude
+
+    codex = _build_cmd("codex", "do stuff", project_dir=tmp_path)
+    assert codex[codex.index("--cd") + 1] == str(tmp_path.resolve())
+
+    antigravity = _build_cmd("antigravity", "do stuff", project_dir=tmp_path)
+    assert antigravity[antigravity.index("--add-dir") + 1] == str(tmp_path.resolve())
+    assert antigravity[-2:] == ["--print", "do stuff"]
 
 
 def test_unknown_backend_returns_empty():
@@ -122,6 +146,24 @@ def test_run_ai_executes_provider_command_and_returns_integer_compatible_exit(
     assert (tmp_path / "generated").is_dir()
 
 
+def test_run_ai_gives_provider_no_inherited_stdin(monkeypatch, tmp_path):
+    # Headless providers receive their prompt as an argument and must never
+    # block reading Forge's stdin. Popen passes stdin=DEVNULL so a child that
+    # reads stdin gets immediate EOF instead of hanging on the terminal.
+    monkeypatch.setattr(
+        "projectforge.runner._build_cmd",
+        lambda *_args, **_kwargs: [
+            sys.executable,
+            "-c",
+            "import sys; sys.exit(0 if sys.stdin.read() == '' else 3)",
+        ],
+    )
+
+    result = run_ai("codex", "prompt", tmp_path / "generated", label="Architecture & Core")
+
+    assert result == 0
+
+
 def test_run_ai_classifies_provider_failure_without_echoing_output(
     monkeypatch,
     tmp_path,
@@ -142,6 +184,30 @@ def test_run_ai_classifies_provider_failure_without_echoing_output(
     assert result == 9
     assert result.failure_category == "authentication"
     assert private_output not in capsys.readouterr().out
+
+
+def test_run_ai_treats_antigravity_headless_permission_as_failure(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(
+        "projectforge.runner._build_cmd",
+        lambda *_args, **_kwargs: [
+            sys.executable,
+            "-c",
+            "print('no output produced: write_file permission denied in headless mode')",
+        ],
+    )
+
+    result = run_ai(
+        "antigravity",
+        "prompt",
+        tmp_path / "generated",
+        label="Frontend & UI",
+    )
+
+    assert result == 1
+    assert result.failure_category == "permission"
 
 
 def test_run_ai_parallel_preserves_phase_order_and_failure_categories(monkeypatch, tmp_path):
@@ -265,9 +331,7 @@ def test_initialize_git_repository_creates_unborn_main_branch(tmp_path):
 def test_ensure_git_init_commits_final_changes_after_provider_commit(tmp_path):
     project_dir = tmp_path / "demo"
     assert initialize_git_repository(project_dir) is True
-    subprocess.run(
-        ["git", "config", "user.name", "Forge Test"], cwd=project_dir, check=True
-    )
+    subprocess.run(["git", "config", "user.name", "Forge Test"], cwd=project_dir, check=True)
     subprocess.run(
         ["git", "config", "user.email", "forge-test"],
         cwd=project_dir,
