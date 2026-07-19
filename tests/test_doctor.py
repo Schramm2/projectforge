@@ -57,13 +57,17 @@ def test_doctor_report_is_deterministic_and_excludes_provider_detail(monkeypatch
         "deterministic_status": True,
         "default_model": "provider_default",
         "approval_modes": {
-            "safe": "workspace-write",
-            "plan": "read-only",
+            "safe": "cd + ephemeral workspace-write (ambient config ignored)",
+            "plan": "cd + ephemeral read-only (ambient config ignored)",
             "unsafe": "bypass approvals and sandbox",
         },
         "unsafe_requires_consent": True,
     }
     assert report["providers"]["antigravity"]["capabilities"]["deterministic_status"] is True
+    assert (
+        "headless write rule required"
+        in report["providers"]["antigravity"]["capabilities"]["approval_modes"]["safe"]
+    )
     assert report["providers"]["antigravity"]["install_url"] == (
         "https://antigravity.google/docs/cli-install"
     )

@@ -299,6 +299,21 @@ def test_verify_prompts_exclude_frontend_only_guidance(stack, backend):
     assert "startup or smoke command" in prompt
 
 
+@pytest.mark.parametrize("backend", ["claude", "antigravity", "codex"])
+def test_python_verify_prompts_enforce_handoff_files_and_real_exit_codes(backend):
+    prompt = build_phase_prompt(
+        ["verify"],
+        ["architecture", "tests", "verify"],
+        {**_BASE_ANSWERS, "stack": "python-cli", "demo_mode": True},
+        "conventions",
+        backend=backend,
+    )
+
+    assert "files named in CLAUDE.md" in prompt
+    assert "uv.lock" in prompt
+    assert "Do not mask failing commands" in prompt
+
+
 def test_phase_prompt_verify_only_uses_codex_guidance_for_codex_backend():
     prompt = build_phase_prompt(
         ["verify"],

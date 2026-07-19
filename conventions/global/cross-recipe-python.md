@@ -5,6 +5,7 @@
 - Line length: 100
 - Python target: 3.12
 - Package manager: uv
+- Commit `uv.lock` for reproducible application and CLI installs; never add it to `.gitignore`
 - MyPy with --strict for type checking
 - pytest for testing, pytest-cov for coverage
 - Include a .pre-commit-config.yaml with ruff hooks

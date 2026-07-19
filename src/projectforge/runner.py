@@ -16,7 +16,11 @@ from rich.text import Text
 
 from projectforge.conventions import FORGE_DIR
 from projectforge.execution_policy import build_provider_command
-from projectforge.failure_taxonomy import classify_provider_failure
+from projectforge.failure_taxonomy import (
+    classify_provider_failure,
+    is_headless_permission_failure,
+)
+from projectforge.provider_permissions import workspace_write_permission
 from projectforge.subprocess_utils import (
     PHASE_TIMEOUT,
     format_activity,
@@ -90,6 +94,7 @@ def _build_cmd(
     *,
     approval_mode: str = "safe",
     allow_unsafe: bool = False,
+    project_dir: Path | None = None,
 ) -> list[str]:
     """Build the subprocess command for the given backend."""
     return build_provider_command(
@@ -98,6 +103,7 @@ def _build_cmd(
         model,
         approval_mode=approval_mode,
         allow_unsafe=allow_unsafe,
+        project_dir=project_dir,
     )
 
 
@@ -248,6 +254,7 @@ def _monitor_provider(
 
 def _render_provider_completion(
     *,
+    backend: str,
     display_label: str,
     elapsed: float,
     returncode: int,
@@ -258,6 +265,15 @@ def _render_provider_completion(
     failure = (
         classify_provider_failure(failure_input, returncode=returncode) if returncode != 0 else None
     )
+    if (
+        returncode == 0
+        and backend == "antigravity"
+        and is_headless_permission_failure(failure_input)
+    ):
+        # Antigravity can exit 0 after an assistant turn that was unable to
+        # perform a denied tool call in print mode.
+        returncode = 1
+        failure = classify_provider_failure(failure_input, returncode=returncode)
     if failure is not None and not verbose:
         console.print(
             make_panel(
@@ -278,11 +294,15 @@ def _render_provider_completion(
         )
 
     if verbose:
+        outcome_label = "completed" if failure is None else "stopped"
         console.print(
-            status_line(f"{display_label} completed in {elapsed:.1f}s (exit {returncode})")
+            status_line(f"{display_label} {outcome_label} in {elapsed:.1f}s (exit {returncode})")
         )
     else:
-        console.print(status_line(f"{display_label} finished in {elapsed:.0f}s", accent=accent))
+        outcome_label = "finished" if failure is None else "stopped"
+        console.print(
+            status_line(f"{display_label} {outcome_label} in {elapsed:.0f}s", accent=accent)
+        )
     return ProviderExit(returncode, failure.category if failure is not None else None)
 
 
@@ -322,6 +342,7 @@ def run_ai(
         model,
         approval_mode=approval_mode,
         allow_unsafe=allow_unsafe,
+        project_dir=project_dir,
     )
     if not cmd:
         console.print(
@@ -340,33 +361,36 @@ def run_ai(
     accent = _phase_accent(backend)
     output = _ProviderOutput(display_label, backend)
 
-    try:
-        proc = subprocess.Popen(
-            cmd,
-            cwd=project_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-        )
-    except FileNotFoundError:
-        failure = classify_provider_failure("command not found", returncode=None)
-        console.print(status_line(failure.summary, accent="amber"))
-        console.print(muted(failure.remediation))
-        return ProviderExit(127, failure.category)
+    with workspace_write_permission(backend, approval_mode, project_dir):
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                cwd=project_dir,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+            )
+        except FileNotFoundError:
+            failure = classify_provider_failure("command not found", returncode=None)
+            console.print(status_line(failure.summary, accent="amber"))
+            console.print(muted(failure.remediation))
+            return ProviderExit(127, failure.category)
 
-    timeout_exit = _monitor_provider(
-        proc,
-        output,
-        display_label=display_label,
-        accent=accent,
-        phase_context=phase_context,
-        started_at=started_at,
-        verbose=verbose,
-    )
+        timeout_exit = _monitor_provider(
+            proc,
+            output,
+            display_label=display_label,
+            accent=accent,
+            phase_context=phase_context,
+            started_at=started_at,
+            verbose=verbose,
+        )
     if timeout_exit is not None:
         return timeout_exit
 
     assert proc.returncode is not None
     return _render_provider_completion(
+        backend=backend,
         display_label=display_label,
         elapsed=time.monotonic() - started_at,
         returncode=proc.returncode,
@@ -505,6 +529,7 @@ class _ParallelExecution:
             phase.model,
             approval_mode=phase.approval_mode,
             allow_unsafe=phase.allow_unsafe,
+            project_dir=self.project_dir,
         )
         if not command:
             with self.lock:
@@ -514,52 +539,61 @@ class _ParallelExecution:
         started_at = time.monotonic()
         with self.lock:
             self.trackers[phase.label].start = started_at
-        try:
-            process = subprocess.Popen(
-                command,
-                cwd=self.project_dir,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-            )
-        except FileNotFoundError:
-            with self.lock:
-                tracker = self.trackers[phase.label]
-                tracker.returncode = 1
-                tracker.summary = (
-                    "The selected AI tool could not start. Run `forge doctor`, then retry."
+        with workspace_write_permission(phase.backend, phase.approval_mode, self.project_dir):
+            try:
+                process = subprocess.Popen(
+                    command,
+                    cwd=self.project_dir,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
                 )
-            return phase.label, ProviderExit(127, "missing_binary")
-
-        reader = threading.Thread(
-            target=self._read_output,
-            args=(phase.label, process.stdout),
-            daemon=True,
-        )
-        reader.start()
-        while process.poll() is None:
-            if time.monotonic() - started_at > PHASE_TIMEOUT:
-                process.kill()
-                process.wait()
-                reader.join(timeout=5)
+            except FileNotFoundError:
                 with self.lock:
                     tracker = self.trackers[phase.label]
                     tracker.returncode = 1
-                    tracker.failure_category = "timeout"
-                return phase.label, ProviderExit(124, "timeout")
-            time.sleep(0.5)
+                    tracker.summary = (
+                        "The selected AI tool could not start. Run `forge doctor`, then retry."
+                    )
+                return phase.label, ProviderExit(127, "missing_binary")
 
-        reader.join(timeout=5)
-        assert process.returncode is not None
+            reader = threading.Thread(
+                target=self._read_output,
+                args=(phase.label, process.stdout),
+                daemon=True,
+            )
+            reader.start()
+            while process.poll() is None:
+                if time.monotonic() - started_at > PHASE_TIMEOUT:
+                    process.kill()
+                    process.wait()
+                    reader.join(timeout=5)
+                    with self.lock:
+                        tracker = self.trackers[phase.label]
+                        tracker.returncode = 1
+                        tracker.failure_category = "timeout"
+                    return phase.label, ProviderExit(124, "timeout")
+                time.sleep(0.5)
+
+            reader.join(timeout=5)
+            assert process.returncode is not None
+
         with self.lock:
             tracker = self.trackers[phase.label]
-            tracker.returncode = process.returncode
-            if process.returncode != 0:
+            failed_headless_action = (
+                phase.backend == "antigravity"
+                and process.returncode == 0
+                and is_headless_permission_failure(tracker.last_line)
+            )
+            effective_returncode = 1 if failed_headless_action else process.returncode
+            tracker.returncode = effective_returncode
+            if effective_returncode != 0:
                 tracker.failure_category = classify_provider_failure(
                     tracker.last_line,
-                    returncode=process.returncode,
+                    returncode=effective_returncode,
                 ).category
             failure_category = tracker.failure_category
-        return phase.label, ProviderExit(process.returncode, failure_category)
+        return phase.label, ProviderExit(effective_returncode, failure_category)
 
     def _render_verbose_output(self) -> None:
         for phase in self.phases:
@@ -595,59 +629,106 @@ def reset_project_dir(project_dir: Path) -> None:
     project_dir.mkdir(parents=True, exist_ok=True)
 
 
-def ensure_git_init(project_dir: Path) -> bool:
-    """Verify git was initialized with at least one commit; if not, init and commit.
+def _ensure_local_git_excludes(project_dir: Path) -> bool:
+    """Keep Forge and local agent runtime state out of generated commits."""
+    exclude_path = project_dir / ".git" / "info" / "exclude"
+    if not exclude_path.parent.is_dir():
+        return True
+    try:
+        existing = exclude_path.read_text() if exclude_path.is_file() else ""
+        missing = [
+            pattern
+            for pattern in (".forge/", ".code-review-graph/")
+            if pattern not in existing.splitlines()
+        ]
+        if missing:
+            prefix = "" if not existing or existing.endswith("\n") else "\n"
+            exclude_path.write_text(existing + prefix + "\n".join(missing) + "\n")
+    except OSError:
+        console.print(
+            status_line(
+                "Forge could not protect its local runtime files from Git. Check that the "
+                "project's `.git` folder is writable, then repeat the scaffold command.",
+                accent="amber",
+            )
+        )
+        return False
+    return True
 
-    Returns:
-        True if the project has a git repo with at least one commit, False otherwise.
-    """
+
+def initialize_git_repository(project_dir: Path) -> bool:
+    """Create the main-branch repository providers require, without committing files."""
+    project_dir.mkdir(parents=True, exist_ok=True)
     git_dir = project_dir / ".git"
+    if git_dir.exists():
+        return _ensure_local_git_excludes(project_dir)
 
     try:
         git_check = subprocess.run(["git", "--version"], capture_output=True, text=True)
     except FileNotFoundError:
+        git_check = None
+    if git_check is None or git_check.returncode != 0:
         console.print(
             status_line(
-                "Git is not installed, so Forge could not create the first commit. Install "
-                "Git, then initialize and commit the project manually.",
+                "Git is required before Forge can start provider work. Install Git, then "
+                "repeat the scaffold command.",
                 accent="amber",
             )
         )
         return False
 
-    if git_check.returncode != 0:
-        console.print(
-            status_line(
-                "Forge could not use Git in the project folder. Run `git status` there, fix "
-                "the reported issue, then create the first commit manually.",
-                accent="amber",
-            )
-        )
-        return False
-
-    if not git_dir.exists():
-        console.print(status_line("Git not initialized by AI — setting up...", accent="violet"))
-        result = subprocess.run(["git", "init"], cwd=project_dir, capture_output=True, text=True)
-        if result.returncode != 0:
-            console.print(
-                status_line(
-                    "Forge could not start version control. Run `git init` in the project "
-                    "folder, then create the first commit manually.",
-                    accent="amber",
-                )
-            )
-            return False
-
-    # Check whether there is at least one commit
-    has_commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
+    result = subprocess.run(
+        ["git", "init", "-b", "main"],
         cwd=project_dir,
         capture_output=True,
+        text=True,
     )
-    if has_commit.returncode == 0:
+    if result.returncode != 0:
+        console.print(
+            status_line(
+                "Forge could not start version control in the project folder. Check that the "
+                "folder is writable, then repeat the scaffold command.",
+                accent="amber",
+            )
+        )
+        return False
+    return _ensure_local_git_excludes(project_dir)
+
+
+def ensure_git_init(project_dir: Path) -> bool:
+    """Ensure the generated project has a repository and one initial commit."""
+    if not initialize_git_repository(project_dir):
+        return False
+
+    # Check whether there is at least one commit
+    has_commit = (
+        subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=project_dir,
+            capture_output=True,
+        ).returncode
+        == 0
+    )
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=project_dir,
+        capture_output=True,
+        text=True,
+    )
+    if status.returncode != 0:
+        console.print(
+            status_line(
+                "Forge could not inspect the generated repository. Run `git status` in the "
+                "project folder, then commit any remaining files manually.",
+                accent="amber",
+            )
+        )
+        return False
+    if has_commit and not status.stdout.strip():
         return True
 
-    console.print(status_line("No commits found — creating initial commit...", accent="violet"))
+    action = "Finalizing generated changes..." if has_commit else "Creating initial commit..."
+    console.print(status_line(action, accent="violet"))
     result = subprocess.run(["git", "add", "-A"], cwd=project_dir, capture_output=True, text=True)
     if result.returncode != 0:
         console.print(
@@ -659,8 +740,13 @@ def ensure_git_init(project_dir: Path) -> bool:
         )
         return False
 
+    commit_message = (
+        "Finalize scaffold (via ProjectForge)"
+        if has_commit
+        else "Initial commit (via ProjectForge)"
+    )
     result = subprocess.run(
-        ["git", "commit", "-m", "Initial commit (via ProjectForge)"],
+        ["git", "commit", "-m", commit_message],
         cwd=project_dir,
         capture_output=True,
         text=True,
@@ -675,7 +761,8 @@ def ensure_git_init(project_dir: Path) -> bool:
         )
         return False
 
-    console.print(status_line("Git initialized with initial commit", accent="aqua"))
+    message = "Generated changes committed" if has_commit else "Git initialized with initial commit"
+    console.print(status_line(message, accent="aqua"))
     return True
 
 

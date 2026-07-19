@@ -19,13 +19,14 @@ prepare: "1  Prepare" {
   context: "4  Load conventions, design,\nmedia, and quality" {class: card}
   safety: "5  Scan for secrets" {class: card}
   prompts: "6  Build phase prompts" {class: data}
+  git: "7  Initialize live Git repo\non main" {class: card}
 }
 
 execute: "2  Execute" {
   class: lavender-zone
   grid-rows: 1
-  copy: "1  Copy selected media" {class: card}
-  progress: "2  Initialize resumable progress" {class: data}
+  progress: "1  Initialize resumable progress" {class: data}
+  copy: "2  Copy selected media" {class: card}
   phases: "3  Run provider phases" {class: card}
 }
 
@@ -33,11 +34,12 @@ finish: "3  Verify and hand off" {
   class: lavender-zone
   grid-rows: 2
   manifest: "1  Write manifest and snapshot" {class: data}
-  git: "2  Initialize Git if needed" {class: card}
-  verify: "3  Run generated-project checks" {class: card}
-  records: "4  Write verification and quality signals" {class: data}
-  hook: "5  Run optional post-scaffold hook" {class: muted}
-  dashboard: "6  Dashboard, card, badge,\nsound, and editor" {class: accent}
+  verify: "2  Run generated-project checks" {class: card}
+  records: "3  Write verification and quality signals" {class: data}
+  hook: "4  Run optional post-scaffold hook" {class: muted}
+  artifacts: "5  Write card and README badge" {class: data}
+  commit: "6  Commit final generated changes" {class: card}
+  dashboard: "7  Dashboard, sound, and editor" {class: accent}
 }
 
 learning: "Local learning for future runs" {

@@ -263,6 +263,70 @@ def test_verify_scaffold_no_health_for_cli(mock_install, mock_check, tmp_path):
     assert "health" not in check_names
 
 
+@patch("projectforge.verify._run_check")
+@patch("projectforge.verify._install_deps")
+def test_python_cli_verification_runs_entrypoint_smoke(mock_install, mock_check, tmp_path):
+    (tmp_path / "pyproject.toml").write_text(
+        """[project]
+name = "atlas"
+version = "0.1.0"
+
+[project.scripts]
+atlas = "atlas.cli:app"
+"""
+    )
+    (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    (tmp_path / "uv.lock").write_text("version = 1\n")
+    mock_install.return_value = CheckResult(name="install", passed=True)
+    mock_check.side_effect = lambda name, *_args, **_kwargs: CheckResult(name=name, passed=True)
+
+    report = verify_scaffold("python-cli", tmp_path)
+
+    commands = [call.args[1] for call in mock_check.call_args_list]
+    assert "uv run atlas --help" in commands
+    assert any(check.name == "smoke" for check in report.checks)
+
+
+@patch("projectforge.verify._run_check")
+@patch("projectforge.verify._install_deps")
+def test_python_cli_verification_rejects_missing_pre_commit_config(
+    mock_install, mock_check, tmp_path
+):
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "atlas"\nversion = "0.1.0"\n'
+    )
+    (tmp_path / "uv.lock").write_text("version = 1\n")
+    mock_install.return_value = CheckResult(name="install", passed=True)
+    mock_check.return_value = CheckResult(name="check", passed=True)
+
+    report = verify_scaffold("python-cli", tmp_path)
+
+    project_files = next(check for check in report.checks if check.name == "project-files")
+    assert project_files.passed is False
+    assert ".pre-commit-config.yaml" in project_files.remediation
+    assert report.all_passed is False
+
+
+@patch("projectforge.verify._run_check")
+@patch("projectforge.verify._install_deps")
+def test_python_cli_verification_rejects_ignored_uv_lock(mock_install, mock_check, tmp_path):
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "atlas"\nversion = "0.1.0"\n'
+    )
+    (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    (tmp_path / "uv.lock").write_text("version = 1\n")
+    (tmp_path / ".gitignore").write_text("uv.lock\n")
+    mock_install.return_value = CheckResult(name="install", passed=True)
+    mock_check.return_value = CheckResult(name="check", passed=True)
+
+    report = verify_scaffold("python-cli", tmp_path)
+
+    project_files = next(check for check in report.checks if check.name == "project-files")
+    assert project_files.passed is False
+    assert "uv.lock" in project_files.remediation
+    assert report.all_passed is False
+
+
 @patch("projectforge.verify._check_health")
 @patch("projectforge.verify._run_check")
 def test_python_verification_uses_generated_project_metadata(mock_check, mock_health, tmp_path):
@@ -280,6 +344,8 @@ dev = ["pytest", "ruff", "mypy"]
 testpaths = ["tests"]
 """
     )
+    (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    (tmp_path / "uv.lock").write_text("version = 1\n")
     mock_check.return_value = CheckResult(name="check", passed=True)
     mock_health.return_value = CheckResult(name="health", passed=True)
 

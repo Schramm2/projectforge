@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 APPROVAL_MODES = ("safe", "plan", "unsafe")
 
 
@@ -27,9 +29,15 @@ def build_provider_command(
     *,
     approval_mode: str = "safe",
     allow_unsafe: bool = False,
+    project_dir: Path | None = None,
 ) -> list[str]:
-    """Build one provider command from a stable Forge approval mode."""
+    """Build one provider command from a stable Forge approval mode.
+
+    ``project_dir`` is explicit for providers whose CLI does not reliably use
+    the subprocess working directory as its workspace (notably Antigravity).
+    """
     validate_approval_mode(approval_mode, allow_unsafe=allow_unsafe)
+    workspace = str(project_dir.resolve()) if project_dir is not None else None
 
     if backend == "claude":
         provider_mode = {
@@ -37,29 +45,51 @@ def build_provider_command(
             "plan": "plan",
             "unsafe": "bypassPermissions",
         }[approval_mode]
+        # Safe mode disables ambient hooks, skills, plugins, MCP, and memory
+        # while preserving subscription authentication. Forge supplies its
+        # effective conventions explicitly in the prompt.
         cmd = [
             "claude",
+            "--safe-mode",
             "-p",
             "--permission-mode",
             provider_mode,
             "--no-session-persistence",
         ]
     elif backend == "codex":
+        cmd = ["codex"]
+        if workspace:
+            cmd.extend(["--cd", workspace])
         if approval_mode == "unsafe":
-            cmd = ["codex", "--dangerously-bypass-approvals-and-sandbox", "exec"]
+            cmd.extend(["--dangerously-bypass-approvals-and-sandbox", "exec"])
         else:
             sandbox = "read-only" if approval_mode == "plan" else "workspace-write"
-            cmd = [
-                "codex",
-                "--ask-for-approval",
-                "never",
-                "--sandbox",
-                sandbox,
-                "exec",
-            ]
+            cmd.extend(
+                [
+                    "--ask-for-approval",
+                    "never",
+                    "--sandbox",
+                    sandbox,
+                    "exec",
+                ]
+            )
+        # Forge scaffolds into fresh directories that are not yet git repos,
+        # and git init only runs as a post-scaffold step. Without this flag
+        # `codex exec` refuses to start ("not inside a trusted directory"),
+        # which breaks every safe/plan scaffold.
+        cmd.append("--skip-git-repo-check")
+        # Forge does not implement provider-session resume. Keep scripted
+        # calls ephemeral and ignore ambient user config/exec rules so the
+        # explicit Forge policy remains the effective boundary.
+        cmd.extend(["--ephemeral", "--ignore-user-config", "--color", "never"])
     elif backend == "antigravity":
+        cmd = ["agy"]
+        if workspace:
+            # `agy` can otherwise attach a print-mode call to its own scratch
+            # project even when the subprocess cwd is the Forge target.
+            cmd.extend(["--add-dir", workspace])
         provider_mode = "plan" if approval_mode == "plan" else "accept-edits"
-        cmd = ["agy", "--mode", provider_mode]
+        cmd.extend(["--mode", provider_mode])
         if approval_mode in {"safe", "plan"}:
             cmd.append("--sandbox")
         else:

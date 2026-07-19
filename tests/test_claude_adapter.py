@@ -38,6 +38,7 @@ class TestClaudeAdapterBuildCmd:
         cmd = adapter.build_cmd("some prompt")
         assert cmd[0] == "claude"
         assert "-p" in cmd
+        assert "--safe-mode" in cmd
         assert cmd[cmd.index("--permission-mode") + 1] == "acceptEdits"
 
     def test_without_model(self):
